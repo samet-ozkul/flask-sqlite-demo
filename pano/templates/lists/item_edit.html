@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Maddeyi düzenle{% endblock %}
+{% block content %}
+{% call ui.page_header("Maddeyi düzenle", lst.name, back=url_for('lists.detail', list_id=lst.id)) %}
+  {{ ui.delete_button(url_for('lists.delete_item', item_id=item.id), "Sil", "Madde silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    <input type="hidden" name="next" value="{{ url_for('lists.detail', list_id=lst.id) }}">
+    {{ ui.field("Madde", "text", item.text, required=True, attrs='maxlength="200"') }}
+    {% if lst.kind == 'shopping' %}
+      {{ ui.field("Miktar", "qty", item.qty, attrs='maxlength="30"') }}
+      {{ ui.field("Son tarih", "due_date", item.due_date, type="date") }}
+    {% else %}
+      <div class="form-row">
+        {{ ui.field("Son tarih", "due_date", item.due_date, type="date") }}
+        {{ ui.field("Saat", "due_time", item.due_time, type="time", hint="Boşsa " ~ default_time) }}
+      </div>
+      <label class="field">
+        <span>🔔 Telegram hatırlatması</span>
+        <select name="remind">
+          {% for v, label in remind_options %}
+            <option value="{{ v }}" {% if (item.remind_before is none and v == '') or (item.remind_before is not none and v == item.remind_before | string) %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <small class="muted">
+          “… önce” seçilirse iki mesaj gelir: süre yaklaşınca ve zamanı gelince.
+          {% if not telegram_enabled %}Yönetici henüz Telegram botunu ayarlamamış.
+          {% elif not g.user.telegram_chat_id %}<a href="{{ url_for('settings.index') }}#telegram">Telegram'ı bağla</a>.{% endif %}
+        </small>
+      </label>
+      {% if item.pre_sent_at or item.due_sent_at %}
+        <p class="muted small">Gönderilen: {% if item.pre_sent_at and item.remind_before %}⏰ {{ item.pre_sent_at | localdt }} {% endif %}{% if item.due_sent_at %}🔔 {{ item.due_sent_at | localdt }}{% endif %}.
+          Tarih, saat ya da hatırlatma değişirse yeniden gönderilir.</p>
+      {% endif %}
+    {% endif %}
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+{% endblock %}

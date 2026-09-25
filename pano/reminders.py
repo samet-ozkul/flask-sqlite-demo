@@ -81,7 +81,8 @@ def upcoming(user_id, days=7, long_days=30):
         " WHERE i.done = 0 AND i.due_date IS NOT NULL AND i.due_date <= ? AND (l.user_id = ? OR l.shared = 1)",
         (soon, user_id),
     ):
-        add("☑️", r["text"], r["due_date"], "lists.detail", detail=r["list_name"], list_id=r["lid"])
+        detail = r["list_name"] + (f" · {r['due_time']}" if r["due_time"] else "")
+        add("☑️", r["text"], r["due_date"], "lists.detail", detail=detail, list_id=r["lid"])
 
     items.sort(key=lambda x: (x["date"], x["title"]))
     return items

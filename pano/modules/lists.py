@@ -8,11 +8,14 @@ Erişim kuralı:
 - Erişemediği listeyi kullanıcı hiç görmez (404); görüp yönetemediği işlemde 403.
 
 Tarifler modülü accessible_lists / list_or_404 / add_items yardımcılarını kullanır.
+Yapılacaklara saat ve Telegram hatırlatması eklenebilir (bkz. pano/todo_reminders.py).
 """
 import re
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
+from .. import telegram
+from .. import todo_reminders as todo
 from ..auth import login_required
 from ..db import execute, get_db, query, query_one
 from ..utils import form_bool, form_choice, form_date, form_str, redirect_back
@@ -67,15 +70,28 @@ def split_items(text, kind):
     return out[:MAX_BATCH]
 
 
-def add_items(list_id, texts, user_id, qty="", due_date=None):
+def add_items(list_id, texts, user_id, qty="", due_date=None, due_time=None, remind_before=None):
     db = get_db()
     for text in texts:
         db.execute(
-            "INSERT INTO list_items (list_id, text, qty, due_date, created_by) VALUES (?, ?, ?, ?, ?)",
-            (list_id, text, qty, due_date, user_id),
+            "INSERT INTO list_items (list_id, text, qty, due_date, due_time, remind_before, created_by)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (list_id, text, qty, due_date, due_time, remind_before, user_id),
         )
     db.commit()
     return len(texts)
+
+
+def _due_fields():
+    """Formdaki son tarih, saat ve hatırlatma. Tarih yoksa saat ve hatırlatma anlamsız."""
+    due_date = form_date("due_date")
+    if not due_date:
+        return None, None, None
+    return due_date, todo.parse_time(request.form.get("due_time")), todo.parse_remind(request.form.get("remind"))
+
+
+def _can_edit(item, user_id):
+    return item["list_owner"] == user_id or item["created_by"] == user_id
 
 
 def _item_or_404(item_id, user_id):
@@ -144,6 +160,8 @@ def detail(list_id):
     return render_template(
         "lists/detail.html", lst=lst, open_items=open_items, done_items=done_items, done_count=done_count,
         is_owner=lst["user_id"] == uid, kinds=KINDS, icons=KIND_ICONS,
+        remind_options=todo.REMIND_OPTIONS, default_remind=todo.DEFAULT_REMIND, remind_label=todo.remind_label,
+        default_time=todo.DEFAULT_DUE_TIME, telegram_enabled=telegram.enabled(),
     )
 
 
@@ -155,7 +173,8 @@ def add_item(list_id):
     if not texts:
         flash("Madde boş olamaz.", "warning")
         return redirect_back("lists.detail", list_id=list_id)
-    n = add_items(list_id, texts, g.user["id"], form_str("qty", QTY_MAX), form_date("due_date"))
+    due_date, due_time, remind = _due_fields() if lst["kind"] == "todo" else (form_date("due_date"), None, None)
+    n = add_items(list_id, texts, g.user["id"], form_str("qty", QTY_MAX), due_date, due_time, remind)
     flash(f"“{texts[0]}” eklendi." if n == 1 else f"{n} madde eklendi.", "success")
     return redirect_back("lists.detail", list_id=list_id)
 
@@ -176,12 +195,44 @@ def toggle_item(item_id):
     return redirect_back("lists.detail", list_id=item["list_id"])
 
 
+@bp.route("/madde/<int:item_id>", methods=["GET", "POST"])
+@login_required
+def edit_item(item_id):
+    uid = g.user["id"]
+    item = _item_or_404(item_id, uid)
+    if not _can_edit(item, uid):
+        abort(403)
+    lst = list_or_404(item["list_id"], uid)
+    if request.method == "POST":
+        text = form_str("text", TEXT_MAX)
+        if not text:
+            flash("Madde boş olamaz.", "warning")
+            return redirect(url_for("lists.edit_item", item_id=item_id))
+        if lst["kind"] == "todo":
+            due_date, due_time, remind = _due_fields()
+        else:
+            due_date, due_time, remind = form_date("due_date"), None, None
+        # Zaman ya da hatırlatma değiştiyse hatırlatmalar yeniden gönderilebilsin
+        changed = (due_date, due_time, remind) != (item["due_date"], item["due_time"], item["remind_before"])
+        execute(
+            "UPDATE list_items SET text = ?, qty = ?, due_date = ?, due_time = ?, remind_before = ?"
+            + (", pre_sent_at = NULL, due_sent_at = NULL" if changed else "") + " WHERE id = ?",
+            (text, form_str("qty", QTY_MAX), due_date, due_time, remind, item_id),
+        )
+        flash("Madde güncellendi.", "success")
+        return redirect_back("lists.detail", list_id=item["list_id"])
+    return render_template(
+        "lists/item_edit.html", item=item, lst=lst, remind_options=todo.REMIND_OPTIONS,
+        default_time=todo.DEFAULT_DUE_TIME, telegram_enabled=telegram.enabled(),
+    )
+
+
 @bp.route("/madde/<int:item_id>/sil", methods=["POST"])
 @login_required
 def delete_item(item_id):
     uid = g.user["id"]
     item = _item_or_404(item_id, uid)
-    if item["list_owner"] != uid and item["created_by"] != uid:
+    if not _can_edit(item, uid):
         abort(403)
     execute("DELETE FROM list_items WHERE id = ?", (item_id,))
     flash("Madde silindi.", "success")

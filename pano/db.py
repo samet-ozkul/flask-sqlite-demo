@@ -263,6 +263,14 @@ MIGRATIONS = [
         value TEXT
     );
     """,
+    # 3: yapılacaklar için saat + Telegram hatırlatması
+    """
+    ALTER TABLE list_items ADD COLUMN due_time TEXT;           -- 'HH:MM', boşsa varsayılan saat
+    ALTER TABLE list_items ADD COLUMN remind_before INTEGER;   -- dakika; NULL = hatırlatma yok, 0 = zamanında
+    ALTER TABLE list_items ADD COLUMN pre_sent_at TEXT;        -- "yaklaşıyor" mesajı gönderildi
+    ALTER TABLE list_items ADD COLUMN due_sent_at TEXT;        -- "zamanı geldi" mesajı gönderildi
+    CREATE INDEX idx_list_items_due ON list_items(done, due_date);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)
