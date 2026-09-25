@@ -79,7 +79,13 @@ def telegram_code():
 def telegram_verify():
     code = g.user["telegram_link_code"]
     if not code:
-        return redirect(url_for(".index"))
+        # Webhook açıksa bağlantı bota "Başlat" denince zaten yapılmıştır
+        if g.user["telegram_chat_id"]:
+            flash("Telegram bağlandı.", "success")
+        return redirect(url_for(".index") + "#telegram")
+    if telegram.webhook_active():
+        flash("Henüz bağlanmadı. Botta “Başlat”a bastıktan birkaç saniye sonra tekrar dene.", "warning")
+        return redirect(url_for(".index") + "#telegram")
     try:
         chat_id = telegram.find_chat_for_code(code)
     except telegram.TelegramError as e:

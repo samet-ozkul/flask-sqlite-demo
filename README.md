@@ -121,7 +121,8 @@ Sonra 3. adımdaki **Static files** ayarını ekle, WSGI dosyasına yeni değiş
 
 1. Telegram'da **@BotFather** → `/newbot` → bir ad ver → verdiği **token**'ı WSGI dosyasına `TELEGRAM_BOT_TOKEN` olarak ekle, **Reload**.
 2. Panoda **Ayarlar → Telegram'ı bağla** → açılan linkten botta **Başlat**'a bas → **Bağlantıyı doğrula**.
-3. Günlük özet için bir sonraki bölümdeki cron görevini kur.
+3. Günlük özet ve hatırlatmalar için bir sonraki bölümdeki cron görevlerini kur.
+4. **Mesaj butonları (isteğe bağlı):** Yönetim → Durum → **Webhook'u kur**. Bundan sonra hatırlatma mesajlarında **✅ Tamamlandı** butonu çıkar; basınca iş panoda tamamlanır, buton **↩️ Geri al**'a döner. Webhook açıkken hesap bağlama da botta **Başlat**'a basınca anında olur. HTTPS gerektirir (PythonAnywhere'de Force HTTPS açık olmalı); `SECRET_KEY` değişirse webhook'u yeniden kur.
 
 ## Zamanlanmış görevler (cron-job.org, ücretsiz)
 

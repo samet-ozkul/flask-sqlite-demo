@@ -52,6 +52,13 @@ def large_upload(megabytes):
     return decorator
 
 
+def csrf_exempt(view):
+    """Form değil, dış servis çağrısı olan POST rotaları için (Telegram webhook).
+    Bu rotalar isteği kendi yöntemiyle doğrulamak zorundadır."""
+    view.csrf_exempt = True
+    return view
+
+
 # ---------- CSRF ----------
 def csrf_token():
     if "_csrf" not in session:
@@ -77,7 +84,8 @@ def init_app(app):
             if g.user is None:
                 session.clear()
 
-        if request.method == "POST" and request.form.get("_csrf") != session.get("_csrf"):
+        if (request.method == "POST" and not getattr(view, "csrf_exempt", False)
+                and request.form.get("_csrf") != session.get("_csrf")):
             abort(400, "Geçersiz form anahtarı. Sayfayı yenileyip tekrar deneyin.")
 
 
