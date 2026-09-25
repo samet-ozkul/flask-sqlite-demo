@@ -10,7 +10,10 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = os.environ.get("RENDER") is not None  # Render'da HTTPS
+# HTTPS üzerinde yayınlanırken (Render otomatik, PythonAnywhere'de env ile) cookie sadece HTTPS'te gönderilir
+app.config["SESSION_COOKIE_SECURE"] = (
+    os.environ.get("RENDER") is not None or os.environ.get("SESSION_COOKIE_SECURE") == "1"
+)
 
 DATABASE = os.environ.get("DATABASE_PATH", os.path.join(os.path.dirname(__file__), "app.db"))
 
