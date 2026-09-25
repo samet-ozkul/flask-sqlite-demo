@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Kayıt{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Kayıt Ol</h1>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label>Kullanıcı adı <input name="username" required minlength="3" autofocus></label>
+    <label>Şifre <input name="password" type="password" required minlength="6"></label>
+    <button>Kayıt Ol</button>
+  </form>
+  <p class="muted">Zaten hesabın var mı? <a href="{{ url_for('login') }}">Giriş yap</a></p>
+</div>
+{% endblock %}
