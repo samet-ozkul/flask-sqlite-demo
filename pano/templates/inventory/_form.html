@@ -1,0 +1,17 @@
+{% import "_macros.html" as ui %}
+
+{# Eşya ekleme/düzenleme alanları. i: inventory satırı ya da None.
+   locations/categories: [(değer, adet)] — mevcut değerler datalist önerisi olur. #}
+{% macro item_fields(i=None, locations=[], categories=[], default_location="", default_category="") -%}
+  {{ ui.field("Eşya", "name", i.name if i else "", required=True, placeholder="ör. Matkap") }}
+  <div class="form-row three">
+    {{ ui.field("Yeri", "location", i.location if i else default_location, placeholder="ör. Balkon dolabı, üst raf",
+                attrs='list="inv-locations" autocomplete="off"') }}
+    {{ ui.field("Kategori", "category", i.category if i else default_category, placeholder="ör. Alet",
+                attrs='list="inv-categories" autocomplete="off"') }}
+    {{ ui.field("Adet", "quantity", i.quantity if i else 1, type="number", attrs='min="0" inputmode="numeric"') }}
+  </div>
+  <datalist id="inv-locations">{% for v, _n in locations %}<option value="{{ v }}">{% endfor %}</datalist>
+  <datalist id="inv-categories">{% for v, _n in categories %}<option value="{{ v }}">{% endfor %}</datalist>
+  {{ ui.textarea("Not", "note", i.note if i else "", rows=2, placeholder="Mavi kutunun içinde, uçları yanında...") }}
+{%- endmacro %}

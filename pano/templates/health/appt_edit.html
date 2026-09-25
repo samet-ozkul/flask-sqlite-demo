@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Randevuyu düzenle{% endblock %}
+{% block content %}
+{% call ui.page_header("📅 Randevuyu düzenle", "Tamamlandı" if appt.done else None, back=url_for('health.index', tab='randevu')) %}
+  {{ ui.post_button(url_for('health.appt_toggle', appt_id=appt.id), "Geri al" if appt.done else "✓ Gidildi", "" if appt.done else "ok") }}
+  {{ ui.delete_button(url_for('health.appt_delete', appt_id=appt.id), "Sil", "Randevu silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    {{ ui.field("Başlık", "title", appt.title, required=True, attrs='maxlength="150"') }}
+    <div class="form-row">
+      {{ ui.field("Tarih ve saat", "starts_at", appt.starts_at[:16], type="datetime-local", required=True) }}
+      {{ ui.field("Yer", "place", appt.place, attrs='maxlength="150"') }}
+    </div>
+    {{ ui.textarea("Not", "note", appt.note, rows=3) }}
+    <button class="btn primary block">Kaydet</button>
+  </form>
+</div>
+<p class="muted small">Eklenme: {{ appt.created_at | localdt }}</p>
+{% endblock %}

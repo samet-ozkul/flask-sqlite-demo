@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "links/_form.html" import link_form %}
+{% block title %}Sonra Bak{% endblock %}
+{% block head %}
+<style>
+  .link-rows > li { align-items: flex-start; }
+  .link-rows .tick { width: 32px; height: 32px; margin-top: 2px; }
+  .link-rows a.title { display: block; color: var(--text); }
+  .link-rows a.title:hover { color: var(--primary); }
+  .link-rows .read a.title { color: var(--muted); font-weight: 400; }
+  .link-rows .note-text { font-size: .88rem; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+  .link-rows .btn.icon { min-width: 36px; min-height: 36px; }
+  .tabs .pill-count { margin-left: 2px; }
+  .tag.on { background: var(--primary-soft); color: var(--primary); }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("🔖 Sonra Bak", "Sonra okumak ya da izlemek istediğin linkler") }}
+
+<div class="card">
+  <details class="add" {% if not counts.tumu %}open{% endif %}>
+    <summary>＋ Link ekle</summary>
+    {{ link_form({"url": "", "title": "", "note": "", "tags": ""}, url_for('links.create'), "Kaydet", next_url=request.full_path) }}
+  </details>
+</div>
+
+<nav class="tabs">
+  {% for key, label in filters.items() %}
+    <a href="{{ url_for('links.index', durum=key, q=q or None, tag=tag or None) }}" class="{{ 'active' if key == durum }}">
+      {{ label }} <span class="pill-count">{{ counts[key] }}</span>
+    </a>
+  {% endfor %}
+</nav>
+
+{% call ui.search_box(q, "Linklerde ara...") %}
+  <input type="hidden" name="durum" value="{{ durum }}">
+  {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
+{% endcall %}
+
+{% if all_tags %}
+  <div class="row-flex" style="margin-bottom: 14px">
+    <a class="tag {{ 'on' if not tag }}" href="{{ url_for('links.index', durum=durum, q=q or None) }}">Tümü</a>
+    {% for t in all_tags %}
+      <a class="tag {{ 'on' if t == tag }}" href="{{ url_for('links.index', durum=durum, q=q or None, tag=t) }}">#{{ t }}</a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if links %}
+  <div class="card">
+    <ul class="rows link-rows">
+      {% for l in links %}
+        <li class="{{ 'read' if l.is_read }}">
+          <form method="post" action="{{ url_for('links.toggle_read', link_id=l.id) }}" class="inline">
+            {{ ui.csrf() }}
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button class="tick {{ 'on' if l.is_read }}" aria-label="{{ 'Okunmadı yap' if l.is_read else 'Okundu' }}"
+                    title="{{ 'Okunmadı yap' if l.is_read else 'Okundu işaretle' }}"></button>
+          </form>
+          <div class="grow">
+            <a class="title" href="{{ l.url }}" target="_blank" rel="noopener noreferrer">{{ l.title or domain(l.url) }}</a>
+            <div class="meta">
+              <span>🌐 {{ domain(l.url) }}</span>
+              <span>{{ l.created_at | localdt('%d.%m.%Y') }}</span>
+              {{ ui.tag_list(l.tags, 'links.index') }}
+            </div>
+            {% if l.note %}<div class="note-text">{{ l.note }}</div>{% endif %}
+          </div>
+          <div class="actions">
+            <a class="btn sm icon" href="{{ url_for('links.edit', link_id=l.id, next=request.full_path) }}" title="Düzenle" aria-label="Düzenle">✏️</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% elif q or tag %}
+  {{ ui.empty("Aramanla eşleşen link yok.", "🔍") }}
+{% elif durum == 'okunmamis' and counts.tumu %}
+  {{ ui.empty("Okunmamış link kalmadı. Tebrikler!", "🎉") }}
+{% else %}
+  {{ ui.empty("Henüz link yok. Telefonda bir sayfayı “Paylaş → Pano” ile de ekleyebilirsin.", "🔖") }}
+{% endif %}
+{% endblock %}

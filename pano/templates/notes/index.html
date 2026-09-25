@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Notlar{% endblock %}
+{% block content %}
+{{ ui.page_header("📝 Notlar", "Markdown desteklenir: **kalın**, *italik*, - liste, - [ ] görev") }}
+
+<div class="card">
+  <details class="add" {% if not notes and not q and not tag %}open{% endif %}>
+    <summary>＋ Yeni not</summary>
+    <form method="post" action="{{ url_for('notes.create') }}">
+      {{ ui.csrf() }}
+      {{ ui.field("Başlık", "title", placeholder="İsteğe bağlı") }}
+      {{ ui.textarea("Not", "content", rows=5, required=True) }}
+      <div class="form-row">
+        {{ ui.field("Etiketler", "tags", placeholder="iş, fikir, alışveriş", hint="Virgülle ayırın") }}
+        <div>{{ ui.checkbox("Sabitle", "pinned") }}</div>
+      </div>
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+{% call ui.search_box(q, "Notlarda ara...") %}
+  {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
+{% endcall %}
+
+{% if all_tags %}
+  <div class="row-flex" style="margin-bottom: 14px">
+    <a class="tag" href="{{ url_for('notes.index') }}" {% if not tag %}style="background: var(--primary-soft); color: var(--primary)"{% endif %}>Tümü</a>
+    {% for t in all_tags %}
+      <a class="tag" href="{{ url_for('notes.index', tag=t) }}" {% if t == tag %}style="background: var(--primary-soft); color: var(--primary)"{% endif %}>#{{ t }}</a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if notes %}
+  <div class="notes-grid">
+    {% for n in notes %}
+      <article class="card note {{ 'pinned' if n.pinned }}">
+        {% if n.title %}<h3>{% if n.pinned %}📌 {% endif %}{{ n.title }}</h3>{% elif n.pinned %}<h3>📌</h3>{% endif %}
+        <div class="md">{{ n.content | md }}</div>
+        <div class="row-flex">{{ ui.tag_list(n.tags, 'notes.index') }}</div>
+        <footer>
+          <span>{{ (n.updated_at or n.created_at) | localdt }}</span>
+          <span class="row-flex">
+            {{ ui.post_button(url_for('notes.toggle_pin', note_id=n.id), '📌' if not n.pinned else 'Sabitlemeyi kaldır', title='Sabitle') }}
+            <a class="btn sm" href="{{ url_for('notes.edit', note_id=n.id) }}">Düzenle</a>
+          </span>
+        </footer>
+      </article>
+    {% endfor %}
+  </div>
+{% elif q or tag %}
+  {{ ui.empty("Aramanla eşleşen not yok.", "🔍") }}
+{% else %}
+  {{ ui.empty("Henüz not yok. Aklına gelen ilk şeyi yaz!") }}
+{% endif %}
+{% endblock %}

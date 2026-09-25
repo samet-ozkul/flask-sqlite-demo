@@ -1,0 +1,99 @@
+{% import "_macros.html" as ui %}
+{# Ölçümler sekmesi: summaries, kinds, selected_kind, now_s #}
+
+{% macro value(r, m) -%}
+  {{ r.value1 | num(m.dec) }}{% if r.value2 is not none %}/{{ r.value2 | num(0) }}{% endif %}
+{%- endmacro %}
+
+<div class="card" id="yeni">
+  <details class="add" {% if not summaries or request.args.get('tur') %}open{% endif %}>
+    <summary>＋ Yeni ölçüm</summary>
+    <form method="post" action="{{ url_for('health.metric_create') }}" class="metric-form">
+      {{ ui.csrf() }}
+      <div class="form-row">
+        {{ ui.select("Tür", "kind", kind_options, selected_kind) }}
+        {{ ui.field("Tarih ve saat", "measured_at", now_s, type="datetime-local", attrs='max="' ~ now_s[:10] ~ 'T23:59"') }}
+      </div>
+      <div class="form-row">
+        {{ ui.field("Değer", "value1", required=True, placeholder="ör. 72,5",
+                    attrs='inputmode="decimal" autocomplete="off"', hint="Tansiyonda büyük (sistolik) değer") }}
+        <div class="only-bp">
+          {{ ui.field("Küçük tansiyon (diastolik)", "value2", placeholder="ör. 80",
+                      attrs='inputmode="decimal" autocomplete="off"', hint="Sadece tansiyon için, zorunlu") }}
+        </div>
+      </div>
+      {{ ui.field("Not", "note", placeholder="İsteğe bağlı: aç karnına, ilaçtan sonra…", attrs='maxlength="300"') }}
+      <button class="btn primary block">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+{% if not summaries %}
+  <div class="card">{{ ui.empty("Henüz ölçüm yok. Kilo, tansiyon, şeker ya da nabız ekleyerek başla.", "📈") }}</div>
+{% endif %}
+
+{% for s in summaries %}
+  {% set m = s.meta %}
+  <section class="card">
+    <div class="kind-head">
+      <h2>{{ m.icon }} {{ m.label }} <span class="muted small">{{ m.unit }}</span></h2>
+      <a class="btn sm" href="{{ url_for('health.index', tab='olcum', tur=s.kind) }}#yeni">＋ Ekle</a>
+    </div>
+
+    <div class="stats tight">
+      <div class="stat">
+        <div class="label">Son ölçüm</div>
+        <div class="value">{{ value(s.latest, m) }}</div>
+        <div class="sub">
+          {% if s.change %}<span title="Önceki ölçüme göre değişim">{{ s.change }} {{ m.unit }}</span> · {% endif %}{{ s.latest.measured_at[:10] | date_tr }} {{ s.latest.measured_at[11:16] }}
+        </div>
+      </div>
+      {% if s.agg %}
+        {% set a = s.agg %}
+        <div class="stat">
+          <div class="label">Son 30 gün ortalama</div>
+          <div class="value">{{ a.avg1 | num(1) }}{% if a.avg2 is not none %}/{{ a.avg2 | num(0) }}{% endif %}</div>
+          <div class="sub">
+            min {{ a.min1 | num(m.dec) }}{% if a.min2 is not none %}/{{ a.min2 | num(0) }}{% endif %}
+            · maks {{ a.max1 | num(m.dec) }}{% if a.max2 is not none %}/{{ a.max2 | num(0) }}{% endif %}
+            · {{ a.n }} ölçüm
+          </div>
+        </div>
+      {% else %}
+        <div class="stat"><div class="label">Son 30 gün</div><div class="value">—</div><div class="sub">Bu dönemde ölçüm yok</div></div>
+      {% endif %}
+    </div>
+
+    {% if s.spark %}
+      {% set sp = s.spark %}
+      <svg class="spark" viewBox="0 0 {{ sp.w }} {{ sp.h }}" preserveAspectRatio="none" role="img"
+           aria-label="{{ m.label }} grafiği, son {{ sp.n }} ölçüm, en düşük {{ sp.lo | num(m.dec) }}, en yüksek {{ sp.hi | num(m.dec) }}">
+        {% for pts in sp.lines %}<polyline points="{{ pts }}" vector-effect="non-scaling-stroke"/>{% endfor %}
+      </svg>
+      <div class="spark-legend">
+        <span>Son {{ sp.n }} ölçüm{% if s.kind == 'bp' %} (koyu: büyük, açık: küçük){% endif %}</span>
+        <span>{{ sp.lo | num(m.dec) }} – {{ sp.hi | num(m.dec) }}</span>
+      </div>
+    {% endif %}
+
+    <details class="records">
+      <summary>Son kayıtlar ({{ s.records | length }}{% if s.total > s.records | length %} / {{ s.total }}{% endif %})</summary>
+      <ul class="rows">
+        {% for r in s.records %}
+          <li>
+            <div class="grow">
+              <div class="title">{{ value(r, m) }} <span class="muted small">{{ m.unit }}</span></div>
+              <div class="meta">
+                <span>{{ r.measured_at[:10] | date_tr(True) }} {{ r.measured_at[11:16] }}</span>
+                {% if r.note %}<span>{{ r.note }}</span>{% endif %}
+              </div>
+            </div>
+            <span class="actions">
+              {{ ui.delete_button(url_for('health.metric_delete', metric_id=r.id), "Sil", "Bu ölçüm silinsin mi?") }}
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+    </details>
+  </section>
+{% endfor %}

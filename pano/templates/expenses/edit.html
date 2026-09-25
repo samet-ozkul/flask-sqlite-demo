@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Harcamayı düzenle{% endblock %}
+{% block content %}
+{% call ui.page_header("Harcamayı düzenle", back=url_for('expenses.index', ay=e.date[:7])) %}
+  {{ ui.delete_button(url_for('expenses.delete', expense_id=e.id), "Sil", "Bu harcama silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.money_field("Tutar (₺)", "amount", e.amount, required=True) }}
+      {{ ui.field("Tarih", "date", e.date, "date", True) }}
+    </div>
+    <div class="form-row">
+      {{ ui.field("Kategori", "category", e.category, attrs='list="expense-categories" autocomplete="off" maxlength="40"') }}
+      {{ ui.field("Not", "note", e.note, placeholder="Nereye / ne için?") }}
+    </div>
+    <datalist id="expense-categories">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+
+<p class="muted small">Eklenme: {{ e.created_at | localdt }}</p>
+{% endblock %}

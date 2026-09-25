@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "habits/_parts.html" as hp %}
+{% block title %}{{ habit.name }}{% endblock %}
+{% block head %}{{ hp.style() }}{% endblock %}
+{% block content %}
+{% call ui.page_header(habit.icon ~ " " ~ habit.name, None if habit.active else "Arşivde", back=url_for('habits.index')) %}
+  {{ ui.post_button(url_for('habits.archive', habit_id=habit.id), "Arşivle" if habit.active else "Arşivden çıkar") }}
+  {{ ui.delete_button(url_for('habits.delete', habit_id=habit.id), "Sil", "Alışkanlık ve tüm kayıtları silinsin mi? Bu işlem geri alınamaz.") }}
+{% endcall %}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Mevcut seri</div>
+    <div class="value streak">🔥 {{ streak }}</div>
+    <div class="sub">{% if done_today %}bugün dahil{% elif streak %}bugün henüz yapılmadı{% else %}gün{% endif %}</div>
+  </div>
+  <div class="stat"><div class="label">En uzun seri</div><div class="value">{{ longest }}</div><div class="sub">gün</div></div>
+  <div class="stat"><div class="label">Toplam</div><div class="value">{{ total }}</div><div class="sub">gün yapıldı</div></div>
+  <div class="stat">
+    <div class="label">{{ month_name }} başarısı</div>
+    <div class="value">{% if month_rate is not none %}%{{ month_rate }}{% else %}—{% endif %}</div>
+    <div class="sub">{{ month_done }} gün</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="cal-nav">
+    {% if prev_ay %}
+      <a class="btn sm" href="{{ url_for('habits.detail', habit_id=habit.id, ay=prev_ay) }}" aria-label="Önceki ay">←</a>
+    {% else %}<span class="btn sm off">←</span>{% endif %}
+    <h2>{{ month_title }}</h2>
+    {% if next_ay %}
+      <a class="btn sm" href="{{ url_for('habits.detail', habit_id=habit.id, ay=next_ay) }}" aria-label="Sonraki ay">→</a>
+    {% else %}<span class="btn sm off">→</span>{% endif %}
+  </div>
+
+  <div class="cal big">
+    {% for w in weekdays %}<div class="h">{{ w }}</div>{% endfor %}
+    {% for _ in range(lead) %}<div></div>{% endfor %}
+    {% for c in cells %}
+      {% if c.editable %}
+        <form method="post" action="{{ url_for('habits.toggle', habit_id=habit.id) }}">
+          {{ ui.csrf() }}
+          <input type="hidden" name="date" value="{{ c.iso }}">
+          <input type="hidden" name="next" value="{{ self_url }}">
+          <button class="d {{ 'on' if c.on }} {{ 'today' if c.today }}" title="{{ c.label }}{{ ' ✓' if c.on }}"
+                  aria-pressed="{{ 'true' if c.on else 'false' }}" aria-label="{{ c.label }}">{{ c.day }}</button>
+        </form>
+      {% else %}
+        <div class="d {{ 'on' if c.on }} {{ 'future' if c.future }}" title="{{ c.label }}">{{ c.day }}</div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <p class="muted small" style="margin-top: 10px">
+    Bir güne dokunarak işaretle ya da kaldır. En fazla {{ backfill_days }} gün geriye gidilebilir.
+    {% if not is_this_month %}<a href="{{ url_for('habits.detail', habit_id=habit.id, ay=this_ay) }}">Bu aya dön</a>{% endif %}
+  </p>
+</div>
+
+<div class="card">
+  <details class="add">
+    <summary>✏️ Düzenle</summary>
+    <form method="post" action="{{ url_for('habits.edit', habit_id=habit.id) }}">
+      {{ ui.csrf() }}
+      {{ ui.field("Ad", "name", habit.name, required=True, attrs='maxlength="60" autocomplete="off"') }}
+      {{ hp.icon_picker(icons, habit.icon) }}
+      <button class="btn primary block">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+<p class="muted small">Oluşturma: {{ habit.created_at | localdt("%d.%m.%Y") }}</p>
+{% endblock %}

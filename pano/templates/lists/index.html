@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Listeler{% endblock %}
+{% block head %}
+<style>
+  .list-rows > li { padding: 0; }
+  .list-rows a.list-link { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 12px 0; color: var(--text); }
+  .list-rows a.list-link:hover { text-decoration: none; }
+  .list-rows a.list-link:hover .title { color: var(--primary); }
+  .list-rows .pill-count { font-size: .85rem; padding: 2px 9px; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("🛒 Listeler", "Alışveriş ve yapılacaklar listeleri") }}
+
+<div class="card">
+  <details class="add" {% if not lists %}open{% endif %}>
+    <summary>＋ Yeni liste</summary>
+    <form method="post" action="{{ url_for('lists.create') }}">
+      {{ ui.csrf() }}
+      <div class="form-row">
+        {{ ui.field("Liste adı", "name", required=True, placeholder="Market, Ev işleri...", attrs='maxlength="80"') }}
+        {{ ui.select("Tür", "kind", [("shopping", "🛒 Alışveriş"), ("todo", "☑️ Yapılacaklar")], "shopping") }}
+      </div>
+      {{ ui.checkbox("Paylaşılan (tüm kullanıcılar görebilir)", "shared") }}
+      <button class="btn primary block">Oluştur</button>
+    </form>
+  </details>
+</div>
+
+{% if lists %}
+  <div class="card">
+    <ul class="rows list-rows">
+      {% for l in lists %}
+        <li>
+          <a class="list-link" href="{{ url_for('lists.detail', list_id=l.id) }}">
+            <span class="ico">{{ icons[l.kind] }}</span>
+            <span class="grow">
+              <span class="title">{{ l.name }}</span>
+              <span class="meta">
+                <span>{{ kinds[l.kind] }}</span>
+                {% if l.user_id != g.user.id %}
+                  <span>👤 {{ l.owner_display or l.owner_username }}</span>
+                {% elif l.shared %}
+                  <span class="tag">paylaşılan</span>
+                {% endif %}
+                {% if l.next_due %}{{ ui.due_badge(l.next_due) }}{% endif %}
+              </span>
+            </span>
+            <span class="pill-count" title="Açık / toplam madde">{{ l.open_count }}/{{ l.total_count }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  {{ ui.empty("Henüz liste yok. Bir market listesiyle başlayabilirsin!", "🛒") }}
+{% endif %}
+{% endblock %}

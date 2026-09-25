@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Sağlık{% endblock %}
+{% block head %}
+<style>
+  .spark { display: block; width: 100%; height: 60px; color: var(--primary); margin: 4px 0 2px; }
+  .spark polyline { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .spark polyline + polyline { opacity: .45; }
+  .spark-legend { display: flex; justify-content: space-between; font-size: .75rem; color: var(--muted); }
+  .metric-form:not(:has(option[value="bp"]:checked)) .only-bp { display: none; }
+  .health-page .rows .actions .btn.sm, .health-page .rows .actions button { min-height: 36px; }
+  .health-page .rows .ico { font-size: 1.2rem; }
+  .times { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+  .sched { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sched span { padding: 6px 10px; border-radius: 99px; background: var(--surface-2); font-size: .88rem; }
+  .sched span.next { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+  .sched span.past { opacity: .55; }
+  .kind-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .kind-head h2 { margin: 0; }
+  details.records > summary { cursor: pointer; font-weight: 500; color: var(--primary); padding: 8px 0; }
+  .stats.tight { margin-bottom: 6px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="health-page">
+{{ ui.page_header("🩺 Sağlık") }}
+
+<nav class="tabs" aria-label="Sağlık bölümleri">
+  {% for key, label in tabs.items() %}
+    <a href="{{ url_for('health.index', tab=key) }}" class="{{ 'active' if tab == key }}" {% if tab == key %}aria-current="page"{% endif %}>
+      {{ label }}{% if key == 'randevu' and upcoming_count %} <span class="pill-count">{{ upcoming_count }}</span>{% endif %}
+    </a>
+  {% endfor %}
+</nav>
+
+{% if tab == 'olcum' %}
+  {% include "health/_metrics.html" %}
+{% elif tab == 'ilac' %}
+  {% include "health/_meds.html" %}
+{% else %}
+  {% include "health/_appointments.html" %}
+{% endif %}
+</div>
+{% endblock %}

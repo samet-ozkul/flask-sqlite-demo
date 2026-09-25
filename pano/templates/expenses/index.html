@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Harcamalar{% endblock %}
+{% block head %}
+<style>
+  .xp-quick .quick { align-items: flex-end; }
+  .xp-quick .quick input[name=amount] { font-size: 1.45rem; font-weight: 700; padding: 10px 14px; }
+  .xp-quick .quick .btn { min-height: 52px; padding: 0 22px; font-size: 1.05rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+  .chips label { position: relative; }
+  .chips input { position: absolute; opacity: 0; pointer-events: none; }
+  .chips span {
+    display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 6px 12px;
+    border-radius: 99px; border: 1px solid var(--border); background: var(--surface);
+    cursor: pointer; font-size: .92rem; user-select: none;
+  }
+  .chips input:checked + span { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+  .chips input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .xp-more > summary { cursor: pointer; color: var(--muted); font-size: .88rem; margin: 2px 0 10px; }
+  .month-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 14px; }
+  .month-nav h2 { margin: 0; }
+  .month-nav .btn { min-height: 40px; }
+  .day-head {
+    display: flex; justify-content: space-between; gap: 8px; padding: 14px 0 4px;
+    font-size: .85rem; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border);
+  }
+  .day-head:first-of-type { padding-top: 0; }
+  .up { color: var(--danger); }
+  .down { color: var(--ok); }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("💸 Harcamalar") }}
+
+<div class="card xp-quick">
+  <form method="post" action="{{ url_for('expenses.create') }}">
+    {{ ui.csrf() }}
+    <div class="quick">
+      {{ ui.money_field("Tutar (₺)", "amount", required=True) }}
+      <button class="btn primary">Ekle</button>
+    </div>
+    <div class="chips" role="radiogroup" aria-label="Kategori">
+      {% for c in chips %}
+        <label><input type="radio" name="category" value="{{ c }}"><span>{{ icon(c) }} {{ c }}</span></label>
+      {% endfor %}
+    </div>
+    {{ ui.field("Not", "note", placeholder="Nereye / ne için? (isteğe bağlı)") }}
+    <details class="xp-more">
+      <summary>Tarih ya da yeni kategori…</summary>
+      <div class="form-row">
+        {{ ui.field("Tarih", "date", today_str(), "date", True) }}
+        {{ ui.field("Başka kategori", "category_new", placeholder="Seçili kategorinin yerine geçer",
+                    attrs='list="expense-categories" autocomplete="off" maxlength="40"') }}
+      </div>
+    </details>
+    <datalist id="expense-categories">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+  </form>
+</div>
+
+<div class="month-nav">
+  <a class="btn sm" href="{{ url_for('expenses.index', ay=prev_key) }}">← {{ MONTHS_TR[prev.month - 1] }}</a>
+  <div class="center">
+    <h2>{{ MONTHS_TR[month - 1] }} {{ year }}</h2>
+    {% if not is_current %}<a class="small" href="{{ url_for('expenses.index') }}">Bu aya dön</a>{% endif %}
+  </div>
+  <a class="btn sm" href="{{ url_for('expenses.index', ay=next_key) }}">{{ MONTHS_TR[nxt.month - 1] }} →</a>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Ay toplamı</div>
+    <div class="value">{{ s.total | money }}</div>
+    <div class="sub">{{ s.count }} harcama</div>
+  </div>
+  {% if is_current %}
+  <div class="stat">
+    <div class="label">Bugün</div>
+    <div class="value">{{ today_total | money }}</div>
+  </div>
+  {% endif %}
+  <div class="stat">
+    <div class="label">Günlük ortalama</div>
+    <div class="value">{{ s.daily_avg | money }}</div>
+    <div class="sub">{{ s.days }} gün üzerinden</div>
+  </div>
+  <div class="stat">
+    <div class="label">Geçen aya göre</div>
+    <div class="value">
+      {% if s.change is none %}—
+      {% elif s.change > 0 %}<span class="up">▲ %{{ s.change | num(0) }}</span>
+      {% elif s.change < 0 %}<span class="down">▼ %{{ (-s.change) | num(0) }}</span>
+      {% else %}%0{% endif %}
+    </div>
+    <div class="sub">{{ MONTHS_TR[prev.month - 1] }}: {{ s.prev_total | money }}</div>
+  </div>
+</div>
+
+{% if bars %}
+<div class="card">
+  <h2>Kategoriler</h2>
+  {{ ui.bars(bars) }}
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Harcamalar</h2>
+  {% for day in s.days_list %}
+    <div class="day-head"><span>{{ day.date | date_tr(True) }}</span><span>{{ day.total | money }}</span></div>
+    <ul class="rows">
+      {% for e in day.entries %}
+        <li>
+          <span class="ico">{{ icon(e.category) }}</span>
+          <div class="grow">
+            <div class="title">{{ e.note or e.category }}</div>
+            {% if e.note %}<div class="meta">{{ e.category }}</div>{% endif %}
+          </div>
+          <span class="amount">{{ e.amount | money }}</span>
+          <div class="actions"><a class="btn sm" href="{{ url_for('expenses.edit', expense_id=e.id) }}" title="Düzenle" aria-label="Düzenle">✎</a></div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ ui.empty("Bu ay henüz harcama yok.", "💸") }}
+  {% endfor %}
+</div>
+{% endblock %}

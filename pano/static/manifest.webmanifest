@@ -1,0 +1,26 @@
+{
+  "name": "Kişisel Pano",
+  "short_name": "Pano",
+  "description": "Notlar, listeler, harcamalar, faturalar ve günlük hayat için kişisel pano",
+  "lang": "tr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f6fa",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Harcama ekle", "url": "/harcamalar/", "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Listeler", "url": "/listeler/", "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Notlar", "url": "/notlar/", "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }] }
+  ],
+  "share_target": {
+    "action": "/linkler/paylas",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  }
+}

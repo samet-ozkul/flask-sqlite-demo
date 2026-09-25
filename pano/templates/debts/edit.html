@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Kaydı düzenle{% endblock %}
+{% block content %}
+{% call ui.page_header("Kaydı düzenle", back=url_for('debts.index', sekme=tab)) %}
+  {% if debt.settled %}
+    <form method="post" action="{{ url_for('debts.reopen', debt_id=debt.id) }}" class="inline">
+      {{ ui.csrf() }}<input type="hidden" name="next" value="{{ request.path }}">
+      <button class="btn sm">Geri aç</button>
+    </form>
+  {% else %}
+    <form method="post" action="{{ url_for('debts.settle', debt_id=debt.id) }}" class="inline">
+      {{ ui.csrf() }}<input type="hidden" name="next" value="{{ request.path }}">
+      <button class="btn sm ok">✓ Kapat</button>
+    </form>
+  {% endif %}
+  {{ ui.delete_button(url_for('debts.delete', debt_id=debt.id), "Sil", "Bu kayıt silinsin mi?") }}
+{% endcall %}
+
+{% if debt.settled %}
+  <p><span class="badge good">✓ {{ debt.settled_at | date_tr }} tarihinde kapandı</span></p>
+{% endif %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.field("Kişi", "person", debt.person, required=True, attrs='maxlength="100"') }}
+      {{ ui.select("Tür", "direction", directions.items() | list, debt.direction) }}
+    </div>
+    <div class="form-row">
+      {{ ui.money_field("Tutar", "amount", debt.amount, required=True) }}
+      {{ ui.currency_select(value=debt.currency) }}
+    </div>
+    <div class="form-row">
+      {{ ui.field("Tarih", "date", debt.date, "date", True) }}
+      {{ ui.field("Vade (isteğe bağlı)", "due_date", debt.due_date or "", "date") }}
+    </div>
+    {{ ui.textarea("Not", "note", debt.note, rows=3) }}
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+
+<p class="muted small">Eklenme: {{ debt.created_at | localdt }}</p>
+{% endblock %}

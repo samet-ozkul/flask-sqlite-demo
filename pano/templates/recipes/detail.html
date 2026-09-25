@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ recipe.title }}{% endblock %}
+{% block head %}
+<style>
+  .ing { list-style: none; margin: 0 0 12px; padding: 0; }
+  .ing li { border-bottom: 1px solid var(--border); }
+  .ing li:last-child { border-bottom: 0; }
+  .ing .check { margin: 0; padding: 9px 0; align-items: flex-start; }
+  .ing .check input { width: 20px; height: 20px; margin-top: 2px; flex-shrink: 0; }
+  .ing li.ing-h { font-weight: 600; font-size: .85rem; color: var(--muted); padding: 12px 0 4px; border-bottom: 0; }
+  .to-list { border-top: 1px solid var(--border); padding-top: 12px; }
+  .recipe-body + .card { margin-top: 14px; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🍲 " ~ recipe.title, ("🍽️ " ~ recipe.servings) if recipe.servings else None, back=url_for('recipes.index')) %}
+  <a class="btn" href="{{ url_for('recipes.edit', recipe_id=recipe.id) }}">✏️ Düzenle</a>
+{% endcall %}
+
+{% if recipe.tags %}
+  <div class="row-flex" style="margin-bottom: 14px">{{ ui.tag_list(recipe.tags, 'recipes.index') }}</div>
+{% endif %}
+
+<div class="grid two recipe-body">
+  <div class="card">
+    <h2>Malzemeler</h2>
+    {% if ingredients %}
+      <form method="post" action="{{ url_for('recipes.to_list', recipe_id=recipe.id) }}">
+        {{ ui.csrf() }}
+        <ul class="ing">
+          {% for ing in ingredients %}
+            {% if ing.header %}
+              <li class="ing-h">{{ ing.text }}</li>
+            {% else %}
+              <li><label class="check"><input type="checkbox" name="ing" value="{{ loop.index0 }}" checked> <span>{{ ing.text }}</span></label></li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+        <div class="to-list">
+          {% if list_options %}
+            {{ ui.select("Alışveriş listesi", "list_id", list_options, list_options[0][0]) }}
+          {% else %}
+            <p class="muted small">Henüz alışveriş listen yok; “Alışveriş” adında yeni bir liste oluşturulacak.</p>
+          {% endif %}
+          <button class="btn primary block">🛒 Malzemeleri alışveriş listesine ekle</button>
+          <p class="muted small">İşaretli malzemeler eklenir; listede zaten olanlar atlanır.</p>
+        </div>
+      </form>
+    {% else %}
+      <p class="muted">Malzeme eklenmemiş. <a href="{{ url_for('recipes.edit', recipe_id=recipe.id) }}">Düzenle</a></p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Hazırlanışı</h2>
+    {% if recipe.steps %}
+      <div class="md">{{ recipe.steps | md }}</div>
+    {% else %}
+      <p class="muted">Adımlar eklenmemiş.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Fotoğraflar</h2>
+  {{ ui.attachments("recipe", recipe.id, files, request.path) }}
+</div>
+
+<p class="muted small">Eklenme: {{ recipe.created_at | localdt }}{% if recipe.updated_at and recipe.updated_at != recipe.created_at %} · Son düzenleme: {{ recipe.updated_at | localdt }}{% endif %}</p>
+{% endblock %}

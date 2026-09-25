@@ -1,0 +1,19 @@
+{% import "_macros.html" as ui %}
+
+{# Araç ekleme/düzenleme alanları. v: vehicles satırı ya da None #}
+{% macro vehicle_fields(v=None) -%}
+  <div class="form-row">
+    {{ ui.field("Araç adı", "name", v.name if v else "", required=True, placeholder="ör. Corolla") }}
+    {{ ui.field("Plaka", "plate", v.plate if v else "", placeholder="34 ABC 123", attrs='autocapitalize="characters" autocomplete="off"') }}
+  </div>
+  <div class="form-row">
+    {{ ui.field("Muayene tarihi", "inspection_date", v.inspection_date if v else "", type="date") }}
+    {{ ui.field("Trafik sigortası bitişi", "insurance_date", v.insurance_date if v else "", type="date") }}
+    {{ ui.field("Kasko bitişi", "casco_date", v.casco_date if v else "", type="date") }}
+    {{ ui.field("Sonraki bakım tarihi", "service_date", v.service_date if v else "", type="date") }}
+  </div>
+  {{ ui.field("Sonraki bakım km", "service_km", (v.service_km | num(0)) if v and v.service_km is not none else "",
+              placeholder="ör. 120.000", attrs='inputmode="numeric" autocomplete="off"',
+              hint="Kalan km, son girilen kilometreye göre hesaplanır.") }}
+  {{ ui.textarea("Not", "note", v.note if v else "", rows=2, placeholder="Lastik ölçüsü, sigorta acentesi, şasi no...") }}
+{%- endmacro %}

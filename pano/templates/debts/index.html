@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Borç / Alacak{% endblock %}
+{% block head %}
+<style>
+  .pos { color: var(--ok); }
+  .neg { color: var(--danger); }
+  .stat .value.multi { font-size: 1.1rem; }
+  .debt-amount { text-align: right; white-space: nowrap; }
+</style>
+{% endblock %}
+{% block content %}
+{% set here = request.full_path.rstrip('?') %}
+{{ ui.page_header("🤝 Borç / Alacak") }}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Alacaklarım</div>
+    <div class="value multi pos">{% for cur, v in lent_totals %}{{ v | money(cur) }}{% if not loop.last %} + {% endif %}{% else %}{{ 0 | money }}{% endfor %}</div>
+    <div class="sub">{{ lent | length }} açık kayıt</div>
+  </div>
+  <div class="stat">
+    <div class="label">Borçlarım</div>
+    <div class="value multi neg">{% for cur, v in borrowed_totals %}{{ v | money(cur) }}{% if not loop.last %} + {% endif %}{% else %}{{ 0 | money }}{% endfor %}</div>
+    <div class="sub">{{ borrowed | length }} açık kayıt</div>
+  </div>
+</div>
+
+<div class="card">
+  <details class="add" {% if not lent and not borrowed and not settled_count %}open{% endif %}>
+    <summary>＋ Yeni kayıt</summary>
+    <form method="post" action="{{ url_for('debts.create') }}">
+      {{ ui.csrf() }}
+      <div class="form-row">
+        {{ ui.field("Kişi", "person", required=True, placeholder="Kime / kimden?", attrs='list="debt-persons" autocomplete="off" maxlength="100"') }}
+        {{ ui.select("Tür", "direction", directions.items() | list, default_direction) }}
+      </div>
+      <div class="form-row">
+        {{ ui.money_field("Tutar", "amount", required=True) }}
+        {{ ui.currency_select() }}
+      </div>
+      <div class="form-row">
+        {{ ui.field("Tarih", "date", today_str(), "date", True) }}
+        {{ ui.field("Vade (isteğe bağlı)", "due_date", "", "date") }}
+      </div>
+      {{ ui.field("Not", "note", placeholder="Ne için? (isteğe bağlı)") }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+    <datalist id="debt-persons">{% for p in persons %}<option value="{{ p }}">{% endfor %}</datalist>
+  </details>
+</div>
+
+<nav class="tabs">
+  <a href="{{ url_for('debts.index') }}" class="{{ 'active' if tab == 'alacaklarim' }}">Alacaklarım <span class="pill-count">{{ lent | length }}</span></a>
+  <a href="{{ url_for('debts.index', sekme='borclarim') }}" class="{{ 'active' if tab == 'borclarim' }}">Borçlarım <span class="pill-count">{{ borrowed | length }}</span></a>
+  <a href="{{ url_for('debts.index', sekme='kapananlar') }}" class="{{ 'active' if tab == 'kapananlar' }}">Kapananlar <span class="pill-count">{{ settled_count }}</span></a>
+</nav>
+
+<div class="card">
+  {% if rows %}
+    <ul class="rows">
+      {% for d in rows %}
+        <li>
+          <span class="ico">{{ '📤' if d.direction == 'lent' else '📥' }}</span>
+          <div class="grow">
+            <div class="title">{{ d.person }}</div>
+            <div class="meta">
+              {% if d.settled %}
+                <span class="badge good">Kapandı {{ d.settled_at | date_tr }}</span>
+                <span>{{ 'Alacak' if d.direction == 'lent' else 'Borç' }}</span>
+              {% elif d.due_date %}
+                {{ ui.due_badge(d.due_date) }}<span>Vade {{ d.due_date | date_tr }}</span>
+              {% endif %}
+              <span>{{ d.date | date_tr }}</span>
+              {% if d.note %}<span>{{ d.note }}</span>{% endif %}
+            </div>
+          </div>
+          <span class="debt-amount amount {{ 'pos' if d.direction == 'lent' and not d.settled }}{{ 'neg' if d.direction == 'borrowed' and not d.settled }}">{{ d.amount | money(d.currency) }}</span>
+          <div class="actions">
+            {% if d.settled %}
+              <form method="post" action="{{ url_for('debts.reopen', debt_id=d.id) }}" class="inline">
+                {{ ui.csrf() }}<input type="hidden" name="next" value="{{ here }}">
+                <button class="btn sm">Geri aç</button>
+              </form>
+            {% else %}
+              <form method="post" action="{{ url_for('debts.settle', debt_id=d.id) }}" class="inline">
+                {{ ui.csrf() }}<input type="hidden" name="next" value="{{ here }}">
+                <button class="btn sm ok" title="{{ 'Geri ödendi' if d.direction == 'lent' else 'Ödedim' }}">✓ Kapat</button>
+              </form>
+            {% endif %}
+            <a class="btn sm" href="{{ url_for('debts.edit', debt_id=d.id) }}" title="Düzenle" aria-label="Düzenle">✎</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% elif tab == 'alacaklarim' %}
+    {{ ui.empty("Kimsenin sana borcu yok.", "📤") }}
+  {% elif tab == 'borclarim' %}
+    {{ ui.empty("Kimseye borcun yok.", "🎉") }}
+  {% else %}
+    {{ ui.empty("Kapanmış kayıt yok.", "🤝") }}
+  {% endif %}
+</div>
+
+{% if people and tab != 'kapananlar' %}
+<div class="card">
+  <h2>Kişi bazında</h2>
+  <p class="muted small">Açık kayıtların neti: <span class="pos">+ sana borçlu</span>, <span class="neg">− sen borçlusun</span></p>
+  <ul class="rows">
+    {% for p in people %}
+      <li>
+        <span class="ico">👤</span>
+        <div class="grow">
+          <div class="title">{{ p.name }}</div>
+          <div class="meta">{{ p.count }} açık kayıt</div>
+        </div>
+        <div class="debt-amount amount">
+          {% for cur, v in p.net %}
+            {% if v > 0 %}<div class="pos">+{{ v | money(cur) }}</div>
+            {% elif v < 0 %}<div class="neg">−{{ (-v) | money(cur) }}</div>
+            {% else %}<div class="muted">denk ({{ cur }})</div>{% endif %}
+          {% endfor %}
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Faturayı düzenle{% endblock %}
+{% block content %}
+{% set back = url_for('bills.index', sekme='odenen') if bill.paid else url_for('bills.index') %}
+{% call ui.page_header("Faturayı düzenle", back=back) %}
+  {{ ui.delete_button(url_for('bills.delete', bill_id=bill.id), "Sil", "Bu fatura silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  {% if bill.paid %}
+    <div class="row-flex">
+      <span class="badge good">✓ {{ bill.paid_at | date_tr }} tarihinde ödendi</span>
+      <span class="spacer"></span>
+      <form method="post" action="{{ url_for('bills.unpay', bill_id=bill.id) }}" class="inline">
+        {{ ui.csrf() }}
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <button class="btn sm">Ödemeyi geri al</button>
+      </form>
+    </div>
+  {% else %}
+    <form method="post" action="{{ url_for('bills.pay', bill_id=bill.id) }}" class="row-flex">
+      {{ ui.csrf() }}
+      {{ ui.due_badge(bill.due_date) }}
+      <span class="spacer"></span>
+      {% if bill.amount %}{{ ui.checkbox("Harcamalara da ekle", "add_expense", True) }}{% endif %}
+      <button class="btn ok">✓ Ödendi</button>
+    </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.field("Fatura", "name", bill.name, required=True, attrs='maxlength="100"') }}
+      {{ ui.money_field("Tutar (₺)", "amount", bill.amount, placeholder="Bilinmiyorsa boş bırakın") }}
+    </div>
+    <div class="form-row">
+      {{ ui.field("Son ödeme tarihi", "due_date", bill.due_date, "date", True) }}
+      <div>{{ ui.checkbox("Her ay tekrarlanır", "recurring", bill.recurring) }}</div>
+    </div>
+    {{ ui.textarea("Not", "note", bill.note, rows=3) }}
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+
+<p class="muted small">Eklenme: {{ bill.created_at | localdt }}</p>
+{% endblock %}

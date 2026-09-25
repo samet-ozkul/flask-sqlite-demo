@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "inventory/_form.html" import item_fields %}
+{% block title %}{{ item.name }}{% endblock %}
+{% block content %}
+{% call ui.page_header("📦 " ~ item.name, ("📍 " ~ item.location) if item.location else None, back=url_for('inventory.index')) %}
+  {{ ui.delete_button(url_for('inventory.delete', item_id=item.id), "Sil", "Eşya ve fotoğrafları silinsin mi? Bu işlem geri alınamaz.") }}
+{% endcall %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    {{ item_fields(item, locations, categories) }}
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Fotoğraflar</h2>
+  <p class="muted small">Eşyanın ya da durduğu yerin (dolap, kutu, raf) fotoğrafı bulmayı kolaylaştırır.</p>
+  {{ ui.attachments("inventory", item.id, files, request.path) }}
+</div>
+
+<p class="muted small">Eklenme: {{ item.created_at | localdt }}</p>
+{% endblock %}

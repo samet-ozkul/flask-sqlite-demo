@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Yönetim{% endblock %}
+{% block content %}
+{% call ui.page_header("🛠️ Yönetim") %}
+  <a class="btn" href="{{ url_for('admin.users') }}">👥 Kullanıcılar ({{ users }})</a>
+  <a class="btn primary" href="{{ url_for('admin.backup') }}">💾 Yedek</a>
+{% endcall %}
+
+{% if secret_default %}
+  <div class="flash error"><b>SECRET_KEY ayarlanmamış!</b> Oturumlar tahmin edilebilir bir anahtarla imzalanıyor. WSGI dosyasında <code>SECRET_KEY</code> tanımla.</div>
+{% endif %}
+
+<section class="card">
+  <h2>Depolama</h2>
+  {% set cls = 'full' if disk.percent >= 90 else 'warn' if disk.percent >= 75 else '' %}
+  <div class="meter {{ cls }}"><span style="width: {{ disk.percent }}%"></span></div>
+  <p><b>{{ disk.used | size }}</b> / {{ disk.quota | size }} kullanıldı (%{{ disk.percent }}) ·
+     Veritabanı {{ disk.db | size }} · Dosyalar {{ disk.files | size }}</p>
+  <p class="muted small">Kota <code>STORAGE_QUOTA_MB</code> ile ayarlanır. PythonAnywhere ücretsiz planı toplam 512 MB veriyor; virtualenv ve kod için pay bırakılmıştır.</p>
+  {% if home %}
+    <p>Ev klasörünün tamamı (<code>{{ home.path }}</code>): <b>{{ home.size | size }}</b> / 512 MB
+      {% if home.pip_cache > 1024 * 1024 %}· pip önbelleği {{ home.pip_cache | size }} — Bash'te <code>rm -rf ~/.cache/pip</code> ile silebilirsin{% endif %}
+      <span class="muted small">({{ home.seconds }} sn)</span></p>
+  {% else %}
+    <a class="btn sm" href="{{ url_for('admin.index', disk=1) }}">Tüm ev klasörünü ölç</a>
+  {% endif %}
+  <form method="post" action="{{ url_for('admin.cleanup') }}" class="inline" data-confirm="Sahipsiz dosyalar silinip veritabanı sıkıştırılacak. Devam?">
+    {{ ui.csrf() }}<button class="btn sm">🧹 Temizlik yap</button>
+  </form>
+</section>
+
+<div class="grid two">
+  <section class="card">
+    <h2>Kayıtlar</h2>
+    <table>
+      {% for label, n in counts %}<tr><td>{{ label }}</td><td class="num">{{ n }}</td></tr>{% endfor %}
+    </table>
+  </section>
+  <section class="card">
+    <h2>Durum</h2>
+    <ul class="rows">
+      <li><span class="grow">Şema sürümü</span><span class="badge">v{{ schema_version }}</span></li>
+      <li><span class="grow">Telegram botu</span>{% if telegram_enabled %}<span class="badge good">Ayarlı</span>{% else %}<span class="badge">Yok</span>{% endif %}</li>
+      <li><span class="grow">Cron adresi (günlük özet)</span>{% if cron_enabled %}<span class="badge good">Ayarlı</span>{% else %}<span class="badge">Yok</span>{% endif %}</li>
+      <li><span class="grow">Herkese açık kayıt</span>{% if registration %}<span class="badge soon">Açık</span>{% else %}<span class="badge good">Kapalı</span>{% endif %}</li>
+    </ul>
+    <p class="muted small">Bu ayarlar ortam değişkenleriyle yapılır; README'deki “Ayarlar” bölümüne bak.</p>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Kayıt{% endblock %}
+{% block content %}
+<div class="auth-card card">
+  <h1>Kayıt ol</h1>
+  <form method="post">
+    {{ ui.csrf() }}
+    {{ ui.field("Kullanıcı adı", "username", required=True, attrs='autofocus minlength="3" maxlength="30" autocapitalize="none"') }}
+    {{ ui.field("Şifre", "password", type="password", required=True, attrs='minlength="8" autocomplete="new-password"', hint="En az 8 karakter") }}
+    <button class="btn primary block">Kayıt ol</button>
+  </form>
+  <p class="muted center">Zaten hesabın var mı? <a href="{{ url_for('auth.login') }}">Giriş yap</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Ayarlar{% endblock %}
+{% block content %}
+{{ ui.page_header("⚙️ Ayarlar", "Kullanıcı: " ~ g.user.username) }}
+
+<section class="card">
+  <h2>Profil</h2>
+  <form method="post" action="{{ url_for('settings.profile') }}">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.field("Görünen ad", "display_name", g.user.display_name, placeholder=g.user.username) }}
+      {{ ui.field("Şehir (hava durumu için)", "city", g.user.city, placeholder="Konya") }}
+    </div>
+    {{ ui.checkbox("Telegram'dan günlük özet gönder", "notify_daily", g.user.notify_daily) }}
+    <button class="btn primary">Kaydet</button>
+  </form>
+</section>
+
+<section class="card" id="telegram">
+  <h2>Telegram bildirimleri</h2>
+  {% if not telegram_enabled %}
+    <p class="muted">Yönetici henüz bir Telegram botu ayarlamamış (<code>TELEGRAM_BOT_TOKEN</code>).</p>
+  {% elif g.user.telegram_chat_id %}
+    <p><span class="badge good">Bağlı</span> Günlük özet, yaklaşan ödemeler ve randevular Telegram'a gelir.</p>
+    <div class="row-flex">
+      {{ ui.post_button(url_for('settings.telegram_test'), "Test mesajı gönder") }}
+      {{ ui.post_button(url_for('settings.telegram_unlink'), "Bağlantıyı kaldır", "danger") }}
+    </div>
+  {% elif g.user.telegram_link_code %}
+    <ol>
+      <li>
+        {% if bot_username %}
+          <a class="btn primary sm" href="https://t.me/{{ bot_username }}?start={{ g.user.telegram_link_code }}" target="_blank" rel="noopener">Telegram'da botu aç</a>
+          ve <b>Başlat</b>'a bas.
+        {% else %}
+          Botuna Telegram'dan şu mesajı gönder: <code>/start {{ g.user.telegram_link_code }}</code>
+        {% endif %}
+      </li>
+      <li>Buraya dönüp aşağıdaki butona bas.</li>
+    </ol>
+    {{ ui.post_button(url_for('settings.telegram_verify'), "Bağlantıyı doğrula", "primary") }}
+  {% else %}
+    <p class="muted">Bildirim almak için Telegram hesabını bağla.</p>
+    {{ ui.post_button(url_for('settings.telegram_code'), "Telegram'ı bağla", "primary") }}
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Şifre değiştir</h2>
+  <form method="post" action="{{ url_for('settings.password') }}">
+    {{ ui.csrf() }}
+    {{ ui.field("Mevcut şifre", "current", type="password", required=True, attrs='autocomplete="current-password"') }}
+    <div class="form-row">
+      {{ ui.field("Yeni şifre", "new", type="password", required=True, attrs='minlength="8" autocomplete="new-password"') }}
+      {{ ui.field("Yeni şifre (tekrar)", "confirm", type="password", required=True, attrs='minlength="8" autocomplete="new-password"') }}
+    </div>
+    <button class="btn">Şifreyi değiştir</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Telefona uygulama olarak ekle</h2>
+  <p class="muted small"><b>Android (Chrome):</b> sağ üstteki ⋮ menüsü → <i>Ana ekrana ekle</i> / <i>Uygulamayı yükle</i>. Yüklendikten sonra başka uygulamalardan “Paylaş → Pano” ile link kaydedebilirsin.</p>
+  <p class="muted small"><b>iPhone (Safari):</b> Paylaş butonu → <i>Ana Ekrana Ekle</i>.</p>
+</section>
+{% endblock %}
