@@ -57,6 +57,16 @@ def test_auth(app):
     # açık yönlendirme engeli
     r = c.post("/giris?next=//evil.com", data={"_csrf": token, "username": "admin", "password": "admin12345"})
     assert r.headers["Location"] == "/", r.headers["Location"]
+    # "Beni hatırla": formun gerçekten gönderdiği değerle 30 günlük kalıcı cookie
+    import re
+    page = app.test_client().get("/giris").get_data(as_text=True)
+    remember_value = re.search(r'name="remember" value="([^"]*)"', page).group(1)
+    for data, persistent in (({"remember": remember_value}, True), ({}, False)):
+        cl = app.test_client()
+        tok = csrf(cl.get("/giris"))
+        r = cl.post("/giris", data={"_csrf": tok, "username": "admin", "password": "admin12345", **data})
+        cookie = r.headers.get("Set-Cookie", "")
+        assert r.status_code == 302 and ("Expires=" in cookie) == persistent, (data, cookie)
     # hatalı denemelerde kilit
     c2 = app.test_client()
     t2 = csrf(c2.get("/giris"))

@@ -9,7 +9,7 @@ from flask import (Blueprint, abort, current_app, flash, g, redirect, render_tem
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .db import execute, get_db, query_one
-from .utils import safe_path
+from .utils import form_bool, safe_path
 
 bp = Blueprint("auth", __name__)
 
@@ -134,7 +134,7 @@ def login():
             _clear_failures(username)
             session.clear()
             session["user_id"] = user["id"]
-            session.permanent = request.form.get("remember") == "on"
+            session.permanent = bool(form_bool("remember"))  # 30 gün; değilse tarayıcı kapanınca biter
             return redirect(_safe_next(request.args.get("next")))
         _record_failure(username)
         flash("Kullanıcı adı veya şifre hatalı.", "error")
