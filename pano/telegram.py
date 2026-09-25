@@ -1,8 +1,14 @@
 """Telegram Bot API (api.telegram.org PythonAnywhere izin listesinde).
 
-Webhook kullanılmıyor: hesap bağlama getUpdates ile, bildirimler dışarıdan tetiklenen
-cron adresi ile gönderiliyor. Böylece arka planda çalışan işlem gerekmiyor.
+Bildirimler dışarıdan tetiklenen cron adresiyle gönderilir; arka planda çalışan işlem gerekmez.
+
+Mesajlardaki butonlar (✅ Tamamlandı) için yönetim sayfasından webhook kurulur: Telegram
+butona basıldığında /telegram/webhook adresine haber verir. Webhook açıkken Telegram
+getUpdates'e izin vermediği için hesap bağlama ("/start KOD") da webhook üzerinden yapılır;
+webhook kurulmamışsa eski yöntem (getUpdates) çalışmaya devam eder.
 """
+import hashlib
+import hmac
 import html
 import json
 import os
@@ -11,6 +17,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from flask import current_app
+
+from .db import query_one
 from .external import cached
 
 TIMEOUT = 15
@@ -65,9 +74,26 @@ def escape(text):
     return html.escape(str(text), quote=False)
 
 
-def send_message(chat_id, text_html):
-    return _call("sendMessage", {"chat_id": chat_id, "text": text_html, "parse_mode": "HTML",
-                                 "disable_web_page_preview": "true"})
+def keyboard(rows):
+    """[[("Metin", "callback_data"), ...], ...] -> Telegram inline_keyboard JSON."""
+    return json.dumps({"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in row] for row in rows]})
+
+
+def send_message(chat_id, text_html, buttons=None):
+    params = {"chat_id": chat_id, "text": text_html, "parse_mode": "HTML", "disable_web_page_preview": "true"}
+    if buttons:
+        params["reply_markup"] = keyboard(buttons)
+    return _call("sendMessage", params)
+
+
+def answer_callback(callback_id, text=""):
+    """Butona basınca Telegram'ın gösterdiği bekleme simgesini kapatır, kısa bir bildirim gösterir."""
+    return _call("answerCallbackQuery", {"callback_query_id": callback_id, "text": text})
+
+
+def edit_buttons(chat_id, message_id, buttons):
+    return _call("editMessageReplyMarkup", {"chat_id": chat_id, "message_id": message_id,
+                                            "reply_markup": keyboard(buttons or [])})
 
 
 def send_document(chat_id, filename, data, caption=""):
@@ -80,6 +106,33 @@ def bot_username():
         return None
     result = cached(f"tg:me:{token()[:10]}", 7 * 86400, lambda: _call("getMe"))
     return result.get("username") if result else None
+
+
+# ---------- Webhook ----------
+def webhook_secret():
+    """Telegram'ın her webhook isteğinde başlıkta gönderdiği gizli anahtar (SECRET_KEY'den türetilir).
+    SECRET_KEY değişirse webhook yönetim sayfasından yeniden kurulmalı."""
+    key = current_app.config["SECRET_KEY"].encode()
+    return hmac.new(key, b"telegram-webhook", hashlib.sha256).hexdigest()[:48]
+
+
+def set_webhook(url):
+    return _call("setWebhook", {"url": url, "secret_token": webhook_secret(),
+                                "allowed_updates": '["message", "callback_query"]', "max_connections": 5})
+
+
+def webhook_active():
+    """Yönetim sayfasından webhook kurulduysa True (butonlar ancak o zaman çalışır)."""
+    row = query_one("SELECT value FROM app_state WHERE key = 'telegram_webhook'")
+    return bool(row and row["value"])
+
+
+def delete_webhook():
+    return _call("deleteWebhook")
+
+
+def webhook_info():
+    return _call("getWebhookInfo")
 
 
 def find_chat_for_code(code):

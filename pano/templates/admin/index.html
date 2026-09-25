@@ -42,10 +42,35 @@
     <ul class="rows">
       <li><span class="grow">Şema sürümü</span><span class="badge">v{{ schema_version }}</span></li>
       <li><span class="grow">Telegram botu</span>{% if telegram_enabled %}<span class="badge good">Ayarlı</span>{% else %}<span class="badge">Yok</span>{% endif %}</li>
+      {% if webhook %}
+        <li style="flex-wrap: wrap">
+          <span class="grow">Mesaj butonları (webhook)
+            {% if webhook.active and webhook.error %}<br><span class="danger-text small">Son hata: {{ webhook.error }}</span>{% endif %}
+          </span>
+          {% if webhook.active %}
+            <span class="badge {{ 'soon' if webhook.error else 'good' }}">{{ 'Hatalı' if webhook.error else 'Açık' }}</span>
+          {% else %}
+            <span class="badge">Kapalı</span>
+          {% endif %}
+          <div class="row-flex" style="width: 100%; margin-top: 6px">
+            <form method="post" action="{{ url_for('admin.telegram_webhook') }}" class="inline">
+              {{ ui.csrf() }}<input type="hidden" name="action" value="set">
+              <button class="btn sm {{ '' if webhook.active else 'primary' }}">{{ "Yeniden kur" if webhook.active else "Webhook'u kur" }}</button>
+            </form>
+            {% if webhook.active %}
+              <form method="post" action="{{ url_for('admin.telegram_webhook') }}" class="inline" data-confirm="Webhook kaldırılsın mı? Hatırlatmalar butonsuz gönderilir.">
+                {{ ui.csrf() }}<input type="hidden" name="action" value="delete">
+                <button class="btn sm danger">Kaldır</button>
+              </form>
+            {% endif %}
+          </div>
+        </li>
+      {% endif %}
       <li><span class="grow">Cron adresi (günlük özet)</span>{% if cron_enabled %}<span class="badge good">Ayarlı</span>{% else %}<span class="badge">Yok</span>{% endif %}</li>
       <li><span class="grow">Herkese açık kayıt</span>{% if registration %}<span class="badge soon">Açık</span>{% else %}<span class="badge good">Kapalı</span>{% endif %}</li>
     </ul>
-    <p class="muted small">Bu ayarlar ortam değişkenleriyle yapılır; README'deki “Ayarlar” bölümüne bak.</p>
+    <p class="muted small">Bu ayarlar ortam değişkenleriyle yapılır; README'deki “Ayarlar” bölümüne bak.
+      Webhook, Telegram mesajlarındaki “✅ Tamamlandı” butonunun çalışması içindir; <code>SECRET_KEY</code> değişirse yeniden kur.</p>
   </section>
 </div>
 {% endblock %}

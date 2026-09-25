@@ -16,6 +16,7 @@ from flask import Blueprint, abort, jsonify, request, url_for
 from .. import backup, external, telegram
 from .. import todo_reminders as todo
 from ..db import get_db, query, query_one
+from .bot import done_buttons
 from ..reminders import medications_today, upcoming
 from ..utils import MONTHS_TR, WEEKDAYS_TR, fmt_money, now_local, rel_days, today, today_str
 
@@ -117,6 +118,8 @@ def todo_reminders(secret):
         return jsonify(error="TELEGRAM_BOT_TOKEN ayarlı değil"), 400
     to_send, stale = todo.pending()
     result = {"sent": 0, "stale": len(stale), "no_telegram": 0, "errors": []}
+    # "✅ Tamamlandı" butonu sadece webhook kuruluysa çalışır; değilse hiç gösterme
+    with_buttons = telegram.webhook_active()
     for item in stale:
         todo.mark_sent(item["id"], "due")
     for kind, item in to_send:
@@ -126,7 +129,8 @@ def todo_reminders(secret):
             continue
         url = url_for("lists.detail", list_id=item["list_id"], _external=True)
         try:
-            telegram.send_message(chat_id, todo.message(kind, item, url, telegram.escape))
+            telegram.send_message(chat_id, todo.message(kind, item, url, telegram.escape),
+                                  buttons=done_buttons(item["id"]) if with_buttons else None)
             todo.mark_sent(item["id"], kind)
             result["sent"] += 1
         except telegram.TelegramError as e:

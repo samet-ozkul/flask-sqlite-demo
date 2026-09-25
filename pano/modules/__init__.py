@@ -19,7 +19,7 @@ MODULES = [
 ]
 
 # Menüde gösterilmeyen altyapı modülleri
-CORE = ["dashboard", "settings", "admin", "cron"]
+CORE = ["dashboard", "settings", "admin", "cron", "bot"]
 
 
 def module_groups():

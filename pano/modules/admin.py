@@ -38,8 +38,19 @@ def index():
             "pip_cache": dir_size(os.path.join(home_dir, ".cache", "pip")),
             "seconds": round(time.time() - started, 1),
         }
+    webhook = None
+    if telegram.enabled():
+        webhook = {"active": telegram.webhook_active(), "error": None, "pending": 0}
+        if webhook["active"]:
+            try:
+                info = telegram.webhook_info()
+                webhook.update(url=info.get("url"), pending=info.get("pending_update_count", 0),
+                               error=info.get("last_error_message"))
+            except telegram.TelegramError as e:
+                webhook["error"] = str(e)
     return render_template(
         "admin/index.html",
+        webhook=webhook,
         disk=usage(),
         home=home,
         counts=counts,
@@ -50,6 +61,32 @@ def index():
         registration=registration_open(),
         secret_default=current_app.config["SECRET_KEY"] == "dev-secret-change-me",
     )
+
+
+# ---------- Telegram webhook (mesaj butonları) ----------
+@bp.route("/telegram/webhook", methods=["POST"])
+@admin_required
+def telegram_webhook():
+    if not telegram.enabled():
+        flash("Önce TELEGRAM_BOT_TOKEN ayarlanmalı.", "error")
+        return redirect(url_for(".index"))
+    try:
+        if request.form.get("action") == "delete":
+            telegram.delete_webhook()
+            execute("DELETE FROM app_state WHERE key = 'telegram_webhook'")
+            flash("Webhook kaldırıldı. Mesajlar butonsuz gönderilecek.", "success")
+        else:
+            url = url_for("bot.webhook", _external=True)
+            if not url.startswith("https://"):
+                flash(f"Telegram webhook için HTTPS adres gerekir ({url}). Yerelde kurulamaz; "
+                      "PythonAnywhere'de Force HTTPS açıkken dene.", "error")
+                return redirect(url_for(".index"))
+            telegram.set_webhook(url)
+            execute("INSERT OR REPLACE INTO app_state (key, value) VALUES ('telegram_webhook', ?)", (url,))
+            flash("Webhook kuruldu: hatırlatmalarda “✅ Tamamlandı” butonu çıkacak.", "success")
+    except telegram.TelegramError as e:
+        flash(f"Telegram hatası: {e}", "error")
+    return redirect(url_for(".index"))
 
 
 # ---------- Kullanıcılar ----------
