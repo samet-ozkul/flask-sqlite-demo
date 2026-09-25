@@ -6,7 +6,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 | Grup | Modüller |
 |---|---|
 | 🏠 Pano | Günün özeti: hava durumu, döviz kuru, yaklaşan ödemeler/tarihler, bugünkü alışkanlıklar ve ilaçlar, hızlı harcama ve hızlı not |
-| 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) |
+| 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) |
 | 💰 Para | **Harcamalar** (aylık özet, kategori grafiği) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** |
 | 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) |
 | 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) |
@@ -114,6 +114,7 @@ Sonra 3. adımdaki **Static files** ayarını ekle, WSGI dosyasına yeni değiş
 | `STORAGE_QUOTA_MB` | – | Veritabanı + dosyalar için üst sınır (varsayılan 350) |
 | `ALLOW_REGISTRATION` | – | `1` ise herkes kayıt olabilir (varsayılan kapalı) |
 | `APP_TZ` | – | Saat dilimi (varsayılan `Europe/Istanbul`) |
+| `REMINDER_DEFAULT_TIME` | – | Saati girilmemiş yapılacaklar için hatırlatma saati (varsayılan `09:00`) |
 | `DATABASE_PATH`, `UPLOAD_DIR` | – | Varsayılan: proje klasöründe `app.db` ve `uploads/` |
 
 ## Telegram bildirimleri (isteğe bağlı)
@@ -128,10 +129,14 @@ PythonAnywhere ücretsiz planında zamanlanmış görev yok. Bunun yerine [cron-
 
 | Görev | Adres | Önerilen zaman |
 |---|---|---|
-| Günlük özet (hava, yaklaşan ödemeler, randevular, ilaçlar) | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/gunluk` | Her gün 08:00 |
-| Veritabanı yedeğini yöneticilere Telegram'dan gönder | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/yedek` | Haftada bir |
+| Günlük özet (hava, yaklaşan ödemeler, randevular, ilaçlar) | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/gunluk` | Her gün 08:00 (`0 8 * * *`) |
+| Yapılacaklar hatırlatmaları | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
+| Veritabanı yedeğini yöneticilere Telegram'dan gönder | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/yedek` | Haftada bir, Pazar 03:00 (`0 3 * * 0`) |
 
 Günlük özet aynı gün ikinci kez çağrılsa da tekrar gönderilmez. `CRON_SECRET`'ı kimseyle paylaşma.
+cron-job.org'da saat dilimini **Europe/Istanbul** yapmayı unutma.
+
+**Yapılacaklar hatırlatmaları:** Maddeye tarih, isteğe bağlı saat ve hatırlatma zamanı (zamanı gelince / 15 dk / 1 saat / 3 saat / 1 gün önce) verilir. “… önce” seçilirse iki mesaj gelir: süre yaklaşınca ⏰ ve zamanı gelince 🔔. Mesaj maddeyi ekleyen kişiye (Telegram'ı bağlı değilse liste sahibine) gider. Hatırlatmalar cron çağrısı sıklığına göre en fazla 5 dakika gecikir; cron 6 saatten uzun süre çalışmazsa kaçan eski hatırlatmalar toplu gönderilmez. Tarih/saat/hatırlatma değiştirilince mesajlar yeniden gönderilebilir.
 
 ## Yedekleme
 

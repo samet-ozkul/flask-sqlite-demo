@@ -17,6 +17,10 @@
   .done-box[open] > summary { margin-bottom: 6px; }
   .done-box .clear { margin-top: 10px; }
   .settings hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
+  .due-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .due-row input[type=date] { flex: 1 1 60%; min-width: 0; }
+  .due-row input[type=time] { flex: 1 1 40%; min-width: 0; }
+  .add-item .quick select { flex: 1; min-width: 0; }
 </style>
 {% endblock %}
 {% block content %}
@@ -38,10 +42,21 @@
       <small class="muted">Birden çok ürünü virgülle ya da alt alta yazarak tek seferde ekleyebilirsin.</small>
     {% else %}
       <input name="text" required maxlength="200" placeholder="Yapılacak iş..." aria-label="Yapılacak iş" autocomplete="off">
-      <div class="quick">
+      <div class="due-row">
         <input type="date" name="due_date" aria-label="Son tarih" title="Son tarih (isteğe bağlı)">
+        <input type="time" name="due_time" aria-label="Saat" title="Saat (isteğe bağlı)">
+      </div>
+      <div class="quick">
+        <select name="remind" aria-label="Hatırlatma" title="Telegram hatırlatması">
+          {% for v, label in remind_options %}<option value="{{ v }}" {% if v == default_remind %}selected{% endif %}>🔔 {{ label }}</option>{% endfor %}
+        </select>
         <button class="btn primary">＋ Ekle</button>
       </div>
+      <small class="muted">
+        Hatırlatma için tarih seç; saat boşsa {{ default_time }}.
+        {% if not telegram_enabled %}Hatırlatmalar için yöneticinin Telegram botunu ayarlaması gerekiyor.
+        {% elif not g.user.telegram_chat_id %}Hatırlatmalar Telegram'dan gelir: <a href="{{ url_for('settings.index') }}#telegram">Telegram'ı bağla</a>.{% endif %}
+      </small>
     {% endif %}
   </form>
 </div>
@@ -57,13 +72,18 @@
       {% set other = i.created_by and i.created_by != g.user.id and i.creator_username %}
       {% if (i.due_date and not done) or other or done %}
         <div class="meta">
-          {% if i.due_date and not done %}{{ ui.due_badge(i.due_date) }}{% endif %}
+          {% if i.due_date and not done %}
+            {{ ui.due_badge(i.due_date) }}
+            {% if i.due_time %}<span>🕒 {{ i.due_time }}</span>{% endif %}
+            {% if i.remind_before is not none %}<span title="Telegram hatırlatması">🔔 {{ remind_label(i.remind_before) }}</span>{% endif %}
+          {% endif %}
           {% if other %}<span>👤 {{ i.creator_display or i.creator_username }}</span>{% endif %}
           {% if done and i.done_at %}<span>✓ {{ i.done_at | localdt }}</span>{% endif %}
         </div>
       {% endif %}
     </div>
     {% if is_owner or i.created_by == g.user.id %}
+      {% if not done %}<a class="btn sm icon" href="{{ url_for('lists.edit_item', item_id=i.id) }}" aria-label="Düzenle" title="Düzenle / hatırlatma">✎</a>{% endif %}
       <form method="post" action="{{ url_for('lists.delete_item', item_id=i.id) }}" class="inline">
         {{ ui.csrf() }}
         <button class="btn sm icon danger" aria-label="Sil" title="Sil">✕</button>

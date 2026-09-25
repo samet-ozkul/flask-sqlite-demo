@@ -1,8 +1,9 @@
 """⏰ Dışarıdan tetiklenen görevler (cron-job.org gibi ücretsiz bir servis çağırır).
 
 PythonAnywhere ücretsiz planında zamanlanmış görev olmadığı için:
-  GET /cron/<CRON_SECRET>/gunluk  -> herkese Telegram günlük özeti (günde bir kez)
-  GET /cron/<CRON_SECRET>/yedek   -> yöneticilere Telegram'dan veritabanı yedeği
+  GET /cron/<CRON_SECRET>/gunluk      -> herkese Telegram günlük özeti (günde bir kez)
+  GET /cron/<CRON_SECRET>/hatirlatma  -> yapılacaklar hatırlatmaları (5 dakikada bir)
+  GET /cron/<CRON_SECRET>/yedek       -> yöneticilere Telegram'dan veritabanı yedeği
 CRON_SECRET ayarlı değilse bu adresler 404 döner.
 """
 import os
@@ -10,9 +11,10 @@ import secrets
 import shutil
 import time
 
-from flask import Blueprint, abort, jsonify, request
+from flask import Blueprint, abort, jsonify, request, url_for
 
 from .. import backup, external, telegram
+from .. import todo_reminders as todo
 from ..db import get_db, query, query_one
 from ..reminders import medications_today, upcoming
 from ..utils import MONTHS_TR, WEEKDAYS_TR, fmt_money, now_local, rel_days, today, today_str
@@ -104,6 +106,31 @@ def daily(secret):
     db = get_db()
     db.execute("DELETE FROM login_attempts WHERE first_at < ?", (time.time() - 86400,))
     db.commit()
+    return jsonify(result)
+
+
+@bp.route("/<secret>/hatirlatma")
+def todo_reminders(secret):
+    """Yapılacaklar hatırlatmaları. Sık çağrılmalı (ör. 5 dakikada bir); iş yoksa hemen döner."""
+    _check_secret(secret)
+    if not telegram.enabled():
+        return jsonify(error="TELEGRAM_BOT_TOKEN ayarlı değil"), 400
+    to_send, stale = todo.pending()
+    result = {"sent": 0, "stale": len(stale), "no_telegram": 0, "errors": []}
+    for item in stale:
+        todo.mark_sent(item["id"], "due")
+    for kind, item in to_send:
+        chat_id = todo.recipient_chat_id(item)
+        if not chat_id:
+            result["no_telegram"] += 1
+            continue
+        url = url_for("lists.detail", list_id=item["list_id"], _external=True)
+        try:
+            telegram.send_message(chat_id, todo.message(kind, item, url, telegram.escape))
+            todo.mark_sent(item["id"], kind)
+            result["sent"] += 1
+        except telegram.TelegramError as e:
+            result["errors"].append(f"madde {item['id']}: {e}")
     return jsonify(result)
 
 
