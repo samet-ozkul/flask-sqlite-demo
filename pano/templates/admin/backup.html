@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Yedek{% endblock %}
+{% block content %}
+{{ ui.page_header("💾 Yedek", "Son indirilen yedek: " ~ (last or "hiç"), back=url_for('admin.index')) }}
+
+<section class="card">
+  <h2>Yedek indir</h2>
+  <p class="muted small">Yedek sunucuda saklanmaz, doğrudan bilgisayarına/telefonuna iner. Haftada bir indirmen önerilir.</p>
+  <div class="row-flex">
+    <form method="post" action="{{ url_for('admin.backup_download') }}" class="inline">
+      {{ ui.csrf() }}<input type="hidden" name="mode" value="full">
+      <button class="btn primary">⬇️ Tam yedek (veritabanı + dosyalar · ~{{ disk.used | size }})</button>
+    </form>
+    <form method="post" action="{{ url_for('admin.backup_download') }}" class="inline">
+      {{ ui.csrf() }}<input type="hidden" name="mode" value="db">
+      <button class="btn">⬇️ Sadece veritabanı (~{{ disk.db | size }})</button>
+    </form>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Otomatik yedek (Telegram)</h2>
+  {% if telegram_enabled and cron_enabled %}
+    <p>Cron servisi <code>/cron/&lt;CRON_SECRET&gt;/yedek</code> adresini çağırdığında veritabanı yedeği, Telegram'ı bağlı yöneticilere dosya olarak gönderilir. Dosya ekleri boyut nedeniyle dahil değildir.</p>
+  {% else %}
+    <p class="muted">Kurmak için <code>TELEGRAM_BOT_TOKEN</code> ve <code>CRON_SECRET</code> ayarla, Ayarlar'dan Telegram'ı bağla ve cron-job.org'da haftalık bir görev oluştur (README'de adımlar var).</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Yedekten geri yükle</h2>
+  <p class="flash warning">Mevcut <b>tüm veriler</b> yedektekilerle değiştirilir. Önce güncel bir tam yedek indir. Sadece veritabanı yedeği yüklersen mevcut dosyalar olduğu gibi kalır.</p>
+  <form method="post" action="{{ url_for('admin.backup_restore') }}" enctype="multipart/form-data">
+    {{ ui.csrf() }}
+    <label class="field"><span>Yedek dosyası (.zip)</span><input type="file" name="file" accept=".zip,application/zip" required></label>
+    {{ ui.field("Onay için EVET yaz", "confirm", required=True, attrs='autocomplete="off" autocapitalize="characters"') }}
+    <button class="btn danger">Geri yükle</button>
+  </form>
+</section>
+{% endblock %}

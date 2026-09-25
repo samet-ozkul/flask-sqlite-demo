@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "links/_form.html" import link_form %}
+{% block title %}Link kaydet{% endblock %}
+{% block content %}
+{{ ui.page_header("🔖 Sonra bak", "Linki kontrol et ve kaydet", back=url_for('links.index')) }}
+
+<div class="card">
+  {% if v.url and domain(v.url) %}<p class="muted small">🌐 {{ domain(v.url) }}</p>{% endif %}
+  {{ link_form(v, url_for('links.create'), "Kaydet") }}
+</div>
+{% endblock %}

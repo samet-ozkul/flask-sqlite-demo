@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "inventory/_form.html" import item_fields %}
+{% block title %}Ev Envanteri{% endblock %}
+{% block head %}
+<style>
+  .inv-search { margin-bottom: 10px; }
+  .inv-search input[type=search] { flex: 1 1 100%; font-size: 17px; padding: 13px 14px; }
+  .inv-search select { flex: 1 1 140px; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; margin-bottom: 14px; }
+  .chips a { white-space: nowrap; }
+  .chips a.on { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+  .qty { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  .qty .n { min-width: 2.2em; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .qty .btn { width: 34px; height: 34px; padding: 0; font-size: 1.1rem; }
+  .qty .btn:disabled { opacity: .4; cursor: default; }
+  .loc { font-weight: 500; color: var(--text); }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("📦 Ev Envanteri", "Matkap nerede? Eşyanın yerini bir kez yaz, saniyede bul.") }}
+
+<form method="get" class="search inv-search" role="search">
+  <input type="search" name="q" value="{{ q }}" placeholder="🔍 Ne arıyorsun? (ör. matkap)" aria-label="Eşya ara">
+  {% if locations %}
+    <select name="loc" data-autosubmit aria-label="Yer">
+      <option value="">📍 Tüm yerler</option>
+      {% for v, n in locations %}<option value="{{ v }}" {% if v == loc %}selected{% endif %}>{{ v }} ({{ n }})</option>{% endfor %}
+    </select>
+  {% endif %}
+  {% if categories %}
+    <select name="cat" data-autosubmit aria-label="Kategori">
+      <option value="">🏷️ Tüm kategoriler</option>
+      {% for v, n in categories %}<option value="{{ v }}" {% if v == cat %}selected{% endif %}>{{ v }} ({{ n }})</option>{% endfor %}
+    </select>
+  {% endif %}
+  <button class="btn primary">Ara</button>
+</form>
+
+{% if locations | length > 1 %}
+  <div class="chips" aria-label="Yere göre">
+    <a class="tag {{ 'on' if not loc }}" href="{{ url_for('inventory.index', q=q or None, cat=cat or None) }}">Tümü</a>
+    {% for v, n in locations %}
+      <a class="tag {{ 'on' if v == loc }}" href="{{ url_for('inventory.index', q=q or None, cat=cat or None, loc=v) }}">📍 {{ v }} <span class="muted">{{ n }}</span></a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if q or loc or cat %}
+  <p class="muted small">{{ items | length }} sonuç{% if loc %} · 📍 {{ loc }}{% endif %}{% if cat %} · 🏷️ {{ cat }}{% endif %}
+    · <a href="{{ url_for('inventory.index') }}">Filtreyi temizle</a></p>
+{% endif %}
+
+<div class="card">
+  <details class="add" {% if not total %}open{% endif %}>
+    <summary>＋ Eşya ekle</summary>
+    <form method="post" action="{{ url_for('inventory.create') }}">
+      {{ ui.csrf() }}
+      <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+      {{ item_fields(None, locations, categories, loc, cat) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+{% if items %}
+  <div class="card">
+    <ul class="rows">
+      {% for i in items %}
+        {% set t = thumbs.get(i.id) %}
+        <li>
+          <a href="{{ url_for('inventory.edit', item_id=i.id) }}">
+            {% if t %}<img class="thumb" src="{{ url_for('files.thumb', att_id=t.id) }}" alt="" loading="lazy">
+            {% else %}<span class="ico">📦</span>{% endif %}
+          </a>
+          <div class="grow">
+            <a class="title" href="{{ url_for('inventory.edit', item_id=i.id) }}">{{ i.name }}</a>
+            <div class="meta">
+              {% if i.location %}<span class="loc">📍 {{ i.location }}</span>{% else %}<span>yeri girilmemiş</span>{% endif %}
+              {% if i.category %}<a class="tag" href="{{ url_for('inventory.index', cat=i.category) }}">{{ i.category }}</a>{% endif %}
+              {% if i.quantity == 0 %}<span class="badge soon">kalmadı</span>{% endif %}
+            </div>
+            {% if i.note %}<div class="meta">{{ i.note | truncate(90) }}</div>{% endif %}
+          </div>
+          <div class="qty">
+            <form method="post" action="{{ url_for('inventory.qty', item_id=i.id) }}" class="inline">
+              {{ ui.csrf() }}<input type="hidden" name="d" value="-1">
+              <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+              <button class="btn" aria-label="Azalt" {% if i.quantity <= 0 %}disabled{% endif %}>−</button>
+            </form>
+            <span class="n">{{ i.quantity }}</span>
+            <form method="post" action="{{ url_for('inventory.qty', item_id=i.id) }}" class="inline">
+              {{ ui.csrf() }}<input type="hidden" name="d" value="1">
+              <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+              <button class="btn" aria-label="Artır">+</button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% elif q or loc or cat %}
+  {{ ui.empty("Bulunamadı. Başka bir kelimeyle dene ya da yukarıdan ekle.", "🔍") }}
+{% else %}
+  {{ ui.empty("Henüz eşya yok. Matkabı, yedek anahtarı, garanti kutusunu nereye koyduğunu yaz; bir daha aramak zorunda kalma.", "📦") }}
+{% endif %}
+{% endblock %}

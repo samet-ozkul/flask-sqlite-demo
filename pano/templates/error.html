@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ error.code }}{% endblock %}
+{% block content %}
+<div class="empty">
+  <span>{{ {400: '⚠️', 403: '🔒', 404: '🔍'}.get(error.code, '⚠️') }}</span>
+  <h1>{{ {400: 'Geçersiz istek', 403: 'Yetkiniz yok', 404: 'Sayfa bulunamadı'}.get(error.code, 'Hata') }}</h1>
+  {% if error.code == 400 and error.description %}<p class="muted">{{ error.description }}</p>{% endif %}
+  <p><a class="btn" href="{{ url_for('dashboard.index') }}">Panoya dön</a></p>
+</div>
+{% endblock %}

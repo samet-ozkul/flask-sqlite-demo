@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "habits/_parts.html" as hp %}
+{% block title %}Alışkanlıklar{% endblock %}
+{% block head %}{{ hp.style() }}{% endblock %}
+{% block content %}
+{{ ui.page_header("🔥 Alışkanlıklar", "Bugün: " ~ (today | date_tr(True))) }}
+
+{% if active %}
+  <div class="card">
+    <h2>Bugün <span class="pill-count">{{ done_count }}/{{ active | length }}</span></h2>
+    <p class="progress-line">
+      {% if done_count == active | length %}Harika, bugünkü hepsi tamam! 🎉
+      {% else %}Yaptıklarına dokunarak işaretle.{% endif %}
+    </p>
+    <div class="habit-chips big">
+      {% for s in active %}
+        <form method="post" action="{{ url_for('habits.toggle', habit_id=s.habit.id) }}">
+          {{ ui.csrf() }}
+          <button class="habit-chip {{ 'on' if s.done }}" aria-pressed="{{ 'true' if s.done else 'false' }}">
+            <span class="hico">{{ s.habit.icon }}</span>
+            <span>{{ s.habit.name }}</span>
+            {% if s.done %}<span aria-hidden="true">✓</span>{% endif %}
+            {% if s.streak > 1 %}<span class="hstreak">🔥{{ s.streak }}</span>{% endif %}
+          </button>
+        </form>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Alışkanlıklarım</h2>
+    <ul class="rows">
+      {% for s in active %}
+        <li>
+          <span class="ico">{{ s.habit.icon }}</span>
+          <div class="grow">
+            <a class="title" href="{{ url_for('habits.detail', habit_id=s.habit.id) }}">{{ s.habit.name }}</a>
+            <div class="meta">
+              {% if s.streak %}<span class="streak">🔥 {{ s.streak }} gün seri</span>{% else %}<span>Seri yok</span>{% endif %}
+              <span>Son 30 gün: %{{ s.rate30 }}</span>
+            </div>
+          </div>
+          {{ hp.dots(s.last7) }}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  <div class="card">{{ ui.empty("Henüz aktif alışkanlık yok. Küçük bir şeyle başla: su içmek, 10 dk yürüyüş…", "🔥") }}</div>
+{% endif %}
+
+<div class="card">
+  <details class="add" {% if not active and not archived %}open{% endif %}>
+    <summary>＋ Yeni alışkanlık</summary>
+    <form method="post" action="{{ url_for('habits.create') }}">
+      {{ ui.csrf() }}
+      {{ ui.field("Ad", "name", required=True, placeholder="ör. 2 litre su", attrs='maxlength="60" autocomplete="off"') }}
+      {{ hp.icon_picker(icons, icons[0]) }}
+      <button class="btn primary block">Ekle</button>
+    </form>
+  </details>
+</div>
+
+{% if archived %}
+  <details class="card">
+    <summary><b>🗄️ Arşiv</b> <span class="pill-count">{{ archived | length }}</span></summary>
+    <ul class="rows">
+      {% for s in archived %}
+        <li>
+          <span class="ico">{{ s.habit.icon }}</span>
+          <div class="grow">
+            <a class="title" href="{{ url_for('habits.detail', habit_id=s.habit.id) }}">{{ s.habit.name }}</a>
+            <div class="meta"><span>Toplam {{ s.total }} gün</span></div>
+          </div>
+          <span class="actions">
+            <form method="post" action="{{ url_for('habits.archive', habit_id=s.habit.id) }}" class="inline">
+              {{ ui.csrf() }}<input type="hidden" name="next" value="{{ url_for('habits.index') }}">
+              <button class="btn sm">Arşivden çıkar</button>
+            </form>
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  </details>
+{% endif %}
+{% endblock %}

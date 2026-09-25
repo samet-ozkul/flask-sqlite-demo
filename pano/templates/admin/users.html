@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Kullanıcılar{% endblock %}
+{% block content %}
+{{ ui.page_header("👥 Kullanıcılar", "Herkese açık kayıt kapalı; hesapları buradan oluşturursun.", back=url_for('admin.index')) }}
+
+<section class="card">
+  <details class="add">
+    <summary>＋ Yeni kullanıcı</summary>
+    <form method="post">
+      {{ ui.csrf() }}
+      <div class="form-row">
+        {{ ui.field("Kullanıcı adı", "username", required=True, attrs='minlength="3" maxlength="30" autocapitalize="none"') }}
+        {{ ui.field("Şifre", "password", type="password", required=True, attrs='minlength="8" autocomplete="new-password"') }}
+      </div>
+      {{ ui.checkbox("Yönetici yetkisi", "is_admin") }}
+      <button class="btn primary">Oluştur</button>
+    </form>
+  </details>
+</section>
+
+<section class="card">
+  <ul class="rows">
+    {% for u in users %}
+      <li style="flex-wrap: wrap">
+        <div class="grow">
+          <div class="title">{{ u.display_name or u.username }} {% if u.display_name %}<span class="muted small">@{{ u.username }}</span>{% endif %}
+            {% if u.is_admin %}<span class="badge good">yönetici</span>{% endif %}
+            {% if u.id == g.user.id %}<span class="badge">sen</span>{% endif %}</div>
+          <div class="meta">
+            <span>{{ u.created_at | localdt('%d.%m.%Y') }}</span>
+            <span>{{ u.files }} dosya · {{ u.files_size | size }}</span>
+            {% if u.telegram_chat_id %}<span>📨 Telegram</span>{% endif %}
+          </div>
+        </div>
+        {% if u.id != g.user.id %}
+          <div class="actions">
+            <details>
+              <summary class="btn sm">Şifre</summary>
+              <form method="post" action="{{ url_for('admin.reset_password', user_id=u.id) }}" class="quick" style="margin-top: 6px">
+                {{ ui.csrf() }}
+                <input type="password" name="password" minlength="8" placeholder="Yeni şifre" required autocomplete="new-password">
+                <button class="btn sm primary">Kaydet</button>
+              </form>
+            </details>
+            {{ ui.post_button(url_for('admin.toggle_admin', user_id=u.id), 'Yöneticiliği kaldır' if u.is_admin else 'Yönetici yap') }}
+            {{ ui.delete_button(url_for('admin.delete_user', user_id=u.id), "Sil", u.username ~ " ve TÜM verileri silinecek. Emin misin?") }}
+          </div>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

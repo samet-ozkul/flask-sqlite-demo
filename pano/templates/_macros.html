@@ -1,0 +1,151 @@
+{# Ortak form ve arayüz parçaları. Kullanım: {% import "_macros.html" as ui %} #}
+
+{% macro csrf() -%}
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+{%- endmacro %}
+
+{# Sayfa başlığı; sağ tarafa buton koymak için {% call ui.page_header("Başlık") %}...{% endcall %} #}
+{% macro page_header(title, subtitle=None, back=None) -%}
+  <div class="page-header">
+    <div>
+      {% if back %}<a class="back" href="{{ back }}">← Geri</a>{% endif %}
+      <h1>{{ title }}</h1>
+      {% if subtitle %}<p class="muted">{{ subtitle }}</p>{% endif %}
+    </div>
+    {% if caller %}<div class="actions">{{ caller() }}</div>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro empty(text, icon="🌱") -%}
+  <div class="empty"><span>{{ icon }}</span><p>{{ text }}</p></div>
+{%- endmacro %}
+
+{% macro field(label, name, value="", type="text", required=False, placeholder="", attrs="", hint=None) -%}
+  <label class="field">
+    <span>{{ label }}{% if required %} <b class="req">*</b>{% endif %}</span>
+    <input type="{{ type }}" name="{{ name }}" value="{{ value if value is not none else '' }}"
+           {% if required %}required{% endif %} {% if placeholder %}placeholder="{{ placeholder }}"{% endif %} {{ attrs | safe }}>
+    {% if hint %}<small class="muted">{{ hint }}</small>{% endif %}
+  </label>
+{%- endmacro %}
+
+{# Tutar alanı: mobilde sayısal klavye açar, "1.234,56" biçimini kabul eder #}
+{% macro money_field(label, name, value=None, required=False, placeholder="0,00") -%}
+  {{ field(label, name, value | num if value is not none else "", "text", required, placeholder,
+           'inputmode="decimal" autocomplete="off"') }}
+{%- endmacro %}
+
+{% macro textarea(label, name, value="", rows=4, placeholder="", required=False, hint=None) -%}
+  <label class="field">
+    <span>{{ label }}{% if required %} <b class="req">*</b>{% endif %}</span>
+    <textarea name="{{ name }}" rows="{{ rows }}" {% if required %}required{% endif %}
+              {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}>{{ value or "" }}</textarea>
+    {% if hint %}<small class="muted">{{ hint }}</small>{% endif %}
+  </label>
+{%- endmacro %}
+
+{# options: [(değer, etiket), ...] #}
+{% macro select(label, name, options, value=None) -%}
+  <label class="field">
+    <span>{{ label }}</span>
+    <select name="{{ name }}">
+      {% for v, text in options %}
+        <option value="{{ v }}" {% if v|string == value|string %}selected{% endif %}>{{ text }}</option>
+      {% endfor %}
+    </select>
+  </label>
+{%- endmacro %}
+
+{% macro currency_select(name="currency", value="TRY", label="Para birimi") -%}
+  <label class="field">
+    <span>{{ label }}</span>
+    <select name="{{ name }}">
+      {% for code, symbol in CURRENCIES.items() %}
+        <option value="{{ code }}" {% if code == (value or 'TRY') %}selected{% endif %}>{{ symbol }} {{ code }}</option>
+      {% endfor %}
+    </select>
+  </label>
+{%- endmacro %}
+
+{% macro checkbox(label, name, checked=False) -%}
+  <label class="check"><input type="checkbox" name="{{ name }}" value="1" {% if checked %}checked{% endif %}> {{ label }}</label>
+{%- endmacro %}
+
+{# Silme butonu: POST + onay sorusu #}
+{% macro delete_button(url, label="Sil", confirm="Silinsin mi? Bu işlem geri alınamaz.", small=True) -%}
+  <form method="post" action="{{ url }}" class="inline" data-confirm="{{ confirm }}">
+    {{ csrf() }}
+    <button class="btn danger {{ 'sm' if small }}">{{ label }}</button>
+  </form>
+{%- endmacro %}
+
+{# Tek tıkla POST eden küçük buton (işaretle, arşivle vb.) #}
+{% macro post_button(url, label, cls="", title="") -%}
+  <form method="post" action="{{ url }}" class="inline">
+    {{ csrf() }}
+    <button class="btn sm {{ cls }}" {% if title %}title="{{ title }}"{% endif %}>{{ label }}</button>
+  </form>
+{%- endmacro %}
+
+{% macro tag_list(tags, endpoint=None) -%}
+  {% for t in tags | tags %}
+    {% if endpoint %}<a class="tag" href="{{ url_for(endpoint, tag=t) }}">#{{ t }}</a>
+    {% else %}<span class="tag">#{{ t }}</span>{% endif %}
+  {% endfor %}
+{%- endmacro %}
+
+{# Tarih rozeti: geçmiş kırmızı, yakın turuncu, uzak gri #}
+{% macro due_badge(date, warn_days=3) -%}
+  {% if date %}<span class="badge {{ date | urgency(warn_days) }}" title="{{ date | date_tr(True) }}">{{ date | rel_days }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro search_box(q="", placeholder="Ara...") -%}
+  <form method="get" class="search">
+    <input type="search" name="q" value="{{ q or '' }}" placeholder="{{ placeholder }}">
+    {% if caller %}{{ caller() }}{% endif %}
+    <button class="btn">Ara</button>
+  </form>
+{%- endmacro %}
+
+{# Dosya ekleri: küçük resimler + yükleme formu. entity: storage.ENTITIES anahtarı #}
+{% macro attachments(entity, entity_id, items, next_url) -%}
+  <div class="attachments">
+    {% for a in items %}
+      <div class="attachment">
+        {% if a.thumb %}
+          <a href="{{ url_for('files.show', att_id=a.id) }}" target="_blank"><img src="{{ url_for('files.thumb', att_id=a.id) }}" alt="{{ a.original_name }}" loading="lazy"></a>
+        {% else %}
+          <a class="pdf" href="{{ url_for('files.show', att_id=a.id) }}" target="_blank">📄<span>{{ a.original_name or 'PDF' }}</span></a>
+        {% endif %}
+        <small class="muted">{{ a.size | size }}</small>
+        <form method="post" action="{{ url_for('files.delete', att_id=a.id) }}" data-confirm="Dosya silinsin mi?">
+          {{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+          <button class="linklike danger-text small">Sil</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+  <form method="post" action="{{ url_for('files.upload') }}" enctype="multipart/form-data" class="upload-form">
+    {{ csrf() }}
+    <input type="hidden" name="entity" value="{{ entity }}">
+    <input type="hidden" name="entity_id" value="{{ entity_id }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <input type="file" name="file" accept="image/*,application/pdf" multiple>
+    <button class="btn sm">Yükle</button>
+    <small class="muted">Fotoğraflar otomatik küçültülür. PDF en fazla 3 MB.</small>
+  </form>
+{%- endmacro %}
+
+{# Basit yatay çubuk grafik: rows = [(etiket, değer, metin)], max değer otomatik #}
+{% macro bars(rows) -%}
+  {% set maxv = (rows | map(attribute=1) | max) if rows else 0 %}
+  <div class="bars">
+    {% for label, value, text in rows %}
+      <div class="bar-row">
+        <span class="bar-label">{{ label }}</span>
+        <span class="bar-track"><span class="bar-fill" style="width: {{ (value * 100 / maxv) | round(1) if maxv else 0 }}%"></span></span>
+        <span class="bar-value">{{ text }}</span>
+      </div>
+    {% endfor %}
+  </div>
+{%- endmacro %}

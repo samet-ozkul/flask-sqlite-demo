@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "warranty/_form.html" import warranty_fields %}
+{% block title %}Garanti{% endblock %}
+{% block content %}
+{{ ui.page_header("🛡️ Garanti", "Fatura ve garanti belgelerini sakla; bitişine 30 gün kala hatırlatılır") }}
+
+<div class="card">
+  <details class="add" {% if not total %}open{% endif %}>
+    <summary>＋ Ürün ekle</summary>
+    <form method="post" action="{{ url_for('warranty.create') }}">
+      {{ ui.csrf() }}
+      {{ warranty_fields() }}
+      <button class="btn primary">Kaydet ve belge ekle →</button>
+    </form>
+  </details>
+</div>
+
+{% if total %}
+  <nav class="tabs">
+    {% for key, label in FILTERS.items() %}
+      <a href="{{ url_for('warranty.index', f=key, q=q or None) }}" class="{{ 'active' if key == f }}">{{ label }} <span class="pill-count">{{ counts[key] }}</span></a>
+    {% endfor %}
+  </nav>
+
+  {% call ui.search_box(q, "Ürün, marka, mağaza, seri no...") %}
+    <input type="hidden" name="f" value="{{ f }}">
+  {% endcall %}
+{% endif %}
+
+{% if items %}
+  <div class="card">
+    <ul class="rows">
+      {% for w in items %}
+        {% set t = thumbs.get(w.id) %}
+        <li>
+          <a href="{{ url_for('warranty.detail', warranty_id=w.id) }}">
+            {% if t %}<img class="thumb" src="{{ url_for('files.thumb', att_id=t.id) }}" alt="" loading="lazy">
+            {% else %}<span class="ico">🛡️</span>{% endif %}
+          </a>
+          <div class="grow">
+            <a class="title" href="{{ url_for('warranty.detail', warranty_id=w.id) }}">{{ w.product }}</a>
+            <div class="meta">
+              {% if w.brand %}<span>{{ w.brand }}</span>{% endif %}
+              {% if w.store %}<span>🏬 {{ w.store }}</span>{% endif %}
+              {% if w.warranty_until %}<span>bitiş {{ w.warranty_until | date_tr }}</span>
+              {% else %}<span>bitiş tarihi yok</span>{% endif %}
+            </div>
+          </div>
+          <div class="right">
+            {{ ui.due_badge(w.warranty_until, WARN_DAYS) }}
+            {% if w.price is not none %}<div class="amount small">{{ w.price | money }}</div>{% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% elif q %}
+  {{ ui.empty("Aramanla eşleşen ürün yok.", "🔍") }}
+{% elif total %}
+  {{ ui.empty("Bu sekmede ürün yok." if f != "expired" else "Süresi dolan ürün yok.", "🛡️") }}
+{% else %}
+  {{ ui.empty("Henüz ürün yok. Yeni aldığın bir ürünü ekle, faturasının fotoğrafını çek; garanti bitmeden haber verelim.", "🧾") }}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,15 @@
+{% import "_macros.html" as ui %}
+{# Link formu: ekleme, paylaşım ve düzenleme sayfaları kullanır. v: dict ya da satır #}
+{% macro link_form(v, action, submit="Kaydet", show_read=False, next_url=None) -%}
+  <form method="post" action="{{ action }}">
+    {{ ui.csrf() }}
+    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+    {{ ui.field("Link", "url", v.url, "url", required=True, placeholder="https://...",
+                attrs='inputmode="url" autocomplete="off" maxlength="2000"') }}
+    {{ ui.field("Başlık", "title", v.title, placeholder="Boş bırakılırsa site adı kullanılır", attrs='maxlength="300"') }}
+    {{ ui.textarea("Not", "note", v.note, rows=2, placeholder="Neden kaydettin? (isteğe bağlı)") }}
+    {{ ui.field("Etiketler", "tags", v.tags, placeholder="okunacak, video, tarif", hint="Virgülle ayırın") }}
+    {% if show_read %}{{ ui.checkbox("Okundu", "is_read", v.is_read) }}{% endif %}
+    <button class="btn primary block">{{ submit }}</button>
+  </form>
+{%- endmacro %}

@@ -1,0 +1,85 @@
+{% import "_macros.html" as ui %}
+{# İlaçlar sekmesi: active_meds, inactive_meds, schedule [(saat, ilaç)], now_hm #}
+
+{% if schedule %}
+  {% set ns = namespace(next_marked=false) %}
+  <div class="card">
+    <h2>Bugünkü program</h2>
+    <div class="sched">
+      {% for t, med in schedule %}
+        {% set is_past = t != '—' and t < now_hm %}
+        {% set is_next = not is_past and t != '—' and not ns.next_marked %}
+        {% if is_next %}{% set ns.next_marked = true %}{% endif %}
+        <span class="{{ 'past' if is_past }} {{ 'next' if is_next }}" {% if is_next %}title="Sıradaki"{% endif %}>
+          {{ t }} · {{ med.name }}{% if med.dose %} ({{ med.dose }}){% endif %}
+        </span>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+<div class="card">
+  <details class="add" {% if not active_meds and not inactive_meds %}open{% endif %}>
+    <summary>＋ Yeni ilaç</summary>
+    <form method="post" action="{{ url_for('health.med_create') }}">
+      {{ ui.csrf() }}
+      <div class="form-row">
+        {{ ui.field("İlaç adı", "name", required=True, placeholder="ör. D vitamini", attrs='maxlength="100"') }}
+        {{ ui.field("Doz", "dose", placeholder="ör. 1 tablet, 5 ml", attrs='maxlength="100"') }}
+      </div>
+      {{ ui.field("Saatler", "times", placeholder="08:00, 20:00", attrs='maxlength="200" autocomplete="off"',
+                  hint="Virgülle ayırın. 8, 8.30, 20:00 gibi yazımlar düzeltilir.") }}
+      {{ ui.field("Not", "note", placeholder="İsteğe bağlı: tok karnına…", attrs='maxlength="500"') }}
+      <button class="btn primary block">Ekle</button>
+    </form>
+  </details>
+</div>
+
+<div class="card">
+  <h2>Kullandığım ilaçlar <span class="pill-count">{{ active_meds | length }}</span></h2>
+  {% if active_meds %}
+    <ul class="rows">
+      {% for m in active_meds %}
+        <li>
+          <span class="ico">💊</span>
+          <div class="grow">
+            <div class="title">{{ m.name }}{% if m.dose %} <span class="muted small">· {{ m.dose }}</span>{% endif %}</div>
+            <div class="meta">
+              {% if m.times %}
+                <span class="times">{% for t in m.times.split(', ') %}<span class="badge">⏰ {{ t }}</span>{% endfor %}</span>
+              {% else %}<span>Saat belirtilmemiş</span>{% endif %}
+              {% if m.note %}<span>{{ m.note }}</span>{% endif %}
+            </div>
+          </div>
+          <span class="actions">
+            <a class="btn sm" href="{{ url_for('health.med_edit', med_id=m.id) }}">Düzenle</a>
+            {{ ui.post_button(url_for('health.med_toggle', med_id=m.id), "Pasife al", title="Artık kullanmıyorum") }}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ ui.empty("Aktif ilaç yok.", "💊") }}
+  {% endif %}
+</div>
+
+{% if inactive_meds %}
+  <details class="card">
+    <summary><b>Kullanmadığım ilaçlar</b> <span class="pill-count">{{ inactive_meds | length }}</span></summary>
+    <ul class="rows">
+      {% for m in inactive_meds %}
+        <li class="done">
+          <span class="ico">💊</span>
+          <div class="grow">
+            <div class="title">{{ m.name }}</div>
+            <div class="meta">{% if m.dose %}<span>{{ m.dose }}</span>{% endif %}{% if m.times %}<span>{{ m.times }}</span>{% endif %}</div>
+          </div>
+          <span class="actions">
+            {{ ui.post_button(url_for('health.med_toggle', med_id=m.id), "Tekrar başla", "ok") }}
+            {{ ui.delete_button(url_for('health.med_delete', med_id=m.id), "Sil", "İlaç silinsin mi?") }}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  </details>
+{% endif %}

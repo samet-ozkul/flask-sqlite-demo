@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ "Tarifi düzenle" if recipe else "Yeni tarif" }}{% endblock %}
+{% block content %}
+{% if recipe %}
+  {% call ui.page_header("Tarifi düzenle", back=url_for('recipes.detail', recipe_id=recipe.id)) %}
+    {{ ui.delete_button(url_for('recipes.delete', recipe_id=recipe.id), "Tarifi sil", "Tarif ve fotoğrafları silinsin mi? Bu işlem geri alınamaz.") }}
+  {% endcall %}
+{% else %}
+  {{ ui.page_header("🍲 Yeni tarif", back=url_for('recipes.index')) }}
+{% endif %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    {{ ui.field("Tarif adı", "title", v.title, required=True, placeholder="Menemen", attrs='maxlength="150"') }}
+    <div class="form-row">
+      {{ ui.field("Porsiyon", "servings", v.servings, placeholder="4 kişilik", attrs='maxlength="50"') }}
+      {{ ui.field("Etiketler", "tags", v.tags, placeholder="kahvaltı, pratik", hint="Virgülle ayırın") }}
+    </div>
+    {{ ui.textarea("Malzemeler", "ingredients", v.ingredients, rows=8,
+                   placeholder="3 domates\n2 sivri biber\n4 yumurta\n# Üzeri için\nPul biber",
+                   hint="Her satıra bir malzeme. Bölüm başlığı için satırı # ile başlatın.") }}
+    {{ ui.textarea("Hazırlanışı", "steps", v.steps, rows=10,
+                   placeholder="1. Domatesleri doğrayın\n2. Biberleri kavurun\n3. Yumurtaları ekleyin",
+                   hint="Markdown: 1. numaralı adım, - madde, **kalın**") }}
+    <button class="btn primary block">Kaydet</button>
+  </form>
+</div>
+
+{% if not recipe %}<p class="muted small">Fotoğrafı kaydettikten sonra tarif sayfasından ekleyebilirsin.</p>{% endif %}
+{% endblock %}

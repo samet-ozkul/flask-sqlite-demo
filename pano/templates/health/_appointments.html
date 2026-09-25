@@ -1,0 +1,79 @@
+{% import "_macros.html" as ui %}
+{# Randevular sekmesi: upcoming, past, past_total, now_s #}
+
+{% macro when(a) -%}
+  {{ a.starts_at[:10] | date_tr(True) }} · {{ a.starts_at[11:16] }}
+{%- endmacro %}
+
+<div class="card">
+  <details class="add" {% if not upcoming and not past %}open{% endif %}>
+    <summary>＋ Yeni randevu</summary>
+    <form method="post" action="{{ url_for('health.appt_create') }}">
+      {{ ui.csrf() }}
+      {{ ui.field("Başlık", "title", required=True, placeholder="ör. Diş kontrolü", attrs='maxlength="150"') }}
+      <div class="form-row">
+        {{ ui.field("Tarih ve saat", "starts_at", type="datetime-local", required=True) }}
+        {{ ui.field("Yer", "place", placeholder="Hastane / klinik / doktor", attrs='maxlength="150"') }}
+      </div>
+      {{ ui.textarea("Not", "note", rows=2, placeholder="Yanına alacakların, sorular…") }}
+      <button class="btn primary block">Ekle</button>
+    </form>
+  </details>
+</div>
+
+<div class="card">
+  <h2>Yaklaşan <span class="pill-count">{{ upcoming | length }}</span></h2>
+  {% if upcoming %}
+    <ul class="rows">
+      {% for a in upcoming %}
+        <li>
+          <span class="ico">🩺</span>
+          <div class="grow">
+            <div class="title">{{ a.title }}</div>
+            <div class="meta">
+              {{ ui.due_badge(a.starts_at[:10]) }}
+              <span>{{ when(a) }}</span>
+              {% if a.place %}<span>📍 {{ a.place }}</span>{% endif %}
+            </div>
+            {% if a.note %}<div class="muted small">{{ a.note }}</div>{% endif %}
+          </div>
+          <span class="actions">
+            <a class="btn sm" href="{{ url_for('health.appt_edit', appt_id=a.id) }}">Düzenle</a>
+            {{ ui.post_button(url_for('health.appt_toggle', appt_id=a.id), "✓", "ok", "Gidildi olarak işaretle") }}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ ui.empty("Yaklaşan randevu yok.", "📅") }}
+  {% endif %}
+</div>
+
+{% if past %}
+  <details class="card" {% if not upcoming %}open{% endif %}>
+    <summary><b>Geçmiş</b> <span class="pill-count">{{ past_total }}</span>{% if past_total > past | length %} <span class="muted small">son {{ past | length }}</span>{% endif %}</summary>
+    <ul class="rows">
+      {% for a in past %}
+        <li class="{{ 'done' if a.done }}">
+          <span class="ico">{{ '✅' if a.done else '⏳' }}</span>
+          <div class="grow">
+            <div class="title">{{ a.title }}</div>
+            <div class="meta">
+              <span>{{ when(a) }}</span>
+              {% if a.place %}<span>📍 {{ a.place }}</span>{% endif %}
+              {% if not a.done %}<span class="badge soon">işaretlenmedi</span>{% endif %}
+            </div>
+          </div>
+          <span class="actions">
+            {% if a.done %}
+              {{ ui.post_button(url_for('health.appt_toggle', appt_id=a.id), "Geri al", title="Tamamlanmadı olarak işaretle") }}
+            {% else %}
+              {{ ui.post_button(url_for('health.appt_toggle', appt_id=a.id), "✓", "ok", "Gidildi olarak işaretle") }}
+            {% endif %}
+            <a class="btn sm" href="{{ url_for('health.appt_edit', appt_id=a.id) }}">Düzenle</a>
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  </details>
+{% endif %}

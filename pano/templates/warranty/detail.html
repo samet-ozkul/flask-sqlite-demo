@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "warranty/_form.html" import warranty_fields %}
+{% block title %}{{ w.product }}{% endblock %}
+{% block head %}
+<style>
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; }
+  .kv dt { color: var(--muted); font-size: .88rem; }
+  .kv dd { margin: 0; overflow-wrap: anywhere; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🛡️ " ~ w.product, w.brand or None, back=url_for('warranty.index', f='active' if active else 'expired')) %}
+  {{ ui.delete_button(url_for('warranty.delete', warranty_id=w.id), "Sil",
+                      "Ürün ve eklenen belgeler silinsin mi? Bu işlem geri alınamaz.") }}
+{% endcall %}
+
+<div class="card">
+  <h2>
+    <span>Garanti</span>
+    {% if w.warranty_until %}{{ ui.due_badge(w.warranty_until, WARN_DAYS) }}{% else %}<span class="badge">bitiş tarihi yok</span>{% endif %}
+  </h2>
+  <dl class="kv">
+    <dt>Garanti bitişi</dt>
+    <dd>{{ w.warranty_until | date_tr(True) if w.warranty_until else "—" }}{% if months %} <span class="muted small">({{ months }} ay)</span>{% endif %}</dd>
+    <dt>Alış tarihi</dt><dd>{{ w.purchase_date | date_tr(True) if w.purchase_date else "—" }}</dd>
+    {% if w.brand %}<dt>Marka / model</dt><dd>{{ w.brand }}</dd>{% endif %}
+    {% if w.store %}<dt>Mağaza</dt><dd>{{ w.store }}</dd>{% endif %}
+    {% if w.serial_no %}<dt>Seri no</dt><dd><code>{{ w.serial_no }}</code></dd>{% endif %}
+    {% if w.price is not none %}<dt>Fiyat</dt><dd>{{ w.price | money }}</dd>{% endif %}
+  </dl>
+  {% if w.note %}<p class="muted" style="white-space: pre-line; margin-top: 10px">{{ w.note }}</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>🧾 Fatura ve belgeler</h2>
+  {% if not files %}<p class="muted small">Faturanın ya da garanti belgesinin fotoğrafını çek; kaybolsa bile burada dursun.</p>{% endif %}
+  {{ ui.attachments("warranty", w.id, files, request.path) }}
+</div>
+
+<div class="card">
+  <details class="add">
+    <summary>✏️ Düzenle</summary>
+    <form method="post">
+      {{ ui.csrf() }}
+      {{ warranty_fields(w) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+<p class="muted small">Eklenme: {{ w.created_at | localdt }}</p>
+{% endblock %}

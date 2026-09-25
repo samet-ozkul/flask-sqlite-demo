@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Giriş{% endblock %}
+{% block content %}
+<div class="auth-card card">
+  <div class="auth-logo">▦</div>
+  <h1>Kişisel Pano</h1>
+  <form method="post">
+    {{ ui.csrf() }}
+    {{ ui.field("Kullanıcı adı", "username", required=True, attrs='autofocus autocomplete="username" autocapitalize="none"') }}
+    {{ ui.field("Şifre", "password", type="password", required=True, attrs='autocomplete="current-password"') }}
+    {{ ui.checkbox("Beni hatırla (30 gün)", "remember", True) }}
+    <button class="btn primary block">Giriş yap</button>
+  </form>
+  {% if registration_open() %}
+    <p class="muted center">Hesabın yok mu? <a href="{{ url_for('auth.register') }}">Kayıt ol</a></p>
+  {% endif %}
+</div>
+{% endblock %}

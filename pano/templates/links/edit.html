@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "links/_form.html" import link_form %}
+{% block title %}Linki düzenle{% endblock %}
+{% block content %}
+{% call ui.page_header("Linki düzenle", back=url_for('links.index')) %}
+  <a class="btn sm" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">↗ Aç</a>
+  {{ ui.delete_button(url_for('links.delete', link_id=link.id), "Sil", "Link silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  {{ link_form(v, url_for('links.edit', link_id=link.id), "Kaydet", show_read=True, next_url=request.values.get('next')) }}
+</div>
+
+<p class="muted small">Eklenme: {{ link.created_at | localdt }}</p>
+{% endblock %}

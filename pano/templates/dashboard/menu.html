@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Menü{% endblock %}
+{% block content %}
+<h1>Menü</h1>
+{% for group, items in module_groups().items() %}
+  <section class="menu-group">
+    <h2>{{ group }}</h2>
+    <div class="tiles">
+      {% for m in items %}
+        <a class="tile" href="{{ url_for(m.endpoint) }}"><span>{{ m.icon }}</span>{{ m.title }}</a>
+      {% endfor %}
+    </div>
+  </section>
+{% endfor %}
+<section class="menu-group">
+  <h2>Hesap</h2>
+  <div class="tiles">
+    <a class="tile" href="{{ url_for('settings.index') }}"><span>⚙️</span>Ayarlar</a>
+    {% if g.user.is_admin %}
+      <a class="tile" href="{{ url_for('admin.index') }}"><span>🛠️</span>Yönetim</a>
+      <a class="tile" href="{{ url_for('admin.backup') }}"><span>💾</span>Yedek</a>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

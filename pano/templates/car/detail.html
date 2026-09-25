@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "car/_form.html" import vehicle_fields %}
+{% block title %}{{ v.name }}{% endblock %}
+{% block head %}
+<style>
+  .stat .value.bad { color: var(--danger); }
+  .log-meta b { font-weight: 600; color: var(--text); }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🚗 " ~ v.name, v.plate or None, back=url_for('car.index')) %}
+  {{ ui.delete_button(url_for('car.delete', vehicle_id=v.id), "Aracı sil",
+                      "Araç; tüm kayıtları ve belgeleriyle birlikte silinsin mi? Bu işlem geri alınamaz.") }}
+{% endcall %}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">{{ stats.year }} harcaması</div>
+    <div class="value">{{ stats.year_total | money }}</div>
+    <div class="sub">{{ stats.year_count }} kayıt</div>
+  </div>
+  <div class="stat">
+    <div class="label">Son km</div>
+    <div class="value">{{ stats.last_km | num(0) if stats.last_km is not none else "—" }}</div>
+    <div class="sub">kayıtlardaki en yüksek</div>
+  </div>
+  <div class="stat">
+    <div class="label">Bakıma kalan</div>
+    {% if stats.remaining_km is not none %}
+      {% if stats.remaining_km >= 0 %}
+        <div class="value">{{ stats.remaining_km | num(0) }} km</div>
+      {% else %}
+        <div class="value bad">{{ (-stats.remaining_km) | num(0) }} km geçti</div>
+      {% endif %}
+      <div class="sub">hedef {{ v.service_km | num(0) }} km</div>
+    {% elif v.service_km is not none %}
+      <div class="value">—</div><div class="sub">hedef {{ v.service_km | num(0) }} km</div>
+    {% else %}
+      <div class="value">—</div><div class="sub">bakım km girilmemiş</div>
+    {% endif %}
+  </div>
+  <div class="stat">
+    <div class="label">Ortalama tüketim</div>
+    <div class="value">{{ (stats.avg | num(1)) ~ " L/100km" if stats.avg else "—" }}</div>
+    <div class="sub">{% if stats.avg %}{{ stats.fuel_count }} dolum, dolu depo yöntemi{% else %}km'li en az 2 yakıt kaydı gerekir{% endif %}</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Tarihler</h2>
+  <ul class="rows">
+    {% for field, label in DATE_FIELDS %}
+      <li>
+        <span class="grow">{{ label }}</span>
+        {% if v[field] %}
+          <span class="muted small">{{ v[field] | date_tr(True) }}</span>
+          {{ ui.due_badge(v[field], WARN_DAYS) }}
+        {% else %}
+          <span class="muted small">girilmemiş</span>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+  {% if v.note %}<p class="muted" style="white-space: pre-line">{{ v.note }}</p>{% endif %}
+  <details class="add" style="margin-top: 10px">
+    <summary>✏️ Bilgileri düzenle</summary>
+    <form method="post" action="{{ url_for('car.update', vehicle_id=v.id) }}">
+      {{ ui.csrf() }}
+      {{ vehicle_fields(v) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+<div class="card">
+  <h2>Kayıt ekle</h2>
+  <form method="post" action="{{ url_for('car.add_log', vehicle_id=v.id) }}">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.select("Tür", "kind", KINDS.items() | list, "fuel") }}
+      {{ ui.field("Tarih", "date", today_str(), type="date", required=True) }}
+    </div>
+    <div class="form-row three">
+      {{ ui.field("Kilometre", "km", placeholder=(stats.last_km | num(0)) if stats.last_km is not none else "ör. 85.000",
+                  attrs='inputmode="numeric" autocomplete="off"') }}
+      {{ ui.money_field("Tutar", "amount") }}
+      {{ ui.field("Litre", "liters", placeholder="ör. 42,5", attrs='inputmode="decimal" autocomplete="off"',
+                  hint="Sadece yakıt için. Tüketim için depoyu fulleyin.") }}
+    </div>
+    {{ ui.field("Not", "note", placeholder="ör. yağ + filtre değişimi, Shell") }}
+    {{ ui.checkbox("Harcamalara da ekle", "add_expense", True) }}
+    <button class="btn primary">Ekle</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Kayıtlar <span class="pill-count">{{ logs | length }}</span></h2>
+  {% if logs %}
+    <ul class="rows">
+      {% for r in logs %}
+        <li>
+          <span class="ico" title="{{ KINDS[r.kind] }}">{{ KIND_ICONS[r.kind] }}</span>
+          <div class="grow">
+            <div class="title">{{ KINDS[r.kind] }}{% if r.note %} · {{ r.note }}{% endif %}</div>
+            <div class="meta log-meta">
+              <span>{{ r.date | date_tr }}</span>
+              {% if r.km is not none %}<span><b>{{ r.km | num(0) }}</b> km</span>{% endif %}
+              {% if r.liters %}<span><b>{{ r.liters | num }}</b> L</span>{% endif %}
+              {% if r.liters and r.amount %}<span>{{ (r.amount / r.liters) | money }}/L</span>{% endif %}
+            </div>
+          </div>
+          {% if r.amount is not none %}<span class="amount">{{ r.amount | money }}</span>{% endif %}
+          <span class="actions">
+            {{ ui.delete_button(url_for('car.delete_log', vehicle_id=v.id, log_id=r.id), "✕",
+                                "Kayıt silinsin mi? Harcamalara işlenmiş tutar ayrıca silinmez.") }}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ ui.empty("Henüz kayıt yok. Yakıt, bakım ya da onarım ekleyince burada listelenir.", "⛽") }}
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Belgeler</h2>
+  <p class="muted small">Ruhsat, trafik sigortası / kasko poliçesi, muayene raporu fotoğrafları.</p>
+  {{ ui.attachments("vehicle", v.id, files, request.path) }}
+</div>
+{% endblock %}

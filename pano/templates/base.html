@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}Pano{% endblock %} · Kişisel Pano</title>
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Pano">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=1">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('dashboard.index') }}"><span class="brand-mark">▦</span> Pano</a>
+    {% if g.user %}
+      <nav class="topnav">
+        {% for _m, endpoint, title, icon, _g in MODULES %}
+          <a href="{{ url_for(endpoint) }}" class="{{ 'active' if request.endpoint and request.endpoint.split('.')[0] == endpoint.split('.')[0] }}" title="{{ title }}">{{ icon }}<span>{{ title }}</span></a>
+        {% endfor %}
+      </nav>
+      <details class="usermenu">
+        <summary aria-label="Kullanıcı menüsü">{{ (g.user.display_name or g.user.username)[:1] | upper }}</summary>
+        <div class="usermenu-panel">
+          <div class="muted small">{{ g.user.display_name or g.user.username }}</div>
+          <a href="{{ url_for('settings.index') }}">⚙️ Ayarlar</a>
+          {% if g.user.is_admin %}<a href="{{ url_for('admin.index') }}">🛠️ Yönetim</a>{% endif %}
+          <form method="post" action="{{ url_for('auth.logout') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button class="linklike">🚪 Çıkış</button>
+          </form>
+        </div>
+      </details>
+    {% endif %}
+  </header>
+
+  <main class="container">
+    {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <div class="flash {{ cat }}" role="status">{{ msg }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% if g.user %}
+  <nav class="bottomnav" aria-label="Hızlı erişim">
+    {% set current = request.endpoint.split('.')[0] if request.endpoint else '' %}
+    <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if current == 'dashboard' and request.endpoint != 'dashboard.menu' }}"><span>🏠</span>Pano</a>
+    <a href="{{ url_for('lists.index') }}" class="{{ 'active' if current == 'lists' }}"><span>🛒</span>Listeler</a>
+    <a href="{{ url_for('notes.index') }}" class="{{ 'active' if current == 'notes' }}"><span>📝</span>Notlar</a>
+    <a href="{{ url_for('expenses.index') }}" class="{{ 'active' if current == 'expenses' }}"><span>💸</span>Harcama</a>
+    <a href="{{ url_for('dashboard.menu') }}" class="{{ 'active' if request.endpoint == 'dashboard.menu' }}"><span>☰</span>Menü</a>
+  </nav>
+  {% endif %}
+
+  <script src="{{ url_for('static', filename='app.js') }}?v=1" defer></script>
+</body>
+</html>

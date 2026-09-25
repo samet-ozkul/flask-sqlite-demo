@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Abonelikler{% endblock %}
+{% block head %}
+<style>
+  .sub-amount { text-align: right; white-space: nowrap; }
+  .sub-amount small { color: var(--muted); font-weight: 400; }
+  .stat .value.multi { font-size: 1.05rem; }
+</style>
+{% endblock %}
+{% block content %}
+{% set here = request.full_path.rstrip('?') %}
+{{ ui.page_header("🔁 Abonelikler", "Yenilenme tarihleri ve toplam maliyet") }}
+
+<div class="stats">
+  {% if totals.monthly is not none %}
+    <div class="stat">
+      <div class="label">Aylık toplam</div>
+      <div class="value">{{ totals.monthly | money }}</div>
+      <div class="sub">{% if totals.converted %}TL karşılığı{% if rates and rates.date %} · kur {{ rates.date | date_tr }}{% endif %}{% else %}aktif abonelikler{% endif %}</div>
+    </div>
+    <div class="stat">
+      <div class="label">Yıllık toplam</div>
+      <div class="value">{{ totals.yearly | money }}</div>
+      <div class="sub">aylık × 12</div>
+    </div>
+  {% else %}
+    <div class="stat">
+      <div class="label">Aylık toplam</div>
+      <div class="value multi">{% for cur, m, y in totals.by_currency %}{{ m | money(cur) }}{% if not loop.last %} + {% endif %}{% endfor %}</div>
+      <div class="sub">para birimine göre</div>
+    </div>
+    <div class="stat">
+      <div class="label">Yıllık toplam</div>
+      <div class="value multi">{% for cur, m, y in totals.by_currency %}{{ y | money(cur) }}{% if not loop.last %} + {% endif %}{% endfor %}</div>
+      <div class="sub">para birimine göre</div>
+    </div>
+  {% endif %}
+  <div class="stat">
+    <div class="label">Aktif abonelik</div>
+    <div class="value">{{ active | length }}</div>
+    <div class="sub">{{ due_soon }} tanesi 7 gün içinde yenileniyor</div>
+  </div>
+</div>
+{% if totals.rates_missing %}
+  <p class="muted small">Döviz kuru şu an alınamadı; toplamlar TL'ye çevrilmeden para birimine göre gösteriliyor.</p>
+{% endif %}
+
+<div class="card">
+  <details class="add" {% if not active and not inactive %}open{% endif %}>
+    <summary>＋ Yeni abonelik</summary>
+    <form method="post" action="{{ url_for('subscriptions.create') }}">
+      {{ ui.csrf() }}
+      <div class="form-row">
+        {{ ui.field("Ad", "name", required=True, placeholder="Netflix, Spotify, iCloud…", attrs='maxlength="100"') }}
+        {{ ui.money_field("Tutar", "amount", required=True) }}
+      </div>
+      <div class="form-row three">
+        {{ ui.currency_select() }}
+        {{ ui.select("Döngü", "cycle", cycles.items() | list, "monthly") }}
+        {{ ui.field("Sonraki ödeme", "next_date", today_str(), "date", True) }}
+      </div>
+      <div class="form-row">
+        {{ ui.field("Kategori", "category", placeholder="İsteğe bağlı", attrs='list="sub-categories" autocomplete="off" maxlength="50"') }}
+        {{ ui.field("Not", "note", placeholder="Hangi kart, paylaşılan hesap…") }}
+      </div>
+      {{ ui.checkbox("Aktif", "active", True) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+    <datalist id="sub-categories">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+  </details>
+</div>
+
+<div class="card">
+  <h2>Aktif</h2>
+  {% if active %}
+    <ul class="rows">
+      {% for s in active %}
+        <li>
+          <span class="ico">🔁</span>
+          <div class="grow">
+            <div class="title">{{ s.name }}</div>
+            <div class="meta">
+              {{ ui.due_badge(s.next_date) }}
+              <span>{{ s.next_date | date_tr(True) }}</span>
+              <span>{{ cycles[s.cycle] }}</span>
+              {% if s.category %}<span class="tag">{{ s.category }}</span>{% endif %}
+            </div>
+          </div>
+          <div class="sub-amount">
+            <div class="amount">{{ s.amount | money(s.currency) }} <small>/ {{ units[s.cycle] }}</small></div>
+            {% if approx.get(s.id) %}<div class="muted small">≈ {{ approx[s.id] | money }}</div>{% endif %}
+          </div>
+          <div class="actions"><a class="btn sm" href="{{ url_for('subscriptions.edit', sub_id=s.id) }}" title="Düzenle" aria-label="Düzenle">✎</a></div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ ui.empty("Aktif abonelik yok.", "🔁") }}
+  {% endif %}
+</div>
+
+{% if inactive %}
+<div class="card">
+  <h2>Durdurulanlar</h2>
+  <ul class="rows">
+    {% for s in inactive %}
+      <li>
+        <span class="ico">⏸️</span>
+        <div class="grow">
+          <div class="title muted">{{ s.name }}</div>
+          <div class="meta"><span>{{ s.amount | money(s.currency) }} / {{ units[s.cycle] }}</span>{% if s.category %}<span class="tag">{{ s.category }}</span>{% endif %}</div>
+        </div>
+        <div class="actions">
+          <form method="post" action="{{ url_for('subscriptions.toggle', sub_id=s.id) }}" class="inline">
+            {{ ui.csrf() }}
+            <input type="hidden" name="next" value="{{ here }}">
+            <button class="btn sm ok">Etkinleştir</button>
+          </form>
+          <a class="btn sm" href="{{ url_for('subscriptions.edit', sub_id=s.id) }}" title="Düzenle" aria-label="Düzenle">✎</a>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

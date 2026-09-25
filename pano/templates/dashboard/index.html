@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Pano{% endblock %}
+{% block content %}
+<div class="hello">
+  <h1>{{ greeting }}, {{ g.user.display_name or g.user.username }} 👋</h1>
+  <p class="muted">{{ date_label }}</p>
+</div>
+
+{% if disk and disk.percent >= 80 %}
+  <div class="flash warning">Depolama alanının %{{ disk.percent }}'i dolu ({{ disk.used | size }} / {{ disk.quota | size }}). <a href="{{ url_for('admin.backup') }}">Yedek al ve temizle</a></div>
+{% endif %}
+
+<div class="grid two">
+  {# ---------- Hava durumu ---------- #}
+  <section class="card">
+    <h2>Hava durumu {% if g.user.city %}<span class="muted small">{{ g.user.city }}</span>{% endif %}</h2>
+    {% if weather %}
+      {% set label, icon = weather_label(weather.code) %}
+      <div class="weather">
+        <span class="big">{{ icon }}</span>
+        <div>
+          <div class="temp">{{ weather.temp }}°C</div>
+          <div class="muted small">{{ label }} · Hissedilen {{ weather.feels }}° · Rüzgar {{ weather.wind }} km/s</div>
+        </div>
+      </div>
+      <div class="forecast">
+        {% for d in weather.days[1:4] %}
+          {% set dl, di = weather_label(d.code) %}
+          <div><div class="muted">{{ d.date | date_tr(True) }}</div><div style="font-size:1.3rem">{{ di }}</div><b>{{ d.max }}°</b> / {{ d.min }}°{% if d.rain %}<div class="muted">☔ %{{ d.rain }}</div>{% endif %}</div>
+        {% endfor %}
+      </div>
+    {% elif g.user.lat is none %}
+      <p class="muted">Hava durumunu görmek için şehrini seç.</p>
+      <a class="btn sm" href="{{ url_for('settings.index') }}">Şehir seç</a>
+    {% else %}
+      <p class="muted">Hava durumu şu an alınamadı.</p>
+    {% endif %}
+  </section>
+
+  {# ---------- Kurlar ---------- #}
+  <section class="card">
+    <h2>Kurlar {% if rates and rates.date %}<span class="muted small">{{ rates.date | date_tr }}</span>{% endif %}</h2>
+    {% if rates %}
+      <div class="rates">
+        <div><span class="muted small">$ Dolar</span><b>{{ rates.USD | num }}</b></div>
+        <div><span class="muted small">€ Euro</span><b>{{ rates.EUR | num }}</b></div>
+        <div><span class="muted small">£ Sterlin</span><b>{{ rates.GBP | num }}</b></div>
+        {% if gold %}<div><span class="muted small">Gram altın</span><b>{{ gold | num }}</b></div>{% endif %}
+      </div>
+      <p class="muted small">Avrupa Merkez Bankası referans kuru (TL).</p>
+    {% else %}
+      <p class="muted">Kurlar şu an alınamadı.</p>
+    {% endif %}
+  </section>
+</div>
+
+{# ---------- Yaklaşanlar ---------- #}
+<section class="card" style="margin-top: 14px">
+  <h2>Yaklaşanlar <span class="muted small">7 gün · araç ve garanti 30 gün</span></h2>
+  {% if upcoming %}
+    <ul class="rows">
+      {% for it in upcoming %}
+        <li>
+          <span class="ico">{{ it.icon }}</span>
+          <a class="grow" href="{{ it.url }}"><div class="title">{{ it.title }}</div>{% if it.detail %}<div class="meta">{{ it.detail }}</div>{% endif %}</a>
+          <span class="badge {{ it.date | urgency(3 if it.icon not in ['🚗', '🛡️'] else 7) }}">{{ it.date | rel_days }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ ui.empty("Yaklaşan ödeme, randevu veya son tarih yok.", "🎉") }}
+  {% endif %}
+</section>
+
+<div class="grid two">
+  {# ---------- Bugün ---------- #}
+  <section class="card">
+    <h2>Bugün <a class="more" href="{{ url_for('habits.index') }}">Alışkanlıklar →</a></h2>
+    {% if habits %}
+      <div class="habit-chips">
+        {% for h in habits %}
+          <form method="post" action="{{ url_for('habits.toggle', habit_id=h.habit.id) }}" class="inline">
+            {{ ui.csrf() }}<input type="hidden" name="next" value="dashboard">
+            <button class="habit-chip {{ 'on' if h.done }}">{{ h.habit.icon }} {{ h.habit.name }}{% if h.streak > 1 %} <span class="streak">🔥{{ h.streak }}</span>{% endif %}</button>
+          </form>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted small">Takip ettiğin alışkanlık yok. <a href="{{ url_for('habits.index') }}">Ekle</a></p>
+    {% endif %}
+
+    {% if meds %}
+      <h3 style="margin-top: 14px">💊 İlaçlar</h3>
+      <ul class="rows">
+        {% for time, m in meds %}
+          <li><span class="badge">{{ time }}</span><span class="grow">{{ m.name }}{% if m.dose %} <span class="muted small">{{ m.dose }}</span>{% endif %}</span></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+
+  {# ---------- Yapılacaklar ---------- #}
+  <section class="card">
+    <h2>Yapılacaklar <a class="more" href="{{ url_for('lists.index') }}">Listeler →</a></h2>
+    {% if todos %}
+      <ul class="rows">
+        {% for it in todos %}
+          <li>
+            <form method="post" action="{{ url_for('lists.toggle_item', item_id=it.id) }}" class="inline">
+              {{ ui.csrf() }}<input type="hidden" name="next" value="dashboard">
+              <button class="tick" title="Tamamla"></button>
+            </form>
+            <div class="grow"><div class="title">{{ it.text }}</div><div class="meta">{{ it.list_name }}</div></div>
+            {{ ui.due_badge(it.due_date) }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted small">Bugün için tarihli iş yok.</p>
+    {% endif %}
+    {% for s in shopping %}
+      <p><a href="{{ url_for('lists.detail', list_id=s.id) }}">🛒 {{ s.name }}</a> <span class="pill-count">{{ s.open_count }} ürün</span></p>
+    {% endfor %}
+  </section>
+</div>
+
+{# ---------- Hızlı ekle ---------- #}
+<div class="grid two" style="margin-top: 14px">
+  <section class="card">
+    <h2>💸 Hızlı harcama <a class="more" href="{{ url_for('expenses.index') }}">{{ month_name }}: {{ month_spent | money }}</a></h2>
+    <form method="post" action="{{ url_for('expenses.create') }}">
+      {{ ui.csrf() }}<input type="hidden" name="next" value="dashboard">
+      <input type="hidden" name="date" value="{{ today_str() }}">
+      <div class="quick">
+        <input name="amount" inputmode="decimal" autocomplete="off" placeholder="Tutar ₺" required>
+        <select name="category" style="flex: 0 1 140px">
+          {% for c in categories %}<option>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="quick" style="margin-top: 8px">
+        <input name="note" placeholder="Not (isteğe bağlı)">
+        <button class="btn primary">Ekle</button>
+      </div>
+    </form>
+    {% if pending.n %}
+      <p class="small" style="margin-top: 10px"><a href="{{ url_for('bills.index') }}">🧾 {{ pending.n }} ödenmemiş fatura{% if pending.s %} · {{ pending.s | money }}{% endif %}</a></p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>📝 Hızlı not</h2>
+    <form method="post" action="{{ url_for('notes.create') }}">
+      {{ ui.csrf() }}<input type="hidden" name="next" value="dashboard">
+      <textarea name="content" rows="3" placeholder="Aklına geleni yaz..." required></textarea>
+      <div class="quick" style="margin-top: 8px">
+        <input name="tags" placeholder="Etiket (isteğe bağlı)">
+        <button class="btn primary">Kaydet</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+{# ---------- Modüller ---------- #}
+<section style="margin-top: 18px">
+  <div class="tiles">
+    {% for _m, endpoint, title, icon, _g in MODULES %}
+      <a class="tile" href="{{ url_for(endpoint) }}"><span>{{ icon }}</span>{{ title }}</a>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

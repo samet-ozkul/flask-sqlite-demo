@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Tarifler{% endblock %}
+{% block head %}
+<style>
+  .recipe-rows > li { padding: 0; }
+  .recipe-rows a.recipe-link { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 10px 0; color: var(--text); }
+  .recipe-rows a.recipe-link:hover { text-decoration: none; }
+  .recipe-rows a.recipe-link:hover .title { color: var(--primary); }
+  .recipe-rows .thumb { width: 56px; height: 56px; }
+  .recipe-rows .thumb.ph { display: grid; place-items: center; background: var(--surface-2); font-size: 1.6rem; }
+  .tag.on { background: var(--primary-soft); color: var(--primary); }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🍲 Tarifler") %}
+  <a class="btn primary" href="{{ url_for('recipes.create') }}">＋ Yeni tarif</a>
+{% endcall %}
+
+{% call ui.search_box(q, "Tarif ya da malzeme ara...") %}
+  {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
+{% endcall %}
+
+{% if all_tags %}
+  <div class="row-flex" style="margin-bottom: 14px">
+    <a class="tag {{ 'on' if not tag }}" href="{{ url_for('recipes.index', q=q or None) }}">Tümü</a>
+    {% for t in all_tags %}
+      <a class="tag {{ 'on' if t == tag }}" href="{{ url_for('recipes.index', q=q or None, tag=t) }}">#{{ t }}</a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if recipes %}
+  <div class="card">
+    <ul class="rows recipe-rows">
+      {% for r in recipes %}
+        {% set t = thumbs.get(r.id) %}
+        <li>
+          <a class="recipe-link" href="{{ url_for('recipes.detail', recipe_id=r.id) }}">
+            {% if t %}
+              <img class="thumb" src="{{ url_for('files.thumb', att_id=t.id) }}" alt="" loading="lazy">
+            {% else %}
+              <span class="thumb ph" aria-hidden="true">🍲</span>
+            {% endif %}
+            <span class="grow">
+              <span class="title">{{ r.title }}</span>
+              <span class="meta">
+                {% if r.servings %}<span>🍽️ {{ r.servings }}</span>{% endif %}
+                {% if ing_counts[r.id] %}<span>{{ ing_counts[r.id] }} malzeme</span>{% endif %}
+                {{ ui.tag_list(r.tags) }}
+              </span>
+            </span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% elif q or tag %}
+  {{ ui.empty("Aramanla eşleşen tarif yok.", "🔍") }}
+{% else %}
+  <div class="card">
+    {{ ui.empty("Henüz tarif yok. Sevdiğin ilk tarifi ekle!", "🍲") }}
+    <a class="btn primary block" href="{{ url_for('recipes.create') }}">＋ Yeni tarif</a>
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Faturalar{% endblock %}
+{% block head %}
+<style>
+  .pay-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .pay-form .check { margin: 0; font-size: .85rem; color: var(--muted); }
+  .pay-form .btn { min-height: 38px; padding: 6px 14px; }
+  .bill-amount { text-align: right; align-self: flex-start; }
+</style>
+{% endblock %}
+{% block content %}
+{% set here = request.full_path.rstrip('?') %}
+{{ ui.page_header("🧾 Faturalar", "Son ödeme tarihini kaçırma") }}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Bekleyen toplam</div>
+    <div class="value">{{ stats.pending_total | money }}</div>
+    <div class="sub">{{ stats.pending_count }} fatura{% if stats.unknown %} · {{ stats.unknown }} tanesinin tutarı yok{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Geciken</div>
+    <div class="value {{ 'danger-text' if stats.overdue }}">{{ stats.overdue }}</div>
+    <div class="sub">{% if stats.overdue %}{{ stats.overdue_total | money }}{% else %}Geciken fatura yok{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Bu ay ödenen</div>
+    <div class="value">{{ stats.paid_month | money }}</div>
+    <div class="sub">{{ stats.paid_month_count }} fatura</div>
+  </div>
+</div>
+
+<div class="card">
+  <details class="add" {% if not pending and not stats.paid_count %}open{% endif %}>
+    <summary>＋ Yeni fatura</summary>
+    <form method="post" action="{{ url_for('bills.create') }}">
+      {{ ui.csrf() }}
+      <input type="hidden" name="next" value="{{ here }}">
+      <div class="form-row">
+        {{ ui.field("Fatura", "name", required=True, placeholder="Elektrik, su, internet…",
+                    attrs='list="bill-names" autocomplete="off" maxlength="100"') }}
+        {{ ui.money_field("Tutar (₺)", "amount", placeholder="Bilinmiyorsa boş bırakın") }}
+      </div>
+      <div class="form-row">
+        {{ ui.field("Son ödeme tarihi", "due_date", today_str(), "date", True) }}
+        <div>{{ ui.checkbox("Her ay tekrarlanır", "recurring", True) }}</div>
+      </div>
+      {{ ui.field("Not", "note", placeholder="Abone no, ödeme yöntemi… (isteğe bağlı)") }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+    <datalist id="bill-names">{% for n in names %}<option value="{{ n }}">{% endfor %}</datalist>
+  </details>
+</div>
+
+<nav class="tabs">
+  <a href="{{ url_for('bills.index') }}" class="{{ 'active' if tab == 'bekleyen' }}">Bekleyen <span class="pill-count">{{ stats.pending_count }}</span></a>
+  <a href="{{ url_for('bills.index', sekme='odenen') }}" class="{{ 'active' if tab == 'odenen' }}">Ödenen <span class="pill-count">{{ stats.paid_count }}</span></a>
+</nav>
+
+{% if tab == 'bekleyen' %}
+  <div class="card">
+    {% if pending %}
+      <ul class="rows">
+        {% for b in pending %}
+          <li>
+            <span class="ico">🧾</span>
+            <div class="grow">
+              <div class="title">{{ b.name }}{% if b.recurring %} <span class="muted small" title="Her ay tekrarlanır">🔁</span>{% endif %}</div>
+              <div class="meta">
+                {{ ui.due_badge(b.due_date) }}
+                <span>{{ b.due_date | date_tr(True) }}</span>
+                {% if b.note %}<span>{{ b.note }}</span>{% endif %}
+              </div>
+              <form method="post" action="{{ url_for('bills.pay', bill_id=b.id) }}" class="pay-form">
+                {{ ui.csrf() }}
+                <input type="hidden" name="next" value="{{ here }}">
+                <button class="btn ok">✓ Ödendi</button>
+                {% if b.amount %}{{ ui.checkbox("Harcamalara da ekle", "add_expense", True) }}{% endif %}
+              </form>
+            </div>
+            <div class="bill-amount">
+              <div class="amount">{{ b.amount | money if b.amount is not none else "—" }}</div>
+              <a class="btn sm" href="{{ url_for('bills.edit', bill_id=b.id) }}" title="Düzenle" aria-label="Düzenle">✎</a>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      {{ ui.empty("Bekleyen fatura yok. Hepsi ödenmiş!", "🎉") }}
+    {% endif %}
+  </div>
+{% else %}
+  <div class="card">
+    {% if paid %}
+      <ul class="rows">
+        {% for b in paid %}
+          <li>
+            <span class="ico">✅</span>
+            <div class="grow">
+              <div class="title">{{ b.name }}{% if b.recurring %} <span class="muted small" title="Her ay tekrarlanır">🔁</span>{% endif %}</div>
+              <div class="meta">
+                <span>Ödendi: {{ b.paid_at | date_tr }}</span>
+                <span>Son tarih: {{ b.due_date | date_tr }}</span>
+              </div>
+            </div>
+            <span class="amount">{{ b.amount | money if b.amount is not none else "—" }}</span>
+            <div class="actions">
+              <form method="post" action="{{ url_for('bills.unpay', bill_id=b.id) }}" class="inline">
+                {{ ui.csrf() }}
+                <input type="hidden" name="next" value="{{ here }}">
+                <button class="btn sm" title="Ödenmedi olarak işaretle">Geri al</button>
+              </form>
+              <a class="btn sm" href="{{ url_for('bills.edit', bill_id=b.id) }}" title="Düzenle" aria-label="Düzenle">✎</a>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+      {% if stats.paid_count > paid | length %}<p class="muted small">Son {{ paid | length }} ödeme gösteriliyor.</p>{% endif %}
+    {% else %}
+      {{ ui.empty("Henüz ödenmiş fatura yok.", "🧾") }}
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

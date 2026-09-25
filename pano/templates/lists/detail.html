@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ lst.name }}{% endblock %}
+{% block head %}
+<style>
+  .add-item textarea { min-height: 58px; margin-bottom: 8px; }
+  .add-item > input[name=text] { margin-bottom: 8px; }
+  .add-item .quick input[name=qty] { flex: 0 1 45%; }
+  .add-item small { display: block; margin-top: 6px; }
+  .items > li { min-height: 54px; }
+  .items .tick { width: 34px; height: 34px; }
+  .items .tick.on::after { font-size: 1rem; }
+  .items .btn.icon { min-width: 36px; min-height: 36px; }
+  .qty-badge { display: inline-block; font-size: .8rem; font-weight: 600; color: var(--primary); background: var(--primary-soft);
+               padding: 0 8px; border-radius: 99px; margin-left: 4px; white-space: nowrap; vertical-align: 1px; }
+  .done-box > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+  .done-box[open] > summary { margin-bottom: 6px; }
+  .done-box .clear { margin-top: 10px; }
+  .settings hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
+</style>
+{% endblock %}
+{% block content %}
+{% set owner_name = lst.owner_display or lst.owner_username %}
+{{ ui.page_header(icons[lst.kind] ~ " " ~ lst.name,
+                  kinds[lst.kind] ~ (" · paylaşılan" if lst.shared else "") ~ ("" if is_owner else " · " ~ owner_name ~ " listesi"),
+                  back=url_for('lists.index')) }}
+
+{# Hızlı ekleme #}
+<div class="card">
+  <form method="post" action="{{ url_for('lists.add_item', list_id=lst.id) }}" class="add-item">
+    {{ ui.csrf() }}
+    {% if lst.kind == 'shopping' %}
+      <textarea name="text" rows="2" required placeholder="süt, ekmek, yumurta" aria-label="Eklenecek ürünler"></textarea>
+      <div class="quick">
+        <input name="qty" maxlength="30" placeholder="Miktar (isteğe bağlı)" aria-label="Miktar" autocomplete="off">
+        <button class="btn primary">＋ Ekle</button>
+      </div>
+      <small class="muted">Birden çok ürünü virgülle ya da alt alta yazarak tek seferde ekleyebilirsin.</small>
+    {% else %}
+      <input name="text" required maxlength="200" placeholder="Yapılacak iş..." aria-label="Yapılacak iş" autocomplete="off">
+      <div class="quick">
+        <input type="date" name="due_date" aria-label="Son tarih" title="Son tarih (isteğe bağlı)">
+        <button class="btn primary">＋ Ekle</button>
+      </div>
+    {% endif %}
+  </form>
+</div>
+
+{% macro item_row(i, done=False) -%}
+  <li class="{{ 'done' if done }}">
+    <form method="post" action="{{ url_for('lists.toggle_item', item_id=i.id) }}" class="inline">
+      {{ ui.csrf() }}
+      <button class="tick {{ 'on' if done }}" aria-label="{{ 'Geri al' if done else 'Tamamlandı' }}" title="{{ 'Geri al' if done else 'Tamamlandı' }}"></button>
+    </form>
+    <div class="grow">
+      <div class="title">{{ i.text }}{% if i.qty %} <span class="qty-badge">{{ i.qty }}</span>{% endif %}</div>
+      {% set other = i.created_by and i.created_by != g.user.id and i.creator_username %}
+      {% if (i.due_date and not done) or other or done %}
+        <div class="meta">
+          {% if i.due_date and not done %}{{ ui.due_badge(i.due_date) }}{% endif %}
+          {% if other %}<span>👤 {{ i.creator_display or i.creator_username }}</span>{% endif %}
+          {% if done and i.done_at %}<span>✓ {{ i.done_at | localdt }}</span>{% endif %}
+        </div>
+      {% endif %}
+    </div>
+    {% if is_owner or i.created_by == g.user.id %}
+      <form method="post" action="{{ url_for('lists.delete_item', item_id=i.id) }}" class="inline">
+        {{ ui.csrf() }}
+        <button class="btn sm icon danger" aria-label="Sil" title="Sil">✕</button>
+      </form>
+    {% endif %}
+  </li>
+{%- endmacro %}
+
+{# Açık maddeler #}
+<div class="card">
+  {% if open_items %}
+    <ul class="rows items">
+      {% for i in open_items %}{{ item_row(i) }}{% endfor %}
+    </ul>
+  {% elif done_count %}
+    {{ ui.empty("Hepsi tamam! Açık madde kalmadı.", "🎉") }}
+  {% else %}
+    {{ ui.empty("Liste boş. Yukarıdan ekleyebilirsin.", "📝") }}
+  {% endif %}
+</div>
+
+{# Tamamlananlar #}
+{% if done_items %}
+  <div class="card">
+    <details class="done-box">
+      <summary>✓ Tamamlananlar <span class="pill-count">{{ done_count }}</span></summary>
+      <ul class="rows items">
+        {% for i in done_items %}{{ item_row(i, True) }}{% endfor %}
+      </ul>
+      {% if done_count > done_items | length %}
+        <p class="muted small">Son {{ done_items | length }} tanesi gösteriliyor.</p>
+      {% endif %}
+      {% if is_owner %}
+        <div class="clear">
+          {{ ui.delete_button(url_for('lists.clear_done', list_id=lst.id), "🧹 Tamamlananları temizle",
+                              "Tamamlanan maddeler silinsin mi?") }}
+        </div>
+      {% endif %}
+    </details>
+  </div>
+{% endif %}
+
+{# Liste ayarları: sadece sahibi #}
+{% if is_owner %}
+  <div class="card settings">
+    <details class="add">
+      <summary>⚙️ Liste ayarları</summary>
+      <form method="post" action="{{ url_for('lists.update', list_id=lst.id) }}">
+        {{ ui.csrf() }}
+        {{ ui.field("Liste adı", "name", lst.name, required=True, attrs='maxlength="80"') }}
+        {{ ui.checkbox("Paylaşılan (tüm kullanıcılar görebilir)", "shared", lst.shared) }}
+        <button class="btn primary">Kaydet</button>
+      </form>
+      <hr>
+      {{ ui.delete_button(url_for('lists.delete', list_id=lst.id), "Listeyi sil",
+                          "Liste ve tüm maddeleri silinsin mi? Bu işlem geri alınamaz.") }}
+    </details>
+  </div>
+{% endif %}
+{% endblock %}

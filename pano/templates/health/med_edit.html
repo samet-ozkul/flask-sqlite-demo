@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}İlacı düzenle{% endblock %}
+{% block content %}
+{% call ui.page_header("💊 İlacı düzenle", None if med.active else "Pasif", back=url_for('health.index', tab='ilac')) %}
+  {{ ui.post_button(url_for('health.med_toggle', med_id=med.id), "Pasife al" if med.active else "Tekrar başla") }}
+  {{ ui.delete_button(url_for('health.med_delete', med_id=med.id), "Sil", "İlaç silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.field("İlaç adı", "name", med.name, required=True, attrs='maxlength="100"') }}
+      {{ ui.field("Doz", "dose", med.dose, placeholder="ör. 1 tablet, 5 ml", attrs='maxlength="100"') }}
+    </div>
+    {{ ui.field("Saatler", "times", med.times, placeholder="08:00, 20:00", attrs='maxlength="200" autocomplete="off"',
+                hint="Virgülle ayırın. 8, 8.30, 20:00 gibi yazımlar düzeltilir.") }}
+    {{ ui.field("Not", "note", med.note, attrs='maxlength="500"') }}
+    <button class="btn primary block">Kaydet</button>
+  </form>
+</div>
+<p class="muted small">Eklenme: {{ med.created_at | localdt }}</p>
+{% endblock %}

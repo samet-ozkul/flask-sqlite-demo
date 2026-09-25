@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "car/_form.html" import vehicle_fields %}
+{% block title %}Araç{% endblock %}
+{% block head %}
+<style>
+  .vehicle-head { display: flex; align-items: center; gap: 12px; color: var(--text); }
+  .vehicle-head:hover { text-decoration: none; }
+  .vehicle-head .thumb { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
+  .vehicle-head .ico { font-size: 2rem; width: 56px; text-align: center; flex-shrink: 0; }
+  .vehicle-head h2 { margin: 0; }
+  .plate { display: inline-block; font-family: ui-monospace, monospace; font-size: .85rem; font-weight: 600; letter-spacing: .03em;
+           padding: 1px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
+  .vdates { list-style: none; margin: 12px 0 0; padding: 0; }
+  .vdates li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: .92rem; }
+  .vdates li:last-child { border-bottom: 0; }
+  .vdates .lbl { flex: 1; }
+  .vfoot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: .85rem; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("🚗 Araç", "Muayene, sigorta, kasko ve bakım tarihleri; yakıt ve servis masrafları") }}
+
+<div class="card">
+  <details class="add" {% if not vehicles %}open{% endif %}>
+    <summary>＋ Araç ekle</summary>
+    <form method="post" action="{{ url_for('car.create') }}">
+      {{ ui.csrf() }}
+      {{ vehicle_fields() }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+{% if vehicles %}
+  <div class="grid two">
+    {% for v in vehicles %}
+      {% set t = thumbs.get(v.id) %}
+      <article class="card">
+        <a class="vehicle-head" href="{{ url_for('car.detail', vehicle_id=v.id) }}">
+          {% if t %}<img class="thumb" src="{{ url_for('files.thumb', att_id=t.id) }}" alt="" loading="lazy">
+          {% else %}<span class="ico">🚗</span>{% endif %}
+          <div>
+            <h2>{{ v.name }}</h2>
+            {% if v.plate %}<span class="plate">{{ v.plate }}</span>{% endif %}
+          </div>
+        </a>
+        <ul class="vdates">
+          {% for field, label in DATE_FIELDS %}
+            <li>
+              <span class="lbl">{{ label }}</span>
+              {% if v[field] %}
+                <span class="muted small">{{ v[field] | date_tr }}</span>
+                {{ ui.due_badge(v[field], WARN_DAYS) }}
+              {% else %}
+                <span class="muted small">—</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        <div class="vfoot">
+          <span class="muted">
+            {% if v.last_km is not none %}Son km: <b>{{ v.last_km | num(0) }}</b>{% else %}Henüz km kaydı yok{% endif %}
+            {% if v.service_km is not none and v.last_km is not none %}
+              {% set rem = v.service_km - v.last_km %}
+              · {% if rem >= 0 %}bakıma {{ rem | num(0) }} km{% else %}<span class="danger-text">bakım {{ (-rem) | num(0) }} km geçti</span>{% endif %}
+            {% endif %}
+          </span>
+          <a class="btn sm" href="{{ url_for('car.detail', vehicle_id=v.id) }}">Kayıtlar →</a>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  {{ ui.empty("Henüz araç yok. Yukarıdan ilk aracını ekle; muayene ve sigorta tarihlerini sana hatırlatalım.", "🚗") }}
+{% endif %}
+{% endblock %}

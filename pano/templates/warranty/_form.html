@@ -1,0 +1,21 @@
+{% import "_macros.html" as ui %}
+
+{# Garanti ekleme/düzenleme alanları. w: warranties satırı ya da None #}
+{% macro warranty_fields(w=None) -%}
+  {{ ui.field("Ürün", "product", w.product if w else "", required=True, placeholder="ör. Bulaşık makinesi") }}
+  <div class="form-row">
+    {{ ui.field("Marka / model", "brand", w.brand if w else "", placeholder="ör. Bosch SMS46") }}
+    {{ ui.field("Mağaza", "store", w.store if w else "", placeholder="ör. Teknosa Kent Plaza") }}
+  </div>
+  <div class="form-row">
+    {{ ui.field("Seri no", "serial_no", w.serial_no if w else "", attrs='autocomplete="off"') }}
+    {{ ui.money_field("Fiyat", "price", w.price if w else None) }}
+  </div>
+  <div class="form-row three">
+    {{ ui.field("Alış tarihi", "purchase_date", (w.purchase_date or "") if w else today_str(), type="date") }}
+    {{ ui.field("Garanti bitişi", "warranty_until", w.warranty_until if w else "", type="date") }}
+    {{ ui.field("veya Garanti süresi (ay)", "warranty_months", "", placeholder="ör. 24",
+                attrs='inputmode="numeric" autocomplete="off"', hint="Bitiş boşsa alış tarihine eklenir.") }}
+  </div>
+  {{ ui.textarea("Not", "note", w.note if w else "", rows=2, placeholder="Servis telefonu, ek garanti, fatura no...") }}
+{%- endmacro %}

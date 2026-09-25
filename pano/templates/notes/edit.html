@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Notu düzenle{% endblock %}
+{% block content %}
+{% call ui.page_header("Notu düzenle", back=url_for('notes.index')) %}
+  {{ ui.delete_button(url_for('notes.delete', note_id=note.id), "Notu sil") }}
+{% endcall %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    {{ ui.field("Başlık", "title", note.title) }}
+    {{ ui.textarea("Not", "content", note.content, rows=12) }}
+    <div class="form-row">
+      {{ ui.field("Etiketler", "tags", note.tags, hint="Virgülle ayırın") }}
+      <div>{{ ui.checkbox("Sabitle", "pinned", note.pinned) }}</div>
+    </div>
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Ekler</h2>
+  {{ ui.attachments("note", note.id, files, request.path) }}
+</div>
+
+<p class="muted small">Oluşturma: {{ note.created_at | localdt }}{% if note.updated_at %} · Son düzenleme: {{ note.updated_at | localdt }}{% endif %}</p>
+{% endblock %}
