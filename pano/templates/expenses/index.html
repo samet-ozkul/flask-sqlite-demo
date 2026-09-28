@@ -31,6 +31,14 @@
 {% endblock %}
 {% block content %}
 {% call ui.page_header("💸 Harcamalar") %}
+  {% if ai_ready %}
+    <form method="post" action="{{ url_for('expenses.receipt') }}" enctype="multipart/form-data" class="inline" id="receipt-form">
+      {{ ui.csrf() }}
+      <label class="btn sm" title="Fiş ya da fatura fotoğrafından oku">📷 Fişten ekle
+        <input type="file" name="file" accept="image/*" capture="environment" hidden onchange="this.form.submit()">
+      </label>
+    </form>
+  {% endif %}
   <a class="btn sm" href="{{ url_for('expenses.budget') }}">🎯 Bütçe</a>
   <a class="btn sm" href="{{ url_for('expenses.export', ay=month_param) }}" title="Bu ayı Excel/CSV olarak indir">⬇️ Excel</a>
 {% endcall %}

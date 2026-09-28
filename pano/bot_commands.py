@@ -23,7 +23,7 @@ from datetime import timedelta
 from flask import request, url_for
 from werkzeug.datastructures import FileStorage
 
-from . import telegram
+from . import ai, assistant, telegram
 from . import todo_reminders as todo
 from .db import execute, get_db, query, query_one
 from .utils import fmt_date, fmt_money, fold, now_local, parse_number, today, today_str
@@ -37,6 +37,7 @@ COMMANDS = [
     ("bugun", "Günün özeti"),
     ("rapor", "Geçen ayın raporu (/rapor bu ay)"),
     ("ara", "Her yerde ara: /ara matkap"),
+    ("sor", "Verilerine soru sor: /sor bu ay ne kadar harcadım"),
     ("yardim", "Komutlar"),
 ]
 
@@ -53,10 +54,12 @@ HELP = """<b>Kişisel Pano komutları</b>
 ☀️ <code>/bugun</code> — günün özeti
 📊 <code>/rapor</code> — geçen ayın raporu · <code>/rapor bu ay</code>
 🔍 <code>/ara matkap</code> — notlar, envanter, garantiler... her yerde ara
+🤖 <code>/sor bu ay markete ne kadar harcadım?</code> — verilerine soru sor (yapay zekâ açıksa)
 
 🔖 Link gönder → Sonra Bak'a kaydedilir
 📷 Fotoğraf gönder → garantiye ya da nota eklenir
-✍️ Düz yazı gönder → ne yapacağımı sorarım"""
+✍️ Düz yazı gönder → ne yapacağımı sorarım (yapay zekâ açıksa kendisi anlar: "yarın 3'te dişçiyi ara")
+🧾 Yapay zekâ açıksa fiş/fatura fotoğrafından tutar ve kategori okunur"""
 
 PENDING_TTL = 3600
 LIST_SHOWN = 30
@@ -142,6 +145,7 @@ def handle_message(msg):
             "bugun": cmd_today,
             "rapor": cmd_report,
             "ara": cmd_search,
+            "sor": cmd_ask,
         }.get(command, cmd_help)
         handler(user, chat_id, rest.strip())
         return
@@ -157,7 +161,8 @@ def handle_callback(cq, chat_id, message_id):
     """Bu modülün butonları. İşlendiyse True."""
     data = cq.get("data") or ""
     prefix = data.split(":", 1)[0]
-    handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text}
+    handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
+                "rc": cb_receipt, "ai": cb_ai}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -533,6 +538,9 @@ def ask_attachment(user, chat_id, msg):
     _set_pending(chat_id, {"kind": "file", "file_id": file_id, "name": name, "caption": caption})
     warranties = query("SELECT id, product FROM warranties WHERE user_id = ? ORDER BY id DESC LIMIT 5", (user["id"],))
     buttons = [[(f"🛡️ {w['product'][:35]}", f"ph:w:{w['id']}")] for w in warranties]
+    is_image = bool(msg.get("photo")) or (msg.get("document") or {}).get("mime_type", "").startswith("image/")
+    if is_image and assistant.available(user):
+        buttons.insert(0, [("🧾 Fişi oku (yapay zekâ)", "ph:ai")])
     buttons.append([("➕ Yeni garanti" + (f": {caption[:25]}" if caption else ""), "ph:new")])
     buttons.append([("📝 Nota ekle", "ph:note"), ("✖️ Vazgeç", "ph:x")])
     telegram.send_message(chat_id, "📷 Bunu nereye ekleyeyim?", buttons=buttons)
@@ -545,6 +553,9 @@ def cb_attachment(user, chat_id, message_id, callback_id, data):
     if choice == "x" or pending is None:
         telegram.answer_callback(callback_id, "Vazgeçildi." if choice == "x" else "Süre doldu, dosyayı tekrar gönder.")
         telegram.edit_message(chat_id, message_id, "✖️ Vazgeçildi." if choice == "x" else "⌛ Süre doldu.")
+        return
+    if choice == "ai":
+        _read_receipt(user, chat_id, message_id, callback_id, pending)
         return
     telegram.answer_callback(callback_id, "Kaydediliyor...")
     uid, caption = user["id"], pending["caption"]
@@ -578,8 +589,189 @@ def cb_attachment(user, chat_id, message_id, callback_id, data):
     telegram.edit_message(chat_id, message_id, f'✅ Eklendi: {esc(label)}\n<a href="{esc(target)}">Aç →</a>')
 
 
+# ---------- Yapay zekâ: fiş okuma ----------
+def _read_receipt(user, chat_id, message_id, callback_id, pending):
+    telegram.answer_callback(callback_id, "Okunuyor…")
+    telegram.edit_message(chat_id, message_id, "🔍 Fiş okunuyor…")
+    try:
+        receipt = assistant.read_receipt(telegram.download_file(pending["file_id"]))
+    except (ai.AIError, telegram.TelegramError) as e:
+        telegram.edit_message(chat_id, message_id, f"⚠️ Okunamadı: {esc(str(e)[:200])}")
+        return
+    if not receipt["is_receipt"]:
+        telegram.edit_message(chat_id, message_id, "🤷 Bu bir fiş ya da fatura gibi görünmüyor; tutarı okuyamadım.")
+        return
+    _set_pending(chat_id, {"kind": "receipt", "receipt": receipt})
+    buttons = [[("✅ Harcama olarak kaydet", "rc:exp")]]
+    if receipt["kind"] == "bill" or receipt["due_date"]:
+        buttons.insert(0 if receipt["kind"] == "bill" else 1, [("🧾 Fatura olarak kaydet", "rc:bill")])
+    buttons.append([("✖️ Vazgeç", "rc:x")])
+    telegram.edit_message(chat_id, message_id, _receipt_card(receipt), buttons)
+
+
+def _receipt_card(r):
+    head = "🧾 <b>Fatura okundu</b>" if r["kind"] == "bill" else "🧾 <b>Fiş okundu</b>"
+    lines = [head, f"<b>{fmt_money(r['total'], r['currency'])}</b> · {esc(r['category'])}"
+             + (f" · {esc(r['merchant'])}" if r["merchant"] else "")]
+    lines.append(f"📅 {fmt_date(r['date'], True)}" + (f" · son ödeme {fmt_date(r['due_date'], True)}" if r["due_date"] else ""))
+    if r["summary"]:
+        lines.append(f"<i>{esc(r['summary'])}</i>")
+    if r["currency"] != "TRY":
+        lines.append("Harcamalar TL tutulduğu için güncel kurla çevrilerek kaydedilir.")
+    return "\n".join(lines)
+
+
+def _in_try(amount, currency):
+    from . import external
+    if currency == "TRY":
+        return amount, ""
+    converted = external.to_try(amount, currency)
+    if converted is None:
+        return amount, f" ({fmt_money(amount, currency)}, kur alınamadı)"
+    return round(converted, 2), f" ({fmt_money(amount, currency)})"
+
+
+def cb_receipt(user, chat_id, message_id, callback_id, data):
+    choice = data.split(":", 1)[1]
+    pending = _pop_pending(chat_id, "receipt")
+    telegram.answer_callback(callback_id)
+    if choice == "x" or pending is None:
+        telegram.edit_message(chat_id, message_id, "✖️ Vazgeçildi." if choice == "x" else "⌛ Süre doldu.")
+        return
+    r, uid = pending["receipt"], user["id"]
+    amount, note_extra = _in_try(r["total"], r["currency"])
+    if choice == "bill":
+        bill_id = execute(
+            "INSERT INTO bills (user_id, name, amount, due_date, remind, note) VALUES (?, ?, ?, ?, 1, ?)",
+            (uid, r["merchant"] or "Fatura", amount, r["due_date"] or r["date"], (r["summary"] + note_extra).strip()),
+        ).lastrowid
+        telegram.edit_message(chat_id, message_id,
+                              f"✅ Fatura kaydedildi: <b>{esc(r['merchant'] or 'Fatura')}</b> · {fmt_money(amount)}"
+                              f" · son gün {fmt_date(r['due_date'] or r['date'], True)}\n"
+                              f'<a href="{esc(link("bills.edit", bill_id=bill_id))}">Faturayı aç →</a>')
+        return
+    expense_id = execute("INSERT INTO expenses (user_id, amount, category, note, date) VALUES (?, ?, ?, ?, ?)",
+                         (uid, amount, r["category"], (r["merchant"] + note_extra).strip()[:200], r["date"])).lastrowid
+    telegram.edit_message(chat_id, message_id,
+                          f"✅ Harcama kaydedildi: <b>{fmt_money(amount)}</b> · {esc(r['category'])}"
+                          + (f" · {esc(r['merchant'])}" if r["merchant"] else "")
+                          + f"\nBu ay toplam: {fmt_money(_month_total(uid))}",
+                          [[("↩️ Geri al", f"exu:{expense_id}")]])
+
+
+# ---------- Yapay zekâ: doğal dil ve soru ----------
+def cmd_ask(user, chat_id, rest):
+    if not assistant.available(user):
+        telegram.send_message(chat_id, "🤖 Yapay zekâ kapalı. Panoda <b>Ayarlar → Yapay zekâ</b> bölümünden açabilirsin"
+                                       " (yöneticinin sağlayıcıyı ayarlamış olması gerekir).")
+        return
+    if not rest:
+        telegram.send_message(chat_id, "Örnek: <code>/sor bu ay markete ne kadar harcadım?</code>")
+        return
+    _answer(user, chat_id, rest)
+
+
+def _answer(user, chat_id, question):
+    telegram.send_typing(chat_id)
+    try:
+        answer = assistant.answer_question(user, question)
+    except ai.AIError as e:
+        telegram.send_message(chat_id, f"⚠️ Yapay zekâ yanıt vermedi: {esc(str(e)[:200])}")
+        return
+    telegram.send_message(chat_id, "🤖 " + esc(answer)[:3900])
+
+
+def _intent_card(intent, user):
+    a = intent
+    if a["action"] == "expense":
+        text = f"💸 <b>Harcama</b>: {fmt_money(a['amount'])} · {esc(a['category'])}" + (f" · {esc(a['text'])}" if a["text"] else "")
+        if a["date"] and a["date"] != today_str():
+            text += f"\n📅 {fmt_date(a['date'], True)}"
+        return text
+    when = (fmt_date(a["date"], True) + (f" {a['time']}" if a["time"] else "")) if a["date"] else ""
+    if a["action"] == "todo":
+        return f"☑️ <b>Yapılacak</b>: {esc(a['text'])}" + (f"\n📅 {when} · 🔔 zamanı gelince" if when else "")
+    if a["action"] == "appointment":
+        return (f"🩺 <b>Randevu</b>: {esc(a['text'])}\n📅 {when or fmt_date(a['date'], True)}"
+                + (f" · {esc(a['place'])}" if a["place"] else ""))
+    if a["action"] == "shopping":
+        lst = _find_list(user["id"], a["list_name"], "shopping") if a["list_name"] else None
+        return f"🛒 <b>{esc(lst['name'] if lst else 'Alışveriş listesi')}</b>: {esc(', '.join(a['items']))}"
+    return f"📝 <b>Not</b>: {esc(a['text'])}"
+
+
+def _natural(user, chat_id, text):
+    """True: yapay zekâ işledi; False: anlaşılamadı, klasik seçeneklere dön."""
+    telegram.send_typing(chat_id)
+    intent = assistant.parse_intent(user, text)
+    if intent["action"] == "question":
+        _answer(user, chat_id, intent["text"] or text)
+        return True
+    if intent["action"] == "unknown":
+        return False
+    _set_pending(chat_id, {"kind": "intent", "intent": intent, "text": text[:2000]})
+    telegram.send_message(chat_id, _intent_card(intent, user),
+                          buttons=[[("✅ Kaydet", "ai:ok"), ("🔀 Başka türlü", "ai:alt")], [("✖️ Vazgeç", "ai:x")]])
+    return True
+
+
+def _save_intent(user, a):
+    """Onaylanan niyeti kaydeder; (mesaj, butonlar) döner."""
+    from .modules.lists import add_items
+    uid = user["id"]
+    if a["action"] == "expense":
+        expense_id = execute("INSERT INTO expenses (user_id, amount, category, note, date) VALUES (?, ?, ?, ?, ?)",
+                             (uid, a["amount"], a["category"], a["text"][:200], a["date"] or today_str())).lastrowid
+        return (f"✅ Harcama kaydedildi: <b>{fmt_money(a['amount'])}</b> · {esc(a['category'])}"
+                f"\nBu ay toplam: {fmt_money(_month_total(uid))}", [[("↩️ Geri al", f"exu:{expense_id}")]])
+    if a["action"] == "todo":
+        lst = (_find_list(uid, a["list_name"], "todo") if a["list_name"] else None) or _default_list(uid, "todo")
+        item_id = execute(
+            "INSERT INTO list_items (list_id, text, due_date, due_time, remind_before, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+            (lst["id"], a["text"], a["date"], a["time"] if a["date"] else None, 0 if a["date"] else None, uid)).lastrowid
+        return f"✅ Yapılacak eklendi: <b>{esc(a['text'])}</b> · {esc(lst['name'])}", todo.done_buttons(item_id)
+    if a["action"] == "appointment":
+        execute("INSERT INTO appointments (user_id, title, place, starts_at) VALUES (?, ?, ?, ?)",
+                (uid, a["text"], a["place"], f"{a['date']}T{a['time'] or todo.DEFAULT_DUE_TIME}"))
+        return (f"✅ Randevu kaydedildi: <b>{esc(a['text'])}</b> · {fmt_date(a['date'], True)} {a['time'] or ''}".strip()
+                + f'\n<a href="{esc(link("health.index", tab="randevu"))}">Randevular →</a>', None)
+    if a["action"] == "shopping":
+        lst = (_find_list(uid, a["list_name"], "shopping") if a["list_name"] else None) or _default_list(uid, "shopping")
+        add_items(lst["id"], a["items"], uid)
+        return (f"✅ <b>{esc(lst['name'])}</b>: {esc(', '.join(a['items']))} eklendi · {_open_count(lst['id'])} açık ürün",
+                [[("📋 Listeyi göster", f"lv:{lst['id']}")]])
+    execute("INSERT INTO notes (user_id, title, content, updated_at) VALUES (?, '', ?, CURRENT_TIMESTAMP)", (uid, a["text"]))
+    return "✅ Not kaydedildi.", None
+
+
+def cb_ai(user, chat_id, message_id, callback_id, data):
+    choice = data.split(":", 1)[1]
+    pending = _pop_pending(chat_id, "intent")
+    telegram.answer_callback(callback_id)
+    if choice == "x" or pending is None:
+        telegram.edit_message(chat_id, message_id, "✖️ Vazgeçildi." if choice == "x" else "⌛ Süre doldu.")
+        return
+    if choice == "alt":
+        telegram.edit_message(chat_id, message_id, f"✔️ <i>{esc(pending['text'][:80])}</i>")
+        _ask_buttons(user, chat_id, pending["text"])
+        return
+    text, buttons = _save_intent(user, pending["intent"])
+    telegram.edit_message(chat_id, message_id, text, buttons)
+
+
 # ---------- Düz yazı ----------
 def ask_text(user, chat_id, text):
+    if assistant.available(user):
+        try:
+            if _natural(user, chat_id, text):
+                return
+        except ai.AIError as e:
+            import logging
+            logging.getLogger(__name__).warning("Yapay zekâ niyet çıkaramadı: %s", e)
+    _ask_buttons(user, chat_id, text)
+
+
+def _ask_buttons(user, chat_id, text):
     _set_pending(chat_id, {"kind": "text", "text": text[:2000]})
     row = [("☑️ Yapılacak", "tx:todo")]
     if parse_expense(user["id"], text):

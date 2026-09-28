@@ -4,7 +4,7 @@ import secrets
 from flask import Blueprint, flash, g, make_response, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
-from .. import external, telegram, totp
+from .. import ai, external, telegram, totp
 from ..auth import login_required, set_password
 from ..db import execute
 from ..utils import form_bool, form_str
@@ -20,6 +20,7 @@ def index():
         telegram_enabled=telegram.enabled(),
         webhook_active=telegram.enabled() and telegram.webhook_active(),
         recovery_left=totp.recovery_left(g.user["id"]) if g.user["totp_enabled"] else 0,
+        ai_config=ai.config(),
         bot_username=telegram.bot_username() if g.user["telegram_link_code"] else None,
     )
 
@@ -63,6 +64,16 @@ def password():
         set_password(g.user["id"], new)
         flash("Şifre değiştirildi.", "success")
     return redirect(url_for(".index"))
+
+
+# ---------- Yapay zekâ ----------
+@bp.route("/yapay-zeka", methods=["POST"])
+@login_required
+def ai_toggle():
+    on = 1 if request.form.get("ai_enabled") else 0
+    execute("UPDATE users SET ai_enabled = ? WHERE id = ?", (on, g.user["id"]))
+    flash("Yapay zekâ özellikleri açıldı." if on else "Yapay zekâ özellikleri kapatıldı.", "success")
+    return redirect(url_for(".index") + "#yapay-zeka")
 
 
 # ---------- İki adımlı giriş ----------

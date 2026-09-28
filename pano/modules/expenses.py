@@ -12,7 +12,7 @@ from itertools import groupby
 
 from flask import Blueprint, Response, flash, g, redirect, render_template, request, url_for
 
-from .. import budgets
+from .. import ai, assistant, budgets
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
 from ..utils import (add_months, fmt_money, form_date, form_str, month_bounds, parse_number,
@@ -166,6 +166,7 @@ def index():
         prev_key=month_key(prev), next_key=month_key(nxt), is_current=is_current,
         today_total=today_total, chips=_chip_categories(uid), categories=_all_categories(uid),
         icon=category_icon, budget=budgets.month_status(uid, year, month), month_param=month_key(first),
+        ai_ready=assistant.available(g.user),
     )
 
 
@@ -272,3 +273,32 @@ def export():
                          _csv_safe(r["note"])])
     return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+# ---------- Fişten ekle (yapay zekâ) ----------
+@bp.route("/fis", methods=["POST"])
+@login_required
+def receipt():
+    """Fiş/fatura fotoğrafını okur ve onay için doldurulmuş formu gösterir (kendisi kaydetmez)."""
+    if not assistant.available(g.user):
+        flash("Yapay zekâ kapalı. Ayarlar → Yapay zekâ bölümünden açabilirsin.", "warning")
+        return redirect(url_for(".index"))
+    f = request.files.get("file")
+    if not f or not f.filename:
+        flash("Fotoğraf seçilmedi.", "warning")
+        return redirect(url_for(".index"))
+    try:
+        r = assistant.read_receipt(f.read())
+    except ai.AIError as e:
+        flash(f"Fiş okunamadı: {str(e)[:200]}", "error")
+        return redirect(url_for(".index"))
+    if not r["is_receipt"]:
+        flash("Bu bir fiş ya da fatura gibi görünmüyor; tutarı okuyamadım.", "warning")
+        return redirect(url_for(".index"))
+    amount, note = r["total"], r["merchant"]
+    if r["currency"] != "TRY":
+        from .. import external
+        converted = external.to_try(r["total"], r["currency"])
+        if converted:
+            amount, note = round(converted, 2), f"{r['merchant']} ({fmt_money(r['total'], r['currency'])})".strip()
+    return render_template("expenses/receipt.html", r=r, amount=amount, note=note, categories=_all_categories(g.user["id"]))

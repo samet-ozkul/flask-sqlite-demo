@@ -86,6 +86,14 @@ def send_message(chat_id, text_html, buttons=None):
     return _call("sendMessage", params)
 
 
+def send_typing(chat_id):
+    """"Yazıyor..." göstergesi (yapay zekâ cevabı birkaç saniye sürebilir)."""
+    try:
+        _call("sendChatAction", {"chat_id": chat_id, "action": "typing"})
+    except TelegramError:
+        pass
+
+
 def answer_callback(callback_id, text=""):
     """Butona basınca Telegram'ın gösterdiği bekleme simgesini kapatır, kısa bir bildirim gösterir."""
     return _call("answerCallbackQuery", {"callback_query_id": callback_id, "text": text})

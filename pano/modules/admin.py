@@ -6,7 +6,7 @@ import time
 from flask import (Blueprint, current_app, flash, g, redirect, render_template, request, send_file,
                    session, url_for)
 
-from .. import backup as backup_lib, bot_commands, telegram
+from .. import ai, backup as backup_lib, bot_commands, telegram
 from ..auth import admin_required, create_user, large_upload, registration_open, set_password, validate_new_user
 from ..db import SCHEMA_VERSION, execute, get_db, query, query_one
 from ..external import purge_cache
@@ -50,6 +50,7 @@ def index():
                 webhook["error"] = str(e)
     return render_template(
         "admin/index.html",
+        ai_config=ai.config(), ai_missing=ai.missing_reason(),
         webhook=webhook,
         disk=usage(),
         home=home,
@@ -61,6 +62,21 @@ def index():
         registration=registration_open(),
         secret_default=current_app.config["SECRET_KEY"] == "dev-secret-change-me",
     )
+
+
+# ---------- Yapay zekâ testi ----------
+@bp.route("/yapay-zeka/test", methods=["POST"])
+@admin_required
+def ai_test():
+    schema = {"type": "object", "properties": {"ok": {"type": "boolean"}, "message": {"type": "string"}},
+              "required": ["ok", "message"], "additionalProperties": False}
+    started = time.time()
+    try:
+        out = ai.complete_json("Kısa ve Türkçe cevap ver.", "Bağlantı testi: ok=true ve kısa bir selam yaz.", schema)
+        flash(f"Yapay zekâ çalışıyor ({time.time() - started:.1f} sn): {str(out.get('message'))[:120]}", "success")
+    except ai.AIError as e:
+        flash(f"Yapay zekâ hatası: {str(e)[:300]}", "error")
+    return redirect(url_for(".index"))
 
 
 # ---------- Telegram webhook (mesaj butonları) ----------

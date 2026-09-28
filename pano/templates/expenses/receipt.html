@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Fiş{% endblock %}
+{% block content %}
+{{ ui.page_header("🧾 Fiş okundu", "Kontrol et, gerekirse düzelt ve kaydet.", back=url_for('expenses.index')) }}
+
+<div class="card">
+  {% if r.summary %}<p class="muted small">{{ r.merchant }} · {{ r.summary }}</p>{% endif %}
+  <form method="post" action="{{ url_for('expenses.create') }}">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.money_field("Tutar (₺)", "amount", amount, required=True) }}
+      {{ ui.field("Tarih", "date", r.date, type="date") }}
+    </div>
+    <div class="form-row">
+      <label class="field"><span>Kategori</span>
+        <select name="category">{% for c in categories %}<option {% if c == r.category %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+      </label>
+      {{ ui.field("Not", "note", note, attrs='maxlength="200"') }}
+    </div>
+    <button class="btn primary block">💸 Harcama olarak kaydet</button>
+  </form>
+</div>
+
+{% if r.kind == 'bill' or r.due_date %}
+  <div class="card">
+    <h2>Ya da fatura olarak</h2>
+    <form method="post" action="{{ url_for('bills.create') }}">
+      {{ ui.csrf() }}
+      <input type="hidden" name="remind" value="1">
+      <div class="form-row">
+        {{ ui.field("Fatura adı", "name", r.merchant or "Fatura", required=True, attrs='maxlength="100"') }}
+        {{ ui.money_field("Tutar (₺)", "amount", amount) }}
+      </div>
+      {{ ui.field("Son ödeme tarihi", "due_date", r.due_date or r.date, type="date", required=True) }}
+      <button class="btn block">🧾 Fatura olarak kaydet</button>
+    </form>
+  </div>
+{% endif %}
+{% endblock %}
