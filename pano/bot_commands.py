@@ -35,6 +35,7 @@ COMMANDS = [
     ("yap", "Yapılacak ekle: /yap fatura öde yarın 14:00"),
     ("liste", "Açık maddeleri göster: /liste market"),
     ("bugun", "Günün özeti"),
+    ("rapor", "Geçen ayın raporu (/rapor bu ay)"),
     ("yardim", "Komutlar"),
 ]
 
@@ -49,6 +50,7 @@ HELP = """<b>Kişisel Pano komutları</b>
     <code>/yap çöpü at pazartesi 20:00 her hafta</code> — tekrarlayan
 📋 <code>/liste</code> ya da <code>/liste market</code> — açık maddeler
 ☀️ <code>/bugun</code> — günün özeti
+📊 <code>/rapor</code> — geçen ayın raporu · <code>/rapor bu ay</code>
 
 🔖 Link gönder → Sonra Bak'a kaydedilir
 📷 Fotoğraf gönder → garantiye ya da nota eklenir
@@ -136,6 +138,7 @@ def handle_message(msg):
             "yap": cmd_todo, "y": cmd_todo,
             "liste": cmd_list, "l": cmd_list,
             "bugun": cmd_today,
+            "rapor": cmd_report,
         }.get(command, cmd_help)
         handler(user, chat_id, rest.strip())
         return
@@ -209,6 +212,12 @@ def cmd_expense(user, chat_id, rest):
                          (user["id"], amount, category, note, today_str())).lastrowid
     text = f"💸 <b>{fmt_money(amount)}</b> · {esc(category)}" + (f" · {esc(note)}" if note else "")
     text += f"\nBu ay toplam: {fmt_money(_month_total(user['id']))}"
+    from . import budgets
+    t = today()
+    for line in (budgets.status_line(user["id"], category, t.year, t.month),
+                 budgets.status_line(user["id"], budgets.TOTAL, t.year, t.month)):
+        if line:
+            text += f"\n🎯 {esc(line)}"
     telegram.send_message(chat_id, text, buttons=[[("↩️ Geri al", f"exu:{expense_id}")]])
 
 
@@ -451,6 +460,18 @@ def cb_list_view(user, chat_id, message_id, callback_id, data):
 def cmd_today(user, chat_id, rest):
     from .modules.cron import build_daily_message
     telegram.send_message(chat_id, build_daily_message(user, request.url_root))
+
+
+def cmd_report(user, chat_id, rest):
+    from .reports import monthly_report
+    t = today()
+    if fold(rest).replace(" ", "") == "buay":
+        year, month = t.year, t.month
+    else:
+        prev = t.replace(day=1) - timedelta(days=1)
+        year, month = prev.year, prev.month
+    url = link("expenses.index", ay=f"{year:04d}-{month:02d}")
+    telegram.send_message(chat_id, monthly_report(user, year, month, url, esc))
 
 
 def cmd_help(user, chat_id, rest):

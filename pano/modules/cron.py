@@ -10,14 +10,16 @@ import os
 import secrets
 import shutil
 import time
+from datetime import timedelta
 
 from flask import Blueprint, abort, jsonify, request, url_for
 
-from .. import backup, external, scheduled, telegram
+from .. import backup, budgets, external, scheduled, telegram
 from .. import todo_reminders as todo
 from ..todo_reminders import done_buttons
 from ..db import get_db, query, query_one
 from ..reminders import medications_today, upcoming
+from ..reports import monthly_report
 from ..utils import MONTHS_TR, WEEKDAYS_TR, fmt_money, now_local, rel_days, today, today_str
 
 bp = Blueprint("cron", __name__, url_prefix="/cron")
@@ -101,6 +103,21 @@ def daily(secret):
             result["sent"] += 1
         except telegram.TelegramError as e:
             result["errors"].append(f"{user['username']}: {e}")
+            continue
+        # Ayın ilk günü: geçen ayın raporu (bir kez)
+        t = todo.now_local().date()
+        if t.day == 1:
+            prev = (t.replace(day=1) - timedelta(days=1))
+            report_key = f"monthly:{user['id']}:{prev.year:04d}-{prev.month:02d}"
+            if _state_get(report_key) is None:
+                try:
+                    telegram.send_message(user["telegram_chat_id"], monthly_report(
+                        user, prev.year, prev.month, url_for("expenses.index", ay=f"{prev.year:04d}-{prev.month:02d}",
+                                                             _external=True), telegram.escape))
+                    _state_set(report_key, today_str())
+                    result["reports"] = result.get("reports", 0) + 1
+                except telegram.TelegramError as e:
+                    result["errors"].append(f"{user['username']} rapor: {e}")
 
     # Ufak bakım: eski önbellek ve giriş denemesi kayıtları
     external.purge_cache()
@@ -170,6 +187,17 @@ def todo_reminders(secret):
                 result["days_sent"] += 1
             except telegram.TelegramError as e:
                 result["errors"].append(f"önemli gün {row['id']}: {e}")
+
+    # Bütçe uyarıları (%80 ve %100, her ay bir kez)
+    result["budget_alerts"] = 0
+    for user, row in budgets.pending_alerts(now):
+        try:
+            telegram.send_message(user["telegram_chat_id"], budgets.alert_message(
+                row, url_for("expenses.index", _external=True), telegram.escape))
+            budgets.mark_alert(user["id"], row, now)
+            result["budget_alerts"] += 1
+        except telegram.TelegramError as e:
+            result["errors"].append(f"bütçe {user['username']}: {e}")
 
     # Kur alarmları (kur önbellekten; saatte en fazla birkaç istek)
     result["rate_alerts"] = 0

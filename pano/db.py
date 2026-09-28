@@ -317,6 +317,15 @@ MIGRATIONS = [
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     """,
+    # 6: aylık bütçe limitleri
+    """
+    CREATE TABLE budgets (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        category TEXT NOT NULL,        -- '*' = toplam aylık bütçe
+        amount REAL NOT NULL,
+        PRIMARY KEY (user_id, category)
+    );
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)
