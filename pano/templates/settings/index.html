@@ -161,6 +161,15 @@
   </form>
 </section>
 
+<section class="card" id="oturumlar">
+  <h2>📱 Oturumlar</h2>
+  <p class="muted small">Telefonda, iş bilgisayarında ya da başka bir yerde açık kalan oturumları kapatır. Bu cihazda açık kalırsın;
+    diğerlerinde bir sonraki tıklamada giriş sayfası açılır. Şifre değiştirince ve iki adımlı giriş açılınca bu kendiliğinden yapılır.</p>
+  {{ ui.delete_button(url_for('settings.logout_others'), "🚪 Diğer cihazlardan çıkış yap",
+                      "Diğer tüm cihazlardaki oturumlar kapatılsın mı?", small=False) }}
+  <p class="muted small" style="margin-top: 10px">Telegram botu ve telefon takvimi aboneliği bundan etkilenmez; onları kendi bölümlerinden kapatabilirsin.</p>
+</section>
+
 <section class="card">
   <h2>Telefona uygulama olarak ekle</h2>
   <p class="muted small"><b>Android (Chrome):</b> sağ üstteki ⋮ menüsü → <i>Ana ekrana ekle</i> / <i>Uygulamayı yükle</i>. Yüklendikten sonra başka uygulamalardan “Paylaş → Pano” ile link kaydedebilirsin.</p>
