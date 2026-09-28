@@ -1,0 +1,138 @@
+{# Hedef sayfalarının ortak parçaları. {% import "goals/_parts.html" as gp %} #}
+{% import "_macros.html" as ui %}
+
+{% macro style() -%}
+<style>
+  .goal-grid { display: grid; gap: 14px; grid-template-columns: 1fr; margin-bottom: 14px; }
+  @media (min-width: 700px) { .goal-grid { grid-template-columns: 1fr 1fr; } }
+  .goal-grid > .card { margin-bottom: 0; display: flex; flex-direction: column; }
+  .goal-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+  .goal-head .gico { font-size: 1.8rem; line-height: 1; flex-shrink: 0; }
+  .goal-head .grow { flex: 1; min-width: 0; }
+  .goal-head .gname { font-weight: 600; font-size: 1.05rem; color: var(--text); overflow-wrap: anywhere; }
+  .goal-head .gnote { overflow-wrap: anywhere; }
+  .goal-amounts { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap;
+                  margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+  .goal-amounts b { font-size: 1.15rem; }
+  .meter.goal > span { background: var(--primary); transition: width .3s; }
+  .meter.goal.done > span { background: var(--ok); }
+  .goal-sub { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: .85rem;
+              color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .goal-plan { list-style: none; padding: 0; margin: 10px 0 0; font-size: .88rem; display: grid; gap: 4px; }
+  .goal-plan .late { color: var(--warn); }
+  .goal-entry { margin-top: auto; padding-top: 12px; }
+  .goal-entry > summary { margin-top: 2px; }
+  .goal-entry .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .goal-entry .btns .btn { min-height: 44px; }
+  .amt-in { color: var(--ok); }
+  .amt-out { color: var(--danger); }
+  .icon-pick { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; padding: 0; border: 0; }
+  .icon-pick legend { font-size: .85rem; font-weight: 500; margin-bottom: 4px; padding: 0; }
+  .icon-pick label { position: relative; }
+  .icon-pick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .icon-pick span {
+    display: grid; place-items: center; width: 46px; height: 46px; font-size: 1.4rem; cursor: pointer;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface);
+  }
+  .icon-pick input:checked + span { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 2px var(--primary); }
+  .icon-pick input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+</style>
+{%- endmacro %}
+
+{# Emoji seçici: radyo butonları, JS gerekmez #}
+{% macro icon_picker(icons, selected) -%}
+  <fieldset class="icon-pick">
+    <legend>Simge</legend>
+    {% for ic in icons %}
+      <label title="{{ ic }}">
+        <input type="radio" name="icon" value="{{ ic }}" {% if ic == selected %}checked{% endif %}>
+        <span>{{ ic }}</span>
+      </label>
+    {% endfor %}
+  </fieldset>
+{%- endmacro %}
+
+{# Yeni hedef / düzenleme alanları; goal None ise boş form #}
+{% macro goal_fields(goal, icons) -%}
+  {{ ui.field("Ad", "name", goal.name if goal else "", required=True, placeholder="ör. Tatil, Yeni telefon",
+              attrs='maxlength="60" autocomplete="off"') }}
+  {{ icon_picker(icons, goal.icon if goal else icons[0]) }}
+  <div class="form-row">
+    {{ ui.money_field("Hedef tutar (₺)", "target", goal.target if goal else None, required=True, placeholder="ör. 12.000") }}
+    {{ ui.field("Hedef tarih", "deadline", (goal.deadline or "") if goal else "", "date", hint="İsteğe bağlı") }}
+  </div>
+  {{ ui.textarea("Not", "note", goal.note if goal else "", rows=2, placeholder="İsteğe bağlı") }}
+{%- endmacro %}
+
+{# Kart başlığı: simge, ad, rozet #}
+{% macro head(c) -%}
+  <div class="goal-head">
+    <span class="gico" aria-hidden="true">{{ c.goal.icon }}</span>
+    <div class="grow">
+      <a class="gname" href="{{ url_for('goals.detail', goal_id=c.goal.id) }}">{{ c.goal.name }}</a>
+      {% if c.goal.note %}<div class="muted small gnote">{{ c.goal.note | truncate(90) }}</div>{% endif %}
+    </div>
+    {% if c.done %}<span class="badge good">Tamamlandı 🎉</span>
+    {% elif c.overdue %}<span class="badge overdue">Süre doldu</span>
+    {% elif c.goal.deadline %}{{ ui.due_badge(c.goal.deadline, 30) }}{% endif %}
+  </div>
+{%- endmacro %}
+
+{# Biriken / hedef, ilerleme çubuğu, kalan #}
+{% macro progress(c) -%}
+  <div class="goal-amounts">
+    <span><b>{{ c.saved | money }}</b> <span class="muted">/ {{ c.goal.target | money }}</span></span>
+    <b class="{{ 'amt-in' if c.done }}">%{{ c.pct_label }}</b>
+  </div>
+  <div class="meter goal {{ 'done' if c.done }}" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+       aria-valuenow="{{ c.bar }}" aria-label="{{ c.goal.name }}: %{{ c.pct_label }}"><span style="width: {{ c.bar }}%"></span></div>
+  <div class="goal-sub">
+    {% if c.done %}
+      <span class="amt-in">Tamamlandı 🎉 {{ c.goal.done_at | date_tr }}</span>
+      {% if c.extra > 0 %}<span>Hedefin {{ c.extra | money }} üstünde</span>{% endif %}
+    {% else %}
+      <span>Kalan <b>{{ c.remaining | money }}</b></span>
+    {% endif %}
+  </div>
+{%- endmacro %}
+
+{# Planlama: hedef tarihe göre aylık tutar + son aylardaki hıza göre tahmin #}
+{% macro plan(c, pace_months=3, show_pace=False) -%}
+  {% if not c.done %}
+    <ul class="goal-plan">
+      {% if c.goal.deadline %}
+        {% if c.overdue %}
+          <li class="late">📅 Hedef tarihi ({{ c.goal.deadline | date_tr }}) geçti · kalan {{ c.remaining | money }}</li>
+        {% else %}
+          <li>📅 {{ c.goal.deadline | date_tr }} ·
+            {% if c.months_left > 1 %}{{ c.months_left }} ay kaldı{% else %}{{ c.goal.deadline | rel_days }}{% endif %}
+            · ayda <b>{{ c.monthly_needed | money }}</b> biriktirmelisin</li>
+        {% endif %}
+      {% endif %}
+      <li class="{{ 'late' if c.proj_late }}">📈 {{ c.projection }}{% if c.proj_late %} (hedef tarihten sonra){% endif %}</li>
+      {% if show_pace and c.per_month %}
+        <li class="muted">Son {{ pace_months }} ayın ortalaması: ayda {{ c.per_month | money }}</li>
+      {% endif %}
+    </ul>
+  {% endif %}
+{%- endmacro %}
+
+{# Hızlı para ekle / çek formu #}
+{% macro entry_form(goal, next_url, saved=0, open=False) -%}
+  <details class="add goal-entry" {% if open %}open{% endif %}>
+    <summary>＋ Para ekle / çek</summary>
+    <form method="post" action="{{ url_for('goals.add_entry', goal_id=goal.id) }}">
+      {{ ui.csrf() }}
+      <input type="hidden" name="next" value="{{ next_url }}">
+      {{ ui.money_field("Tutar (₺)", "amount", required=True) }}
+      <div class="form-row">
+        {{ ui.field("Tarih", "date", today_str(), "date", attrs='max="' ~ today_str() ~ '"') }}
+        {{ ui.field("Not", "note", placeholder="İsteğe bağlı", attrs='maxlength="200" autocomplete="off"') }}
+      </div>
+      <div class="btns">
+        <button class="btn primary" name="kind" value="add">＋ Ekle</button>
+        <button class="btn danger" name="kind" value="withdraw" {% if saved <= 0 %}disabled title="Hedefte para yok"{% endif %}>− Çek</button>
+      </div>
+    </form>
+  </details>
+{%- endmacro %}

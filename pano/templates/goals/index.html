@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "goals/_parts.html" as gp %}
+{% block title %}Hedefler{% endblock %}
+{% block head %}{{ gp.style() }}{% endblock %}
+{% block content %}
+{{ ui.page_header("🏁 Hedefler", "Ne için biriktiriyorsun? Hedef koy, ekledikçe ilerle.") }}
+
+{% if active %}
+  <div class="stats">
+    <div class="stat">
+      <div class="label">Biriken</div>
+      <div class="value">{{ totals.saved | money }}</div>
+      <div class="sub">{{ active | length }} aktif hedef</div>
+    </div>
+    <div class="stat">
+      <div class="label">Kalan</div>
+      <div class="value">{{ totals.remaining | money }}</div>
+      <div class="sub">toplam hedef {{ totals.target | money }}</div>
+    </div>
+    {% if totals.monthly is not none %}
+      <div class="stat">
+        <div class="label">Aylık gereken</div>
+        <div class="value">{{ totals.monthly | money }}</div>
+        <div class="sub">tarihli hedefler için</div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="goal-grid">
+    {% for c in active %}
+      <article class="card">
+        {{ gp.head(c) }}
+        {{ gp.progress(c) }}
+        {{ gp.plan(c, pace_months) }}
+        {{ gp.entry_form(c.goal, url_for('goals.index'), c.saved) }}
+      </article>
+    {% endfor %}
+  </div>
+{% elif completed %}
+  <div class="card">{{ ui.empty("Aktif hedef yok; hepsine ulaştın! Sıradaki hedefin ne?", "🎉") }}</div>
+{% else %}
+  <div class="card">{{ ui.empty("Henüz hedef yok. Tatil, yeni telefon, ev… Ne için biriktiriyorsun?", "🏁") }}</div>
+{% endif %}
+
+<div class="card">
+  <details class="add" {% if not active %}open{% endif %}>
+    <summary>＋ Yeni hedef</summary>
+    <form method="post" action="{{ url_for('goals.create') }}">
+      {{ ui.csrf() }}
+      {{ gp.goal_fields(None, icons) }}
+      <button class="btn primary block">Hedef ekle</button>
+    </form>
+  </details>
+</div>
+
+{% if completed %}
+  <details class="card">
+    <summary><b>🎉 Tamamlananlar</b> <span class="pill-count">{{ completed | length }}</span></summary>
+    <ul class="rows">
+      {% for c in completed %}
+        <li>
+          <span class="ico" aria-hidden="true">{{ c.goal.icon }}</span>
+          <div class="grow">
+            <a class="title" href="{{ url_for('goals.detail', goal_id=c.goal.id) }}">{{ c.goal.name }}</a>
+            <div class="meta">
+              <span>Tamamlandı: {{ c.goal.done_at | date_tr }}</span>
+              <span>Hedef {{ c.goal.target | money }}</span>
+            </div>
+          </div>
+          <span class="amount amt-in">{{ c.saved | money }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </details>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "goals/_parts.html" as gp %}
+{% block title %}{{ goal.name }}{% endblock %}
+{% block head %}{{ gp.style() }}{% endblock %}
+{% block content %}
+{% call ui.page_header(goal.icon ~ " " ~ goal.name, "Hedef " ~ (goal.target | money), back=url_for('goals.index')) %}
+  {{ ui.delete_button(url_for('goals.delete', goal_id=goal.id), "Sil", "Hedef ve tüm hareketleri silinsin mi? Bu işlem geri alınamaz.") }}
+{% endcall %}
+
+<div class="card">
+  <div class="goal-head" style="margin-bottom: 6px">
+    <div class="grow">{% if goal.note %}<div class="muted small gnote">{{ goal.note }}</div>{% endif %}</div>
+    {% if c.done %}<span class="badge good">Tamamlandı 🎉</span>
+    {% elif c.overdue %}<span class="badge overdue">Süre doldu</span>
+    {% elif goal.deadline %}{{ ui.due_badge(goal.deadline, 30) }}{% endif %}
+  </div>
+  {{ gp.progress(c) }}
+  {{ gp.plan(c, pace_months, show_pace=True) }}
+  {{ gp.entry_form(goal, self_url, c.saved, open=True) }}
+</div>
+
+<div class="card">
+  <h2>Hareketler <span class="pill-count">{{ entries | length }}</span></h2>
+  {% if entries %}
+    <ul class="rows">
+      {% for e in entries %}
+        {% set incoming = e.row.amount > 0 %}
+        <li>
+          <span class="ico" aria-hidden="true">{{ '➕' if incoming else '➖' }}</span>
+          <div class="grow">
+            <div class="title">{{ e.row.note or ('Para eklendi' if incoming else 'Para çekildi') }}</div>
+            <div class="meta">
+              <span>{{ e.row.date | date_tr(True) }}</span>
+              <span>Bakiye {{ e.balance | money }}</span>
+            </div>
+          </div>
+          <span class="amount {{ 'amt-in' if incoming else 'amt-out' }}">{{ '+' if incoming else '−' }}{{ e.row.amount | abs | money }}</span>
+          <span class="actions">
+            {{ ui.delete_button(url_for('goals.delete_entry', goal_id=goal.id, entry_id=e.row.id), "Sil", "Bu kayıt silinsin mi?") }}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ ui.empty("Henüz hareket yok. İlk birikimini yukarıdan ekle.", "💰") }}
+  {% endif %}
+</div>
+
+<div class="card">
+  <details class="add">
+    <summary>✏️ Düzenle</summary>
+    <form method="post" action="{{ url_for('goals.edit', goal_id=goal.id) }}">
+      {{ ui.csrf() }}
+      {{ gp.goal_fields(goal, icons) }}
+      <button class="btn primary block">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+<p class="muted small">Oluşturma: {{ goal.created_at | localdt("%d.%m.%Y") }}</p>
+{% endblock %}

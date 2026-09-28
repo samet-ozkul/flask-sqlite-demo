@@ -1,0 +1,72 @@
+{# Ortak Harcama parçaları. Kullanım: {% import "splits/_bits.html" as sp with context %} #}
+{% import "_macros.html" as ui %}
+
+{# Sayfaya özel stiller: {% block head %}{{ sp.styles() }}{% endblock %} #}
+{% macro styles() -%}
+<style>
+  .pos { color: var(--ok); }
+  .neg { color: var(--danger); }
+  .who-label { display: block; font-size: .85rem; font-weight: 500; margin-bottom: 6px; }
+  .who { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 0 0 12px; }
+  .who .check { margin: 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface); }
+  .who .check:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+  .me-tag { font-size: .72rem; font-weight: 600; color: var(--primary); background: var(--primary-soft);
+            padding: 0 7px; border-radius: 99px; margin-left: 4px; vertical-align: 1px; }
+  .net-sub { display: block; font-size: .78rem; font-weight: 400; }
+  .split-amount { text-align: right; white-space: nowrap; }
+  .transfer .title { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .transfer .arrow { color: var(--muted); }
+  .settings hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
+  table.balances td.num { white-space: nowrap; }
+  table.balances td:first-child { overflow-wrap: anywhere; }
+  @media (max-width: 420px) {
+    table.balances th.hide-sm, table.balances td.hide-sm { display: none; }
+  }
+</style>
+{%- endmacro %}
+
+{# Net bakiye: + alacaklı (yeşil), − borçlu (kırmızı), denk #}
+{% macro net(value) -%}
+  {% if value is none %}<span class="muted">—</span>
+  {% elif value >= 0.005 %}<span class="pos">+{{ value | money }}</span>
+  {% elif value <= -0.005 %}<span class="neg">−{{ (-value) | money }}</span>
+  {% else %}<span class="muted">{{ 0 | money }}</span>{% endif %}
+{%- endmacro %}
+
+{# Kullanıcının kendi bakiyesi için açıklama #}
+{% macro net_label(value) -%}
+  {% if value is none %}bu grupta üye değilsin
+  {% elif value >= 0.005 %}alacaklısın
+  {% elif value <= -0.005 %}borçlusun
+  {% else %}hesap denk{% endif %}
+{%- endmacro %}
+
+{# Üye adı; kullanıcının kendisiyse "sen" etiketi #}
+{% macro who(member) -%}
+  {{ member.name }}{% if member.user_id and member.user_id == g.user.id %}<span class="me-tag">sen</span>{% endif %}
+{%- endmacro %}
+
+{# Harcama ekleme / düzenleme formu.
+   selected: paylaşanların id kümesi; boşsa herkes işaretli gelir. #}
+{% macro expense_form(action, members, member_options, payer_id=None, amount=None, date=None, note="", selected=None, submit="Kaydet") -%}
+  <form method="post" action="{{ action }}">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.money_field("Tutar", "amount", amount, required=True) }}
+      {{ ui.select("Ödeyen", "payer", member_options, payer_id) }}
+    </div>
+    <div class="form-row">
+      {{ ui.field("Ne için?", "note", note, placeholder="Market, akşam yemeği, benzin...", attrs='maxlength="200" autocomplete="off"') }}
+      {{ ui.field("Tarih", "date", date or today_str(), "date", True) }}
+    </div>
+    <span class="who-label">Kimler arasında eşit bölünsün?</span>
+    <div class="who">
+      {% for m in members %}
+        <label class="check"><input type="checkbox" name="members" value="{{ m.id }}"
+               {% if not selected or m.id in selected %}checked{% endif %}> {{ m.name }}</label>
+      {% endfor %}
+    </div>
+    <button class="btn primary block">{{ submit }}</button>
+    <small class="muted">Kuruşlar tam dağıtılır: 100 ₺ üç kişiye 33,34 + 33,33 + 33,33 olarak bölünür.</small>
+  </form>
+{%- endmacro %}

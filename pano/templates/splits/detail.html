@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "splits/_bits.html" as sp with context %}
+{% block title %}{{ group.name }}{% endblock %}
+{% block head %}{{ sp.styles() }}{% endblock %}
+{% block content %}
+{% set owner_name = group.owner_display or group.owner_username %}
+{{ ui.page_header("👥 " ~ group.name,
+                  (members | length) ~ " üye" ~ ("" if is_owner else " · sahibi " ~ owner_name),
+                  back=url_for('splits.index')) }}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Toplam harcama</div>
+    <div class="value">{{ total | money }}</div>
+    <div class="sub">{{ expense_count }} kayıt</div>
+  </div>
+  <div class="stat">
+    <div class="label">Senin bakiyen</div>
+    <div class="value">{{ sp.net(my_net) }}</div>
+    <div class="sub">{{ sp.net_label(my_net) }}</div>
+  </div>
+</div>
+
+<nav class="tabs">
+  <a href="{{ url_for('splits.detail', group_id=group.id) }}" class="{{ 'active' if tab == 'harcamalar' }}">🧾 Harcamalar <span class="pill-count">{{ expense_count }}</span></a>
+  <a href="{{ url_for('splits.detail', group_id=group.id, sekme='bakiyeler') }}" class="{{ 'active' if tab == 'bakiyeler' }}">⚖️ Bakiyeler</a>
+  <a href="{{ url_for('splits.detail', group_id=group.id, sekme='uyeler') }}" class="{{ 'active' if tab == 'uyeler' }}">👤 Üyeler <span class="pill-count">{{ members | length }}</span></a>
+</nav>
+
+{# =============================== Harcamalar =============================== #}
+{% if tab == 'harcamalar' %}
+  <div class="card">
+    <details class="add" {% if not expenses %}open{% endif %}>
+      <summary>＋ Harcama ekle</summary>
+      {% if members | length < 2 %}
+        <p class="muted small">Harcamayı bölmek için önce <a href="{{ url_for('splits.detail', group_id=group.id, sekme='uyeler') }}">üye ekle</a>.</p>
+      {% endif %}
+      {{ sp.expense_form(url_for('splits.add_expense', group_id=group.id), members, member_options,
+                         payer_id=me.id if me else none, submit="＋ Ekle") }}
+    </details>
+  </div>
+
+  <div class="card">
+    {% if expenses %}
+      <ul class="rows">
+        {% for e in expenses %}
+          <li>
+            <span class="ico">🧾</span>
+            <div class="grow">
+              <div class="title">{{ e.note or "Harcama" }}</div>
+              <div class="meta">
+                <span>{{ "Sen ödedin" if e.payer_user_id and e.payer_user_id == g.user.id else e.payer_name ~ " ödedi" }}</span>
+                <span>{{ e.date | date_tr }}</span>
+                <span>{{ e.share_count }} kişi</span>
+                {% if e.my_share is not none %}<span>Senin payın: {{ e.my_share | money }}</span>{% endif %}
+                {% if e.created_by and e.created_by != g.user.id and e.creator_username %}
+                  <span title="Ekleyen">✍️ {{ e.creator_display or e.creator_username }}</span>
+                {% endif %}
+              </div>
+            </div>
+            <span class="amount">{{ e.amount | money }}</span>
+            {% if is_owner or e.created_by == g.user.id %}
+              <div class="actions">
+                <a class="btn sm icon" href="{{ url_for('splits.edit_expense', expense_id=e.id) }}" title="Düzenle / sil" aria-label="Düzenle">✎</a>
+              </div>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+      {% if expenses | length >= shown_limit %}
+        <p class="muted small">Son {{ shown_limit }} harcama gösteriliyor; bakiyeler tüm kayıtlarla hesaplanır.</p>
+      {% endif %}
+    {% else %}
+      {{ ui.empty("Henüz harcama yok. Yukarıdan ilkini ekle.", "🧾") }}
+    {% endif %}
+  </div>
+
+{# =============================== Bakiyeler =============================== #}
+{% elif tab == 'bakiyeler' %}
+  <div class="card">
+    <h2>Kim kime ne kadar ödemeli</h2>
+    {% if plan %}
+      <ul class="rows">
+        {% for t in plan %}
+          <li class="transfer">
+            <span class="ico">💸</span>
+            <div class="grow">
+              <div class="title">{{ sp.who(t['from']) }} <span class="arrow">→</span> {{ sp.who(t['to']) }}</div>
+            </div>
+            <span class="amount">{{ t.amount | money }}</span>
+            <form method="post" action="{{ url_for('splits.add_settlement', group_id=group.id) }}" class="inline"
+                  data-confirm="{{ t['from'].name }} → {{ t['to'].name }}: {{ t.amount | money }} ödendi olarak kaydedilsin mi?">
+              {{ ui.csrf() }}
+              <input type="hidden" name="from_id" value="{{ t['from'].id }}">
+              <input type="hidden" name="to_id" value="{{ t['to'].id }}">
+              <input type="hidden" name="amount" value="{{ '%.2f' | format(t.amount) }}">
+              <button class="btn sm ok" title="Ödeme yapıldı, kaydet">✓ Ödendi</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+      <p class="muted small">En az sayıda transferle ödeşme önerisi. Ödeme yapılınca “Ödendi”ye bas.</p>
+    {% else %}
+      {{ ui.empty("Herkes ödeşmiş; kimsenin kimseye borcu yok.", "🎉") }}
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Bakiyeler</h2>
+    <div class="table-wrap">
+      <table class="balances">
+        <thead>
+          <tr><th>Üye</th><th class="num hide-sm">Ödediği</th><th class="num hide-sm">Payı</th><th class="num">Bakiye</th></tr>
+        </thead>
+        <tbody>
+          {% for b in balances %}
+            <tr>
+              <td>{{ sp.who(b.member) }}</td>
+              <td class="num hide-sm">{{ b.paid | money }}</td>
+              <td class="num hide-sm">{{ b.owed | money }}</td>
+              <td class="num">{{ sp.net(b.net) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="muted small">Bakiye = ödediği − payı, yapılan ödemeler dahil. <span class="pos">+ alacaklı</span> · <span class="neg">− borçlu</span></p>
+  </div>
+
+  {% if members | length >= 2 %}
+    <div class="card">
+      <details class="add">
+        <summary>＋ Elle ödeme kaydet</summary>
+        <form method="post" action="{{ url_for('splits.add_settlement', group_id=group.id) }}">
+          {{ ui.csrf() }}
+          <div class="form-row">
+            {{ ui.select("Ödeyen", "from_id", member_options, me.id if me else none) }}
+            {{ ui.select("Alan", "to_id", member_options, default_to) }}
+          </div>
+          <div class="form-row">
+            {{ ui.money_field("Tutar", "amount", required=True) }}
+            {{ ui.field("Tarih", "date", today_str(), "date", True) }}
+          </div>
+          <button class="btn primary">Kaydet</button>
+          <small class="muted">Borcun bir kısmı ödendiyse ya da önerilenden farklı bir ödeme yapıldıysa.</small>
+        </form>
+      </details>
+    </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Ödemeler</h2>
+    {% if settlements %}
+      <ul class="rows">
+        {% for s in settlements %}
+          <li>
+            <span class="ico">🤝</span>
+            <div class="grow">
+              <div class="title">{{ s.from_name }} → {{ s.to_name }}</div>
+              <div class="meta"><span>{{ s.date | date_tr }}</span></div>
+            </div>
+            <span class="amount">{{ s.amount | money }}</span>
+            {% if is_owner or s.from_user == g.user.id or s.to_user == g.user.id %}
+              <div class="actions">
+                {{ ui.delete_button(url_for('splits.delete_settlement', settlement_id=s.id), "✕", "Bu ödeme kaydı silinsin mi?") }}
+              </div>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted small">Henüz ödeme kaydı yok.</p>
+    {% endif %}
+  </div>
+
+{# =============================== Üyeler =============================== #}
+{% else %}
+  <div class="card">
+    <ul class="rows">
+      {% for m in members %}
+        {% set u = usage.get(m.id, {}) %}
+        <li>
+          <span class="ico">{{ '👤' if m.user_id else '🙂' }}</span>
+          <div class="grow">
+            <div class="title">{{ sp.who(m) }}</div>
+            <div class="meta">
+              {% if m.user_id %}<span>@{{ m.username }}</span>{% else %}<span>hesabı yok</span>{% endif %}
+              {% if m.user_id and m.user_id == group.owner_id %}<span class="badge good">sahibi</span>{% endif %}
+              {% if u.text %}<span>{{ u.text }}</span>{% endif %}
+            </div>
+          </div>
+          {% if is_owner and not (m.user_id and m.user_id == group.owner_id) %}
+            {% if u.text %}
+              <span class="muted small" title="Harcamada ya da ödemede adı geçen üye çıkarılamaz">🔒 çıkarılamaz</span>
+            {% else %}
+              {{ ui.delete_button(url_for('splits.remove_member', member_id=m.id), "Çıkar", m.name ~ " gruptan çıkarılsın mı?") }}
+            {% endif %}
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% if is_owner %}
+      <p class="muted small">Harcamada ya da ödemede adı geçen üye çıkarılamaz; önce o kayıtları sil ya da düzenle.</p>
+    {% endif %}
+  </div>
+
+  {% if is_owner %}
+    <div class="card">
+      <h2>Üye ekle</h2>
+      {% if members | length >= max_members %}
+        <p class="muted small">Bir grupta en fazla {{ max_members }} üye olabilir.</p>
+      {% else %}
+        <form method="post" action="{{ url_for('splits.add_member', group_id=group.id) }}">
+          {{ ui.csrf() }}
+          <div class="form-row">
+            <label class="field">
+              <span>Uygulama kullanıcısı</span>
+              <select name="username">
+                <option value="">— Hesabı olmayan kişi —</option>
+                {% for c in candidates %}
+                  <option value="{{ c.username }}">{{ c.display_name or c.username }}{% if c.display_name %} (@{{ c.username }}){% endif %}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {{ ui.field("Ad", "name", placeholder="Ali", attrs='maxlength="60" autocomplete="off"',
+                        hint="Kullanıcı seçtiysen boş bırakabilirsin.") }}
+          </div>
+          <button class="btn primary">＋ Ekle</button>
+        </form>
+        <p class="muted small">Uygulama kullanıcısı olan üyeler grubu görür, harcama ekler ve Telegram bağlıysa bildirim alır.</p>
+      {% endif %}
+    </div>
+
+    <div class="card settings">
+      <details class="add">
+        <summary>⚙️ Grup ayarları</summary>
+        <form method="post" action="{{ url_for('splits.update', group_id=group.id) }}">
+          {{ ui.csrf() }}
+          {{ ui.field("Grup adı", "name", group.name, required=True, attrs='maxlength="80"') }}
+          <button class="btn primary">Kaydet</button>
+        </form>
+        <hr>
+        {{ ui.delete_button(url_for('splits.delete', group_id=group.id), "Grubu sil",
+                            "Grup, tüm harcama ve ödemeleriyle silinsin mi? Bu işlem geri alınamaz.") }}
+      </details>
+    </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

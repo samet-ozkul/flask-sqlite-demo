@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "assets/_form.html" as af with context %}
+{% block title %}Varlıklar{% endblock %}
+{% block head %}
+{{ af.style() }}
+<style>
+  .asset-total .value { font-size: 2rem; line-height: 1.15; overflow-wrap: anywhere; }
+  .pos { color: var(--ok); }
+  .neg { color: var(--danger); }
+  .asset-chart svg { display: block; width: 100%; height: 140px; color: var(--primary); margin: 6px 0; }
+  .asset-chart .area { fill: currentColor; opacity: .12; }
+  .asset-chart .ends { display: flex; justify-content: space-between; gap: 8px; font-size: .82rem; }
+  .asset-value { text-align: right; }
+  .asset-value .share { display: block; font-size: .78rem; font-weight: 400; color: var(--muted); }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("💰 Varlıklar", "Nakit, döviz, altın ve diğer varlıklarının güncel TL değeri") }}
+
+{% if result.missing %}
+  <div class="flash warning" role="status">
+    ⚠️ {{ result.missing }} varlığın fiyatı bulunamadı; toplama dahil edilmedi.
+    Kur alınamıyorsa biraz sonra tekrar dene ya da düzenleyip birim fiyat gir.
+  </div>
+{% endif %}
+
+{% if items %}
+  <div class="stats">
+    <div class="stat asset-total">
+      <div class="label">Toplam varlık</div>
+      <div class="value">{{ total | money }}</div>
+      <div class="sub">{{ items | length }} varlık{% if result.missing %} · {{ result.missing }} tanesi hariç{% endif %}</div>
+    </div>
+    {% if chart %}
+      <div class="stat">
+        <div class="label">Son {{ history_days }} gün</div>
+        <div class="value {{ 'pos' if chart.diff > 0 else 'neg' if chart.diff < 0 }}">
+          {{ '▲' if chart.diff > 0 else '▼' if chart.diff < 0 else '＝' }}
+          {% if chart.change is not none %}%{{ (chart.change | abs) | num(1) }}{% endif %}
+        </div>
+        <div class="sub">{{ '+' if chart.diff > 0 else '−' if chart.diff < 0 }}{{ (chart.diff | abs) | money }}</div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="grid two">
+    <section class="card">
+      <h2>Dağılım</h2>
+      {% if distribution %}
+        {{ ui.bars(distribution) }}
+      {% else %}
+        <p class="muted">Fiyatı bilinen varlık yok.</p>
+      {% endif %}
+    </section>
+    <section class="card asset-chart">
+      <h2>Son {{ history_days }} gün</h2>
+      {% if chart %}
+        <svg viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none" role="img"
+             aria-label="Son {{ history_days }} günde toplam varlık: {{ chart.first | money }} → {{ chart.last | money }}">
+          <polygon class="area" points="{{ chart.area }}"/>
+          <polyline points="{{ chart.line }}" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <div class="ends">
+          <span><span class="muted">{{ chart.first_date | date_tr }}</span><br><b>{{ chart.first | money }}</b></span>
+          <span style="text-align: right"><span class="muted">{{ chart.last_date | date_tr }}</span><br><b>{{ chart.last | money }}</b></span>
+        </div>
+        <p class="muted small">
+          {% if chart.change is not none %}Değişim:
+            <span class="{{ 'pos' if chart.diff > 0 else 'neg' if chart.diff < 0 }}">{{ '+' if chart.change > 0 }}{{ '−' if chart.change < 0 }}%{{ (chart.change | abs) | num(1) }}</span> ·
+          {% endif %}
+          en düşük {{ chart.low | money }} · en yüksek {{ chart.high | money }} · {{ chart.count }} kayıt
+        </p>
+      {% else %}
+        <p class="muted">Grafik için en az iki günlük kayıt gerekiyor. Toplam değer her gün otomatik kaydedilir
+          (fiyatı bulunamayan varlık varken o günün kaydı atlanır).</p>
+      {% endif %}
+    </section>
+  </div>
+{% endif %}
+
+<div class="card">
+  <details class="add" {% if not items %}open{% endif %}>
+    <summary>＋ Yeni varlık</summary>
+    {{ af.form(url_for('assets.create'), submit="Ekle") }}
+  </details>
+</div>
+
+{% if items %}
+  <div class="card">
+    <h2>Varlıklarım</h2>
+    <ul class="rows">
+      {% for it in items %}
+        {% set a = it.asset %}
+        <li>
+          <span class="ico" title="{{ kinds[a.kind] }}">{{ icons[a.kind] }}</span>
+          <div class="grow">
+            <div class="title">{{ a.name }}</div>
+            <div class="meta">
+              <span>{{ quantity_text(a) }}</span>
+              {% if it.value is not none and a.kind != 'cash' %}
+                <span>1 {{ unit_of(a) }} = {{ (it.value / a.quantity) | money }}</span>
+              {% endif %}
+              {% if a.kind != 'cash' %}
+                <span class="badge {{ 'good' if it.source == live else 'overdue' if it.value is none }}">{{ it.source }}</span>
+              {% endif %}
+              {% if a.note %}<span>{{ a.note }}</span>{% endif %}
+            </div>
+          </div>
+          <span class="amount asset-value">
+            {% if it.value is none %}
+              <span class="muted">fiyat yok</span>
+            {% else %}
+              {{ it.value | money }}
+              {% if total and items | length > 1 %}<span class="share">%{{ (it.value * 100 / total) | num(1) }}</span>{% endif %}
+            {% endif %}
+          </span>
+          <div class="actions">
+            <a class="btn sm" href="{{ url_for('assets.edit', asset_id=a.id) }}" title="Düzenle" aria-label="Düzenle">✎</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  {{ ui.empty("Henüz varlık yok. Nakit, döviz, altın ya da aracın gibi bir varlık ekle.", "💰") }}
+{% endif %}
+{% endblock %}

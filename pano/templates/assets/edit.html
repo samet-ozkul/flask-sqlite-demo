@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "assets/_form.html" as af with context %}
+{% block title %}Varlığı düzenle{% endblock %}
+{% block head %}{{ af.style() }}{% endblock %}
+{% block content %}
+{% call ui.page_header(icons[asset.kind] ~ " " ~ asset.name, kinds[asset.kind], back=url_for('assets.index')) %}
+  {{ ui.delete_button(url_for('assets.delete', asset_id=asset.id), "Sil", "Bu varlık silinsin mi?") }}
+{% endcall %}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Miktar</div>
+    <div class="value">{{ quantity_text(asset) }}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Şu anki değer</div>
+    <div class="value">{% if value is none %}<span class="muted">fiyat yok</span>{% else %}{{ value | money }}{% endif %}</div>
+    {% if asset.kind != 'cash' %}
+      <div class="sub">
+        {% if value is not none %}1 {{ unit_of(asset) }} = {{ (value / asset.quantity) | money }} · {% endif %}{{ source }}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  {{ af.form(url_for('assets.edit', asset_id=asset.id), asset) }}
+</div>
+
+<p class="muted small">Eklenme: {{ asset.created_at | localdt }}{% if asset.updated_at %} · Son düzenleme: {{ asset.updated_at | localdt }}{% endif %}</p>
+{% endblock %}
