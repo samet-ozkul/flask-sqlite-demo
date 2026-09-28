@@ -51,6 +51,27 @@
   {% endif %}
 </section>
 
+<section class="card" id="takvim">
+  <h2>📅 Telefon takvimine abonelik</h2>
+  <p class="muted small">Faturalar, abonelikler, randevular, yapılacaklar, araç tarihleri ve önemli günler telefonundaki takvimde görünür; takvim uygulaması saatte bir günceller.</p>
+  {% if g.user.calendar_token %}
+    {% set feed = url_for('calendar.feed', token=g.user.calendar_token, _external=True) %}
+    <label class="field"><span>Takvim adresi (kimseyle paylaşma)</span>
+      <input value="{{ feed }}" readonly onclick="this.select()"></label>
+    <div class="row-flex">
+      <a class="btn primary sm" href="{{ feed | replace('https://', 'webcal://') | replace('http://', 'webcal://') }}">📲 iPhone / Mac'te aç</a>
+      {{ ui.post_button(url_for('settings.calendar_feed'), "Yeni adres oluştur") }}
+      <form method="post" action="{{ url_for('settings.calendar_feed') }}" class="inline" data-confirm="Abonelik kapatılsın mı? Telefonundaki takvim güncellenmeyi bırakır.">
+        {{ ui.csrf() }}<input type="hidden" name="action" value="revoke"><button class="btn sm danger">Kapat</button>
+      </form>
+    </div>
+    <p class="muted small" style="margin-top: 10px"><b>Google Takvim:</b> bilgisayardan calendar.google.com → sol menüde “Diğer takvimler” yanındaki <b>+</b> → <i>URL ile</i> → adresi yapıştır. Telefondaki Google Takvim de birkaç dakika içinde gösterir.<br>
+      <b>iPhone:</b> yukarıdaki butona dokun ya da Ayarlar → Takvim → Hesaplar → Hesap Ekle → Diğer → <i>Abone Olunan Takvim Ekle</i>.</p>
+  {% else %}
+    {{ ui.post_button(url_for('settings.calendar_feed'), "Takvim adresi oluştur", "primary") }}
+  {% endif %}
+</section>
+
 <section class="card">
   <h2>Şifre değiştir</h2>
   <form method="post" action="{{ url_for('settings.password') }}">

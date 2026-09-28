@@ -36,6 +36,7 @@ COMMANDS = [
     ("liste", "Açık maddeleri göster: /liste market"),
     ("bugun", "Günün özeti"),
     ("rapor", "Geçen ayın raporu (/rapor bu ay)"),
+    ("ara", "Her yerde ara: /ara matkap"),
     ("yardim", "Komutlar"),
 ]
 
@@ -51,6 +52,7 @@ HELP = """<b>Kişisel Pano komutları</b>
 📋 <code>/liste</code> ya da <code>/liste market</code> — açık maddeler
 ☀️ <code>/bugun</code> — günün özeti
 📊 <code>/rapor</code> — geçen ayın raporu · <code>/rapor bu ay</code>
+🔍 <code>/ara matkap</code> — notlar, envanter, garantiler... her yerde ara
 
 🔖 Link gönder → Sonra Bak'a kaydedilir
 📷 Fotoğraf gönder → garantiye ya da nota eklenir
@@ -139,6 +141,7 @@ def handle_message(msg):
             "liste": cmd_list, "l": cmd_list,
             "bugun": cmd_today,
             "rapor": cmd_report,
+            "ara": cmd_search,
         }.get(command, cmd_help)
         handler(user, chat_id, rest.strip())
         return
@@ -472,6 +475,29 @@ def cmd_report(user, chat_id, rest):
         year, month = prev.year, prev.month
     url = link("expenses.index", ay=f"{year:04d}-{month:02d}")
     telegram.send_message(chat_id, monthly_report(user, year, month, url, esc))
+
+
+def cmd_search(user, chat_id, rest):
+    from .search import search
+    if not rest:
+        telegram.send_message(chat_id, "Örnek: <code>/ara matkap</code>")
+        return
+    groups = search(user["id"], rest, per_group=3)
+    if not groups:
+        telegram.send_message(chat_id, f"🔍 “{esc(rest)}” ile eşleşen bir şey bulunamadı.")
+        return
+    lines = [f"🔍 <b>{esc(rest)}</b> — {sum(gr['count'] for gr in groups)} sonuç"]
+    for gr in groups[:6]:
+        lines.append(f"\n{gr['icon']} <b>{esc(gr['label'])}</b>" + (f" ({gr['count']})" if gr["count"] > 3 else ""))
+        for it in gr["results"]:
+            url = request.url_root.rstrip("/") + it["url"]
+            detail = f" — {esc(it['detail'])}" if it["detail"] else ""
+            lines.append(f'• <a href="{esc(url)}">{esc(it["title"])}</a>{detail}')
+    lines.append(f'\n<a href="{esc(link("search.index", q=rest))}">Tüm sonuçlar →</a>')
+    # Telegram sınırı 4096 karakter: HTML etiketini bölmemek için kesmek yerine satır at ("Tüm sonuçlar" kalsın)
+    while len("\n".join(lines)) > 4000 and len(lines) > 2:
+        lines.pop(-2)
+    telegram.send_message(chat_id, "\n".join(lines))
 
 
 def cmd_help(user, chat_id, rest):

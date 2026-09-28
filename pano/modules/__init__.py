@@ -3,6 +3,7 @@ from importlib import import_module
 
 # (python modülü, endpoint, başlık, ikon, grup)
 MODULES = [
+    ("agenda", "calendar.index", "Takvim", "📅", "Genel"),
     ("notes", "notes.index", "Notlar", "📝", "Listeler ve notlar"),
     ("lists", "lists.index", "Listeler", "🛒", "Listeler ve notlar"),
     ("links", "links.index", "Sonra Bak", "🔖", "Listeler ve notlar"),
@@ -21,7 +22,7 @@ MODULES = [
 ]
 
 # Menüde gösterilmeyen altyapı modülleri
-CORE = ["dashboard", "settings", "admin", "cron", "bot"]
+CORE = ["dashboard", "settings", "admin", "cron", "bot", "search"]
 
 
 def module_groups():

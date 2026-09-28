@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ q or "Ara" }}{% endblock %}
+{% block content %}
+{{ ui.page_header("🔍 Ara", "Notlar, listeler, envanter, garantiler, faturalar ve diğer tüm modüller") }}
+
+<form method="get" class="search">
+  <input type="search" name="q" value="{{ q }}" placeholder="ör. matkap, fatura, annem…" autofocus>
+  <button class="btn primary">Ara</button>
+</form>
+
+{% if q %}
+  {% if groups %}
+    <p class="muted small">{{ total }} sonuç</p>
+    {% for gr in groups %}
+      <section class="card">
+        <h2>{{ gr.icon }} {{ gr.label }} <span class="pill-count">{{ gr.count }}</span></h2>
+        <ul class="rows">
+          {% for it in gr.results %}
+            <li>
+              <a class="grow" href="{{ it.url }}">
+                <div class="title">{{ it.title }}</div>
+                {% if it.detail %}<div class="meta">{{ it.detail }}</div>{% endif %}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+        {% if gr.count > gr.results | length %}<p class="muted small">İlk {{ gr.results | length }} tanesi gösteriliyor.</p>{% endif %}
+      </section>
+    {% endfor %}
+  {% else %}
+    {{ ui.empty("“" ~ q ~ "” ile eşleşen bir şey bulunamadı.", "🔍") }}
+  {% endif %}
+{% endif %}
+{% endblock %}

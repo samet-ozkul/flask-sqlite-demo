@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Takvim{% endblock %}
+{% block head %}
+<style>
+  .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .month-grid .h { font-size: .72rem; text-align: center; color: var(--muted); padding-bottom: 2px; }
+  .month-grid .cell { min-height: 58px; border-radius: 8px; background: var(--surface-2); padding: 4px; font-size: .78rem;
+                      display: flex; flex-direction: column; gap: 2px; color: var(--text); text-decoration: none; }
+  .month-grid .cell.empty { background: transparent; }
+  .month-grid .cell.today { outline: 2px solid var(--primary); }
+  .month-grid .cell.has:hover { background: var(--primary-soft); text-decoration: none; }
+  .month-grid .num { font-weight: 600; }
+  .month-grid .icons { font-size: .85rem; line-height: 1.1; overflow: hidden; }
+  .month-grid .more-n { font-size: .68rem; color: var(--muted); }
+  .day-head { margin: 14px 0 4px; font-weight: 600; scroll-margin-top: 70px; }
+  .day-head.today { color: var(--primary); }
+  .month-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+  @media (min-width: 700px) { .month-grid .cell { min-height: 76px; } }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("📅 Takvim", count ~ " kayıt: faturalar, abonelikler, randevular, yapılacaklar, araç, garanti, önemli günler") %}
+  <a class="btn sm" href="{{ url_for('settings.index') }}#takvim">📲 Telefon takvimine ekle</a>
+{% endcall %}
+
+<div class="month-nav">
+  <a class="btn sm" href="{{ url_for('calendar.index', ay='%04d-%02d' % (prev.year, prev.month)) }}">← {{ months[prev.month - 1] }}</a>
+  <h2 style="margin: 0">{{ month_name }} {{ year }}</h2>
+  <a class="btn sm" href="{{ url_for('calendar.index', ay='%04d-%02d' % (nxt.year, nxt.month)) }}">{{ months[nxt.month - 1] }} →</a>
+</div>
+
+<div class="card">
+  <div class="month-grid">
+    {% for w in weekdays %}<div class="h">{{ w }}</div>{% endfor %}
+    {% for week in weeks %}
+      {% for d in week %}
+        {% if d is none %}
+          <div class="cell empty"></div>
+        {% else %}
+          {% set evs = by_day.get(d, []) %}
+          {% set icons = [] %}
+          {% for ev in evs %}{% if ev.icon not in icons %}{% set _ = icons.append(ev.icon) %}{% endif %}{% endfor %}
+          <a class="cell {{ 'today' if d == today }} {{ 'has' if evs }}" {% if evs %}href="#g-{{ d.isoformat() }}"{% endif %}>
+            <span class="num">{{ d.day }}</span>
+            {% if evs %}<span class="icons">{{ icons[:3] | join('') }}</span>{% if evs | length > 3 %}<span class="more-n">+{{ evs | length - 3 }}</span>{% endif %}{% endif %}
+          </a>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  {% if by_day %}
+    {% for d, evs in by_day | dictsort %}
+      <div class="day-head {{ 'today' if d == today }}" id="g-{{ d.isoformat() }}">{{ d | date_tr(True) }}{% if d == today %} · bugün{% endif %}</div>
+      <ul class="rows">
+        {% for ev in evs %}
+          <li class="{{ 'done' if ev.done }}">
+            <span class="ico">{{ ev.icon }}</span>
+            <a class="grow" href="{{ ev.url }}">
+              <div class="title">{{ ev.title }}{% if ev.done %} ✓{% endif %}</div>
+              {% if ev.time or ev.detail %}<div class="meta">{% if ev.time %}<span>🕒 {{ ev.time }}</span>{% endif %}{% if ev.detail %}<span>{{ ev.detail }}</span>{% endif %}</div>{% endif %}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endfor %}
+  {% else %}
+    {{ ui.empty("Bu ay tarihli bir kayıt yok.", "📅") }}
+  {% endif %}
+</div>
+{% endblock %}
