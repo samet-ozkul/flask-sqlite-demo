@@ -55,6 +55,7 @@ def login_password(client, username="admin", password="admin12345", remember=Tru
 
 def test_setup_and_login():
     c = Client(app)
+    other = Client(app)  # başka cihazdaki oturum: 2FA açılınca kapanmalı
     assert "İki adımlı girişi kur" in c.text("/ayarlar/")
     r = c.post("/ayarlar/2fa")
     assert r.status_code == 302 and r.headers["Location"].endswith("/ayarlar/2fa")
@@ -72,6 +73,7 @@ def test_setup_and_login():
     u = one("SELECT * FROM users WHERE id = 1")
     assert u["totp_enabled"] == 1 and u["totp_secret"] == secret
     assert "8 yedek kod kaldı" in c.text("/ayarlar/")
+    assert other.get("/").status_code == 302 and c.get("/").status_code == 200
 
     # Şifre doğru -> doğrulama sayfası; kod girilmeden panoya girilemez
     fresh = app.test_client()

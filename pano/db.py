@@ -507,6 +507,10 @@ MIGRATIONS = [
     ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'auto';
     ALTER TABLE users ADD COLUMN dashboard_cards TEXT;
     """,
+    # 15: oturum sürümü — artınca eski oturum çerezleri geçersiz olur (diğer cihazlardan çıkış)
+    """
+    ALTER TABLE users ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

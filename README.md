@@ -28,6 +28,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 - Şifreler hash'li; tüm formlarda CSRF koruması; giriş sonrası açık yönlendirme engeli.
 - Aynı IP'den 10 hatalı denemede o kullanıcı için, 30 denemede IP için 15 dk kilit.
 - **İki adımlı giriş (önerilir):** Ayarlar → 🔐 İki adımlı giriş → QR kodu Google Authenticator / Microsoft Authenticator ile okut. Girişte şifreden sonra 6 haneli kod istenir; aynı kod ikinci kez kullanılamaz, 5 hatalı kodda 15 dk kilit. Telefon kaybolursa diye 8 tek kullanımlık **yedek kod** verilir (Ayarlar'dan şifreyle yenilenir). Hem telefonunu hem yedek kodlarını kaybeden kullanıcının 2FA'sını yönetici Kullanıcılar sayfasından kapatabilir.
+- **Diğer cihazlardan çıkış:** Ayarlar → 📱 Oturumlar → *Diğer cihazlardan çıkış yap* telefonda, iş bilgisayarında açık kalan (“Beni hatırla” ile 30 günlük olanlar dahil) bütün oturumları kapatır; bu cihaz açık kalır. Şifre değişince, yönetici şifreyi sıfırlayınca ve iki adımlı giriş açılınca bu kendiliğinden yapılır.
 - Her kayıt kullanıcıya ait; dosyalar sadece sahibine sunulur.
 - Şifre, kart bilgisi, kimlik fotoğrafı gibi hassas verileri burada saklamayın; bunun için şifre yöneticisi kullanın.
 

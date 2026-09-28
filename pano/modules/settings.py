@@ -5,7 +5,7 @@ from flask import Blueprint, flash, g, make_response, redirect, render_template,
 from werkzeug.security import check_password_hash
 
 from .. import ai, external, telegram, totp
-from ..auth import login_required, set_password
+from ..auth import end_other_sessions, login_required, set_password
 from ..db import execute
 from ..utils import form_bool, form_choice, form_str, redirect_back
 
@@ -79,8 +79,16 @@ def password():
         flash("Yeni şifreler eşleşmiyor.", "error")
     else:
         set_password(g.user["id"], new)
-        flash("Şifre değiştirildi.", "success")
+        flash("Şifre değiştirildi; diğer cihazlardaki oturumlar kapatıldı.", "success")
     return redirect(url_for(".index"))
+
+
+@bp.route("/oturumlar/kapat", methods=["POST"])
+@login_required
+def logout_others():
+    end_other_sessions(g.user["id"])
+    flash("Diğer tüm cihazlardaki oturumlar kapatıldı. Bu cihazda açık kalmaya devam ediyorsun.", "success")
+    return redirect(url_for(".index") + "#oturumlar")
 
 
 # ---------- Görünüm ----------
@@ -150,7 +158,9 @@ def twofa_confirm():
     execute("UPDATE users SET totp_secret = ?, totp_enabled = 1, totp_last_step = ? WHERE id = ?",
             (secret, step, g.user["id"]))
     session.pop("2fa_setup", None)
-    flash("İki adımlı giriş açıldı. Bundan sonra girişte doğrulama kodu istenecek.", "success")
+    end_other_sessions(g.user["id"])  # kodsuz açılmış eski oturumlar kalmasın
+    flash("İki adımlı giriş açıldı; diğer cihazlardaki oturumlar kapatıldı. Bundan sonra girişte doğrulama kodu istenecek.",
+          "success")
     return _show_codes(totp.new_recovery_codes(g.user["id"]))
 
 

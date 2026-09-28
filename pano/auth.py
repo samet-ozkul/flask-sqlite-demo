@@ -81,7 +81,10 @@ def init_app(app):
         uid = session.get("user_id")
         if uid:
             g.user = query_one("SELECT * FROM users WHERE id = ?", (uid,))
-            if g.user is None:
+            # Çerez imzalı ama sunucuda tutulmuyor; iptal için sürüm karşılaştırılır.
+            # Bu özellikten önce açılan oturumlarda sürüm yok, 0 sayılır.
+            if g.user is None or session.get("epoch", 0) != g.user["session_epoch"]:
+                g.user = None
                 session.clear()
 
         if (request.method == "POST" and not getattr(view, "csrf_exempt", False)
@@ -158,7 +161,15 @@ def login():
 def _start_session(user_id, remember):
     session.clear()
     session["user_id"] = user_id
+    session["epoch"] = query_one("SELECT session_epoch FROM users WHERE id = ?", (user_id,))["session_epoch"]
     session.permanent = remember
+
+
+def end_other_sessions(user_id):
+    """Kullanıcının bütün oturumlarını geçersiz kılar; bu istek o kullanıcınınsa bu cihazda açık kalır."""
+    execute("UPDATE users SET session_epoch = session_epoch + 1 WHERE id = ?", (user_id,))
+    if session.get("user_id") == user_id:
+        session["epoch"] = query_one("SELECT session_epoch FROM users WHERE id = ?", (user_id,))["session_epoch"]
 
 
 TWO_FA_TTL = 5 * 60        # şifreden sonra kodu girmek için süre
@@ -252,4 +263,6 @@ def create_user(username, password, is_admin=False):
 
 
 def set_password(user_id, password):
+    """Şifre değişince eski şifreyle açılmış diğer oturumlar da kapanır."""
     execute("UPDATE users SET password_hash = ? WHERE id = ?", (generate_password_hash(password), user_id))
+    end_other_sessions(user_id)
