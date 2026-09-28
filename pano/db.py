@@ -289,6 +289,34 @@ MIGRATIONS = [
         UNIQUE (med_id, date, slot)
     );
     """,
+    # 5: önemli günler, kur alarmları
+    """
+    CREATE TABLE special_days (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'birthday' CHECK (kind IN ('birthday', 'anniversary', 'other')),
+        month INTEGER NOT NULL,
+        day INTEGER NOT NULL,
+        year INTEGER,                              -- biliniyorsa yaş / kaçıncı yıl hesaplanır
+        notify_days INTEGER NOT NULL DEFAULT 7,    -- kaç gün önce hatırlat (0 = sadece o gün)
+        pre_sent_year INTEGER,                     -- "yaklaşıyor" mesajının gönderildiği yıl
+        day_sent_year INTEGER,                     -- "bugün" mesajının gönderildiği yıl
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE rate_alerts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        currency TEXT NOT NULL CHECK (currency IN ('USD', 'EUR', 'GBP', 'XAU')),  -- XAU: gram altın
+        direction TEXT NOT NULL CHECK (direction IN ('above', 'below')),
+        threshold REAL NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1,
+        triggered_at TEXT,
+        triggered_value REAL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

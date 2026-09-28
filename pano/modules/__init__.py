@@ -10,12 +10,14 @@ MODULES = [
     ("bills", "bills.index", "Faturalar", "🧾", "Para"),
     ("subscriptions", "subscriptions.index", "Abonelikler", "🔁", "Para"),
     ("debts", "debts.index", "Borç / Alacak", "🤝", "Para"),
+    ("rates", "rates.index", "Kurlar", "💱", "Para"),
     ("car", "car.index", "Araç", "🚗", "Ev ve araç"),
     ("warranty", "warranty.index", "Garanti", "🛡️", "Ev ve araç"),
     ("inventory", "inventory.index", "Ev Envanteri", "📦", "Ev ve araç"),
     ("habits", "habits.index", "Alışkanlıklar", "🔥", "Kişisel"),
     ("health", "health.index", "Sağlık", "🩺", "Kişisel"),
     ("recipes", "recipes.index", "Tarifler", "🍲", "Kişisel"),
+    ("specialdays", "specialdays.index", "Önemli Günler", "🎂", "Kişisel"),
 ]
 
 # Menüde gösterilmeyen altyapı modülleri

@@ -84,6 +84,10 @@ def upcoming(user_id, days=7, long_days=30):
         detail = r["list_name"] + (f" · {r['due_time']}" if r["due_time"] else "")
         add("☑️", r["text"], r["due_date"], "lists.detail", detail=detail, list_id=r["lid"])
 
+    from .modules.specialdays import KINDS, upcoming_rows
+    for r, nxt, _days, ordinal in upcoming_rows(user_id, within_days=long_days):
+        add(KINDS[r["kind"]][1], r["name"], nxt.isoformat(), "specialdays.index", detail=ordinal, overdue_ok=False)
+
     items.sort(key=lambda x: (x["date"], x["title"]))
     return items
 

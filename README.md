@@ -7,9 +7,9 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 |---|---|
 | 🏠 Pano | Günün özeti: hava durumu, döviz kuru, yaklaşan ödemeler/tarihler, bugünkü alışkanlıklar ve ilaçlar, hızlı harcama ve hızlı not |
 | 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) |
-| 💰 Para | **Harcamalar** (aylık özet, kategori grafiği) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** |
+| 💰 Para | **Harcamalar** (aylık özet, kategori grafiği) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) |
 | 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) |
-| 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) |
+| 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) |
 | ⚙️ Altyapı | Kullanıcı yönetimi, tek tıkla yedek al/geri yükle, disk kullanımı, Telegram günlük özeti, telefona uygulama olarak yükleme (PWA) |
 
 ## 512 MB disk nasıl korunuyor?
@@ -159,6 +159,10 @@ cron-job.org'da saat dilimini **Europe/Istanbul** yapmayı unutma.
 **Tekrarlayan işler:** Yapılacağa *her gün / hafta içi / her hafta / her ay / her yıl* tekrarı verilebilir (bottan: `/yap çöpü at pazartesi 20:00 her hafta`). Tamamlanınca bir sonraki tarihle yenisi eklenir; geri alınırsa o yenisi silinir.
 
 **Fatura hatırlatmaları:** “Telegram'dan hatırlat” işaretli ödenmemiş faturalar için son günden bir gün önce ve son gün 09:00'da mesaj gelir. **✅ Ödendi** butonu faturayı öder, tekrarlıysa sonraki ayı ekler ve harcamalara yazar; **↩️ Geri al** bunların hepsini geri alır.
+
+**Önemli günler:** Seçilen gün sayısı kadar önce ve o gün 09:00'da mesaj gelir (“🎂 7 gün sonra: Annemin doğum günü (60. yaş)”); panoda 30 gün önceden görünür.
+
+**Kur alarmı:** Kurlar sayfasında “Dolar 50 ₺ üstüne çıkınca” gibi alarm kurulur; tetiklenince mesaj gelir ve alarm kapanır. Kaynak Avrupa Merkez Bankası referans kuru olduğundan günde bir kez (iş günleri) güncellenir.
 
 **İlaç hatırlatmaları:** “Doz saatlerinde Telegram'dan hatırlat” işaretli ilaçlar için her doz saatinde (en fazla 2 saat gecikmeyle) mesaj gelir; **✅ Aldım** ile işaretlenir. Sağlık → İlaçlar'da bugünkü dozlar işaretlenebilir ve son 7 günün uyumu görünür.
 
