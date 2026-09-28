@@ -78,11 +78,18 @@ def upcoming(user_id, days=7, long_days=30):
 
     for r in query(
         "SELECT i.*, l.name AS list_name, l.id AS lid FROM list_items i JOIN lists l ON l.id = i.list_id"
-        " WHERE i.done = 0 AND i.due_date IS NOT NULL AND i.due_date <= ? AND (l.user_id = ? OR l.shared = 1)",
-        (soon, user_id),
+        " WHERE i.done = 0 AND i.due_date IS NOT NULL AND i.due_date <= ? AND (l.user_id = ? OR l.shared = 1)"
+        " AND (i.assignee_id IS NULL OR i.assignee_id = ?)",
+        (soon, user_id, user_id),
     ):
         detail = r["list_name"] + (f" · {r['due_time']}" if r["due_time"] else "")
         add("☑️", r["text"], r["due_date"], "lists.detail", detail=detail, list_id=r["lid"])
+
+    from .modules.events import visible_events
+    for e in visible_events(user_id, " AND e.date BETWEEN ? AND ?", (ts, soon)):
+        detail = " · ".join(x for x in (e["time"] or "", e["place"]) if x)
+        add("👨‍👩‍👧" if e["shared"] else "📅", e["title"], e["date"], "events.edit", detail=detail, overdue_ok=False,
+            event_id=e["id"])
 
     from .modules.specialdays import KINDS, upcoming_rows
     for r, nxt, _days, ordinal in upcoming_rows(user_id, within_days=long_days):

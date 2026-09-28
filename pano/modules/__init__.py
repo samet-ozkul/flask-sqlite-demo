@@ -4,6 +4,7 @@ from importlib import import_module
 # (python modülü, endpoint, başlık, ikon, grup)
 MODULES = [
     ("agenda", "calendar.index", "Takvim", "📅", "Genel"),
+    ("events", "events.index", "Etkinlikler", "👨‍👩‍👧", "Genel"),
     ("notes", "notes.index", "Notlar", "📝", "Listeler ve notlar"),
     ("lists", "lists.index", "Listeler", "🛒", "Listeler ve notlar"),
     ("links", "links.index", "Sonra Bak", "🔖", "Listeler ve notlar"),

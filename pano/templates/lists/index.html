@@ -13,6 +13,26 @@
 {% block content %}
 {{ ui.page_header("🛒 Listeler", "Alışveriş ve yapılacaklar listeleri") }}
 
+{% if assigned %}
+  <div class="card">
+    <h2>➡️ Bana atananlar <span class="pill-count">{{ assigned | length }}</span></h2>
+    <ul class="rows">
+      {% for i in assigned %}
+        <li>
+          <form method="post" action="{{ url_for('lists.toggle_item', item_id=i.id) }}" class="inline">
+            {{ ui.csrf() }}<input type="hidden" name="next" value="{{ url_for('lists.index') }}">
+            <button class="tick" title="Tamamlandı"></button>
+          </form>
+          <a class="grow" href="{{ url_for('lists.detail', list_id=i.list_id) }}">
+            <div class="title">{{ i.text }}</div>
+            <div class="meta"><span>{{ i.list_name }}</span>{% if i.due_date %}{{ ui.due_badge(i.due_date) }}{% if i.due_time %}<span>🕒 {{ i.due_time }}</span>{% endif %}{% endif %}</div>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
 <div class="card">
   <details class="add" {% if not lists %}open{% endif %}>
     <summary>＋ Yeni liste</summary>

@@ -158,6 +158,24 @@ def todo_reminders(secret):
         except telegram.TelegramError as e:
             result["errors"].append(f"madde {item['id']}: {e}")
 
+    # Etkinlikler: paylaşılan -> Telegram'ı bağlı herkes, özel -> ekleyen
+    from .events import mark_sent as mark_event, message as event_message, pending as pending_events, \
+        recipients as event_recipients
+    ev_send, ev_stale = pending_events(todo.now_local())
+    result["events_sent"] = 0
+    result["stale"] += len(ev_stale)
+    for ev in ev_stale:
+        mark_event(ev["id"], "due")
+    for kind, ev in ev_send:
+        text = event_message(kind, ev, url_for("events.index", _external=True), telegram.escape)
+        for chat_id in event_recipients(ev):
+            try:
+                telegram.send_message(chat_id, text)
+                result["events_sent"] += 1
+            except telegram.TelegramError as e:
+                result["errors"].append(f"etkinlik {ev['id']}: {e}")
+        mark_event(ev["id"], kind)
+
     # Faturalar: yarın / bugün son gün
     bills, stale_bills = scheduled.pending_bills()
     result["bills_sent"], result["stale"] = 0, result["stale"] + len(stale_bills)

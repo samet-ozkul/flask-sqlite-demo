@@ -34,6 +34,7 @@ COMMANDS = [
     ("ekle", "Alışveriş listesine ekle: /ekle süt, ekmek"),
     ("yap", "Yapılacak ekle: /yap fatura öde yarın 14:00"),
     ("liste", "Açık maddeleri göster: /liste market"),
+    ("etkinlik", "Ortak etkinlik ekle: /etkinlik piknik pazar 11:00"),
     ("bugun", "Günün özeti"),
     ("rapor", "Geçen ayın raporu (/rapor bu ay)"),
     ("ara", "Her yerde ara: /ara matkap"),
@@ -50,6 +51,8 @@ HELP = """<b>Kişisel Pano komutları</b>
     <code>/ekle market: süt</code> — belirli listeye
 ☑️ <code>/yap fatura öde yarın 14:00</code> — yapılacak ekle
     <code>/yap çöpü at pazartesi 20:00 her hafta</code> — tekrarlayan
+    <code>/yap bulaşıkları yıka yarın 21:00 @ayse</code> — birine ata
+👨‍👩‍👧 <code>/etkinlik annemlerde yemek cumartesi 19:00</code> — ortak takvime ekle
 📋 <code>/liste</code> ya da <code>/liste market</code> — açık maddeler
 ☀️ <code>/bugun</code> — günün özeti
 📊 <code>/rapor</code> — geçen ayın raporu · <code>/rapor bu ay</code>
@@ -141,6 +144,7 @@ def handle_message(msg):
             "not": cmd_note, "n": cmd_note,
             "ekle": cmd_shop, "e": cmd_shop,
             "yap": cmd_todo, "y": cmd_todo,
+            "etkinlik": cmd_event,
             "liste": cmd_list, "l": cmd_list,
             "bugun": cmd_today,
             "rapor": cmd_report,
@@ -369,7 +373,10 @@ def cmd_todo(user, chat_id, rest):
     if not rest:
         telegram.send_message(chat_id, "Örnek: <code>/yap faturayı öde yarın 14:00</code>")
         return
+    assignee, rest = _extract_mention(rest)
     lst, text = _split_target(user["id"], rest, "todo")
+    if assignee and assignee["id"] != user["id"] and not lst["shared"]:
+        lst = _shared_todo_list(user["id"])  # başkasına atanan iş onun görebileceği listeye
     text, repeat = parse_repeat_phrase(text)
     task, due_date, due_time = parse_when(text)
     if repeat and not due_date:
@@ -379,16 +386,58 @@ def cmd_todo(user, chat_id, rest):
         return
     remind = 0 if due_date else None
     item_id = execute(
-        "INSERT INTO list_items (list_id, text, due_date, due_time, remind_before, repeat, created_by)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (lst["id"], task[:200], due_date, due_time, remind, repeat, user["id"]),
+        "INSERT INTO list_items (list_id, text, due_date, due_time, remind_before, repeat, created_by, assignee_id)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (lst["id"], task[:200], due_date, due_time, remind, repeat, user["id"], assignee["id"] if assignee else None),
     ).lastrowid
-    lines = [f"☑️ <b>{esc(task)}</b> · {esc(lst['name'])}"]
+    lines = [f"☑️ <b>{esc(task)}</b> · {esc(lst['name'])}"
+             + (f" · ➡️ {esc(assignee['display_name'] or assignee['username'])}" if assignee else "")]
+    if assignee and assignee["id"] != user["id"]:
+        from .modules.lists import notify_assignee
+        notify_assignee(item_id, user)
     if due_date:
         when = fmt_date(due_date, True) + (f" {due_time}" if due_time else "")
         hint = "" if due_time else f" ({todo.DEFAULT_DUE_TIME})"
         lines.append(f"📅 {when} · 🔔 zamanı gelince{hint}" + (f" · 🔁 {todo.repeat_label(repeat)}" if repeat else ""))
     telegram.send_message(chat_id, "\n".join(lines), buttons=todo.done_buttons(item_id))
+
+
+def _extract_mention(text):
+    """'çöpü at @ayse yarın' -> (Ayşe'nin kullanıcı satırı, 'çöpü at yarın'). Bulunamazsa (None, metin)."""
+    words = text.split()
+    for i, word in enumerate(words):
+        if word.startswith("@") and len(word) > 1:
+            key = fold(word[1:])
+            for u in query("SELECT * FROM users ORDER BY id"):
+                if key in (fold(u["username"]), fold(u["display_name"])) or \
+                        (u["display_name"] and fold(u["display_name"]).startswith(key)):
+                    return u, " ".join(words[:i] + words[i + 1:])
+    return None, text
+
+
+def _shared_todo_list(user_id):
+    from .modules.lists import accessible_lists
+    for lst in accessible_lists(user_id, "todo"):
+        if lst["shared"]:
+            return lst
+    list_id = execute("INSERT INTO lists (user_id, name, kind, shared) VALUES (?, 'Ev işleri', 'todo', 1)",
+                      (user_id,)).lastrowid
+    return query_one("SELECT * FROM lists WHERE id = ?", (list_id,))
+
+
+def cmd_event(user, chat_id, rest):
+    if not rest:
+        telegram.send_message(chat_id, "Örnek: <code>/etkinlik annemlerde yemek cumartesi 19:00</code>")
+        return
+    title, due_date, due_time = parse_when(rest)
+    if not title or not due_date:
+        telegram.send_message(chat_id, "Başlık ve tarih gerekli. Örnek: <code>/etkinlik piknik pazar 11:00</code>")
+        return
+    execute("INSERT INTO events (user_id, title, date, time, shared, remind_before) VALUES (?, ?, ?, ?, 1, 0)",
+            (user["id"], title[:150], due_date, due_time))
+    when = fmt_date(due_date, True) + (f" {due_time}" if due_time else "")
+    telegram.send_message(chat_id, f"👨‍👩‍👧 <b>{esc(title)}</b> ortak takvime eklendi · {when}\n"
+                                   f'<a href="{esc(link("events.index"))}">Etkinlikler →</a>')
 
 
 def _list_keyboard(list_id):
@@ -691,6 +740,9 @@ def _intent_card(intent, user):
     when = (fmt_date(a["date"], True) + (f" {a['time']}" if a["time"] else "")) if a["date"] else ""
     if a["action"] == "todo":
         return f"☑️ <b>Yapılacak</b>: {esc(a['text'])}" + (f"\n📅 {when} · 🔔 zamanı gelince" if when else "")
+    if a["action"] == "event":
+        return (f"👨‍👩‍👧 <b>Ortak etkinlik</b>: {esc(a['text'])}\n📅 {when or fmt_date(a['date'], True)}"
+                + (f" · {esc(a['place'])}" if a["place"] else ""))
     if a["action"] == "appointment":
         return (f"🩺 <b>Randevu</b>: {esc(a['text'])}\n📅 {when or fmt_date(a['date'], True)}"
                 + (f" · {esc(a['place'])}" if a["place"] else ""))
@@ -730,6 +782,11 @@ def _save_intent(user, a):
             "INSERT INTO list_items (list_id, text, due_date, due_time, remind_before, created_by) VALUES (?, ?, ?, ?, ?, ?)",
             (lst["id"], a["text"], a["date"], a["time"] if a["date"] else None, 0 if a["date"] else None, uid)).lastrowid
         return f"✅ Yapılacak eklendi: <b>{esc(a['text'])}</b> · {esc(lst['name'])}", todo.done_buttons(item_id)
+    if a["action"] == "event":
+        execute("INSERT INTO events (user_id, title, date, time, place, shared, remind_before) VALUES (?, ?, ?, ?, ?, 1, 0)",
+                (uid, a["text"], a["date"], a["time"], a["place"]))
+        return (f"✅ Ortak takvime eklendi: <b>{esc(a['text'])}</b> · {fmt_date(a['date'], True)} {a['time'] or ''}".strip()
+                + f'\n<a href="{esc(link("events.index"))}">Etkinlikler →</a>', None)
     if a["action"] == "appointment":
         execute("INSERT INTO appointments (user_id, title, place, starts_at) VALUES (?, ?, ?, ?)",
                 (uid, a["text"], a["place"], f"{a['date']}T{a['time'] or todo.DEFAULT_DUE_TIME}"))

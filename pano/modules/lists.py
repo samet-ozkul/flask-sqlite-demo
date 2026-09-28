@@ -70,16 +70,54 @@ def split_items(text, kind):
     return out[:MAX_BATCH]
 
 
-def add_items(list_id, texts, user_id, qty="", due_date=None, due_time=None, remind_before=None, repeat=None):
+def add_items(list_id, texts, user_id, qty="", due_date=None, due_time=None, remind_before=None, repeat=None,
+              assignee_id=None):
     db = get_db()
     for text in texts:
         db.execute(
-            "INSERT INTO list_items (list_id, text, qty, due_date, due_time, remind_before, repeat, created_by)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (list_id, text, qty, due_date, due_time, remind_before, repeat, user_id),
+            "INSERT INTO list_items (list_id, text, qty, due_date, due_time, remind_before, repeat, created_by, assignee_id)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (list_id, text, qty, due_date, due_time, remind_before, repeat, user_id, assignee_id),
         )
     db.commit()
     return len(texts)
+
+
+# ---------- İş atama ----------
+def user_options():
+    """[(id, görünen ad)] — atama listesi için tüm kullanıcılar."""
+    return [(r["id"], r["display_name"] or r["username"])
+            for r in query("SELECT id, username, display_name FROM users ORDER BY display_name, username")]
+
+
+def _assignee(lst):
+    """Formdaki atanan kişi; sadece paylaşılan listede ve var olan kullanıcıysa."""
+    if not lst["shared"]:
+        return None
+    raw = (request.form.get("assignee") or "").strip()
+    if not raw.isdigit():
+        return None
+    return int(raw) if query_one("SELECT 1 FROM users WHERE id = ?", (int(raw),)) else None
+
+
+def notify_assignee(item_id, assigner):
+    """Atanan kişiye Telegram'dan haber verir (kendine atadıysa ya da Telegram yoksa sessiz)."""
+    from ..utils import fmt_date
+    item = query_one(
+        "SELECT i.*, l.name AS list_name, u.telegram_chat_id AS chat_id FROM list_items i"
+        " JOIN lists l ON l.id = i.list_id JOIN users u ON u.id = i.assignee_id WHERE i.id = ?", (item_id,))
+    if not item or not item["chat_id"] or item["assignee_id"] == assigner["id"] or not telegram.enabled():
+        return
+    esc = telegram.escape
+    when = (f" · {fmt_date(item['due_date'], True)}" + (f" {item['due_time']}" if item["due_time"] else "")) if item["due_date"] else ""
+    text = (f"📋 <b>{esc(assigner['display_name'] or assigner['username'])}</b> sana bir iş atadı: {esc(item['text'])}\n"
+            f"{esc(item['list_name'])}{when}\n"
+            f'<a href="{esc(url_for("lists.detail", list_id=item["list_id"], _external=True))}">Listeyi aç →</a>')
+    try:
+        telegram.send_message(item["chat_id"], text,
+                              buttons=todo.done_buttons(item_id) if telegram.webhook_active() else None)
+    except telegram.TelegramError:
+        pass
 
 
 def _due_fields():
@@ -121,7 +159,11 @@ def index():
         " ORDER BY (l.user_id = ?) DESC, l.name COLLATE NOCASE, l.id",
         (uid, uid),
     )
-    return render_template("lists/index.html", lists=lists, kinds=KINDS, icons=KIND_ICONS)
+    assigned = query(
+        "SELECT i.*, l.name AS list_name FROM list_items i JOIN lists l ON l.id = i.list_id"
+        " WHERE i.done = 0 AND i.assignee_id = ? AND (l.user_id = ? OR l.shared = 1)"
+        " ORDER BY i.due_date IS NULL, i.due_date, i.id", (uid, uid))
+    return render_template("lists/index.html", lists=lists, kinds=KINDS, icons=KIND_ICONS, assigned=assigned)
 
 
 @bp.route("/yeni", methods=["POST"])
@@ -146,8 +188,10 @@ def detail(list_id):
     uid = g.user["id"]
     lst = list_or_404(list_id, uid)
     item_sql = (
-        "SELECT i.*, u.username AS creator_username, u.display_name AS creator_display"
-        " FROM list_items i LEFT JOIN users u ON u.id = i.created_by WHERE i.list_id = ?"
+        "SELECT i.*, u.username AS creator_username, u.display_name AS creator_display,"
+        " a.username AS assignee_username, a.display_name AS assignee_display"
+        " FROM list_items i LEFT JOIN users u ON u.id = i.created_by LEFT JOIN users a ON a.id = i.assignee_id"
+        " WHERE i.list_id = ?"
     )
     open_items = query(
         item_sql + " AND i.done = 0 ORDER BY i.due_date IS NULL, i.due_date, i.created_at, i.id", (list_id,)
@@ -164,6 +208,7 @@ def detail(list_id):
         remind_options=todo.REMIND_OPTIONS, default_remind=todo.DEFAULT_REMIND, remind_label=todo.remind_label,
         repeat_options=todo.REPEAT_OPTIONS, repeat_label=todo.repeat_label,
         default_time=todo.DEFAULT_DUE_TIME, telegram_enabled=telegram.enabled(),
+        users=user_options() if lst["shared"] else [],
     )
 
 
@@ -179,7 +224,11 @@ def add_item(list_id):
         due_date, due_time, remind, repeat = _due_fields()
     else:
         due_date, due_time, remind, repeat = form_date("due_date"), None, None, None
-    n = add_items(list_id, texts, g.user["id"], form_str("qty", QTY_MAX), due_date, due_time, remind, repeat)
+    assignee = _assignee(lst) if lst["kind"] == "todo" else None
+    n = add_items(list_id, texts, g.user["id"], form_str("qty", QTY_MAX), due_date, due_time, remind, repeat, assignee)
+    if assignee and assignee != g.user["id"]:
+        for row in query("SELECT id FROM list_items WHERE list_id = ? ORDER BY id DESC LIMIT ?", (list_id, n)):
+            notify_assignee(row["id"], g.user)
     flash(f"“{texts[0]}” eklendi." if n == 1 else f"{n} madde eklendi.", "success")
     return redirect_back("lists.detail", list_id=list_id)
 
@@ -214,17 +263,21 @@ def edit_item(item_id):
             due_date, due_time, remind, repeat = form_date("due_date"), None, None, None
         # Zaman ya da hatırlatma değiştiyse hatırlatmalar yeniden gönderilebilsin
         changed = (due_date, due_time, remind) != (item["due_date"], item["due_time"], item["remind_before"])
+        assignee = _assignee(lst) if lst["kind"] == "todo" else None
         execute(
-            "UPDATE list_items SET text = ?, qty = ?, due_date = ?, due_time = ?, remind_before = ?, repeat = ?"
+            "UPDATE list_items SET text = ?, qty = ?, due_date = ?, due_time = ?, remind_before = ?, repeat = ?, assignee_id = ?"
             + (", pre_sent_at = NULL, due_sent_at = NULL" if changed else "") + " WHERE id = ?",
-            (text, form_str("qty", QTY_MAX), due_date, due_time, remind, repeat, item_id),
+            (text, form_str("qty", QTY_MAX), due_date, due_time, remind, repeat, assignee, item_id),
         )
+        if assignee and assignee != item["assignee_id"] and assignee != uid:
+            notify_assignee(item_id, g.user)
         flash("Madde güncellendi.", "success")
         return redirect_back("lists.detail", list_id=item["list_id"])
     return render_template(
         "lists/item_edit.html", item=item, lst=lst, remind_options=todo.REMIND_OPTIONS,
         repeat_options=todo.REPEAT_OPTIONS,
         default_time=todo.DEFAULT_DUE_TIME, telegram_enabled=telegram.enabled(),
+        users=user_options() if lst["shared"] else [],
     )
 
 
