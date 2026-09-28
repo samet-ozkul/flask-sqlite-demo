@@ -26,6 +26,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 - Herkese açık kayıt **kapalı**; hesapları yönetici oluşturur (`ALLOW_REGISTRATION=1` ile açılabilir).
 - Şifreler hash'li; tüm formlarda CSRF koruması; giriş sonrası açık yönlendirme engeli.
 - Aynı IP'den 10 hatalı denemede o kullanıcı için, 30 denemede IP için 15 dk kilit.
+- **İki adımlı giriş (önerilir):** Ayarlar → 🔐 İki adımlı giriş → QR kodu Google Authenticator / Microsoft Authenticator ile okut. Girişte şifreden sonra 6 haneli kod istenir; aynı kod ikinci kez kullanılamaz, 5 hatalı kodda 15 dk kilit. Telefon kaybolursa diye 8 tek kullanımlık **yedek kod** verilir (Ayarlar'dan şifreyle yenilenir). Hem telefonunu hem yedek kodlarını kaybeden kullanıcının 2FA'sını yönetici Kullanıcılar sayfasından kapatabilir.
 - Her kayıt kullanıcıya ait; dosyalar sadece sahibine sunulur.
 - Şifre, kart bilgisi, kimlik fotoğrafı gibi hassas verileri burada saklamayın; bunun için şifre yöneticisi kullanın.
 

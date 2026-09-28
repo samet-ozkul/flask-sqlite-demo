@@ -141,12 +141,72 @@ def login():
         if user and check_password_hash(user["password_hash"], password):
             _clear_failures(username)
             session.clear()
-            session["user_id"] = user["id"]
-            session.permanent = bool(form_bool("remember"))  # 30 gün; değilse tarayıcı kapanınca biter
+            remember = bool(form_bool("remember"))  # 30 gün; değilse tarayıcı kapanınca biter
+            if user["totp_enabled"]:
+                # Şifre doğru ama oturum henüz açılmaz: doğrulama kodu bekleniyor
+                session["2fa_uid"] = user["id"]
+                session["2fa_ts"] = time.time()
+                session["2fa_remember"] = remember
+                return redirect(url_for("auth.verify_2fa", next=request.args.get("next") or None))
+            _start_session(user["id"], remember)
             return redirect(_safe_next(request.args.get("next")))
         _record_failure(username)
         flash("Kullanıcı adı veya şifre hatalı.", "error")
     return render_template("auth/login.html")
+
+
+def _start_session(user_id, remember):
+    session.clear()
+    session["user_id"] = user_id
+    session.permanent = remember
+
+
+TWO_FA_TTL = 5 * 60        # şifreden sonra kodu girmek için süre
+TWO_FA_MAX_FAILS = 5       # bu kadar hatalı koddan sonra 15 dk kilit
+
+
+@bp.route("/giris/dogrulama", methods=["GET", "POST"])
+def verify_2fa():
+    from . import totp
+    uid = session.get("2fa_uid")
+    if not uid or time.time() - session.get("2fa_ts", 0) > TWO_FA_TTL:
+        session.pop("2fa_uid", None)
+        flash("Süre doldu, tekrar giriş yapın.", "warning")
+        return redirect(url_for("auth.login"))
+    user = query_one("SELECT * FROM users WHERE id = ?", (uid,))
+    if user is None or not user["totp_enabled"]:
+        session.clear()
+        return redirect(url_for("auth.login"))
+    if request.method == "POST":
+        key = f"2fa:{uid}"
+        row = query_one("SELECT count, first_at FROM login_attempts WHERE key = ?", (key,))
+        if row and row["count"] >= TWO_FA_MAX_FAILS and time.time() - row["first_at"] < LOCK_SECONDS:
+            flash("Çok fazla hatalı kod. 15 dakika sonra tekrar deneyin.", "error")
+            return render_template("auth/verify_2fa.html"), 429
+        code = request.form.get("code", "").strip()
+        step = totp.verify(user["totp_secret"], code, user["totp_last_step"])
+        used_recovery = step is None and totp.use_recovery_code(uid, code)
+        if step is not None or used_recovery:
+            db = get_db()
+            db.execute("DELETE FROM login_attempts WHERE key = ?", (key,))
+            if step is not None:
+                db.execute("UPDATE users SET totp_last_step = ? WHERE id = ?", (step, uid))
+            db.commit()
+            remember = session.get("2fa_remember", False)
+            _start_session(uid, remember)
+            if used_recovery:
+                flash(f"Yedek kodla giriş yapıldı. {totp.recovery_left(uid)} yedek kod kaldı; "
+                      "gerekirse Ayarlar'dan yenilerini oluştur.", "warning")
+            return redirect(_safe_next(request.args.get("next")))
+        now = time.time()
+        db = get_db()
+        if row is None or now - row["first_at"] >= LOCK_SECONDS:
+            db.execute("INSERT OR REPLACE INTO login_attempts (key, count, first_at) VALUES (?, 1, ?)", (key, now))
+        else:
+            db.execute("UPDATE login_attempts SET count = count + 1 WHERE key = ?", (key,))
+        db.commit()
+        flash("Kod hatalı ya da süresi geçmiş.", "error")
+    return render_template("auth/verify_2fa.html")
 
 
 @bp.route("/cikis", methods=["POST"])

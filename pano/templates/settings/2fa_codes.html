@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Yedek kodlar{% endblock %}
+{% block head %}
+<style>
+  .codes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; }
+  .codes code { display: block; text-align: center; font-size: 1.1rem; padding: 8px; background: var(--surface-2); border-radius: 8px; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("🔑 Yedek kodlar") }}
+
+<div class="card">
+  <p class="flash warning">Bu kodlar <b>sadece şimdi</b> gösteriliyor. Bir yere yaz ya da şifre yöneticine kaydet.</p>
+  <p class="small">Telefonun kaybolursa ya da doğrulama uygulamasına erişemezsen, kod yerine bunlardan birini girerek giriş yapabilirsin. Her kod <b>bir kez</b> kullanılır.</p>
+  <div class="codes">{% for c in codes %}<code>{{ c }}</code>{% endfor %}</div>
+  <a class="btn primary block" href="{{ url_for('settings.index') }}#iki-adimli">Kaydettim, devam et</a>
+</div>
+{% endblock %}

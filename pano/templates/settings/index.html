@@ -72,6 +72,29 @@
   {% endif %}
 </section>
 
+<section class="card" id="iki-adimli">
+  <h2>🔐 İki adımlı giriş</h2>
+  {% if g.user.totp_enabled %}
+    <p><span class="badge good">Açık</span> Girişte şifreden sonra doğrulama uygulamasındaki kod isteniyor.
+      <span class="muted small">{{ recovery_left }} yedek kod kaldı.</span></p>
+    <details class="add">
+      <summary>Yedek kodları yenile / kapat</summary>
+      <form method="post" action="{{ url_for('settings.twofa_codes') }}">
+        {{ ui.csrf() }}
+        {{ ui.field("Şifren", "password", type="password", required=True, attrs='autocomplete="current-password"') }}
+        <div class="row-flex">
+          <button class="btn">🔑 Yeni yedek kodlar</button>
+          <button class="btn danger" formaction="{{ url_for('settings.twofa_disable') }}"
+                  onclick="return confirm('İki adımlı giriş kapatılsın mı?')">Kapat</button>
+        </div>
+      </form>
+    </details>
+  {% else %}
+    <p class="muted small">Açınca girişte şifreye ek olarak telefonundaki doğrulama uygulamasının (Google Authenticator vb.) ürettiği kod istenir. Şifren çalınsa bile hesabına girilemez.</p>
+    {{ ui.post_button(url_for('settings.twofa_setup'), "İki adımlı girişi kur", "primary") }}
+  {% endif %}
+</section>
+
 <section class="card">
   <h2>Şifre değiştir</h2>
   <form method="post" action="{{ url_for('settings.password') }}">

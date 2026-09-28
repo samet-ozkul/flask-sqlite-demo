@@ -1,10 +1,10 @@
 """⚙️ Ayarlar: profil, şehir (hava durumu), şifre, Telegram bildirimleri."""
 import secrets
 
-from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, flash, g, make_response, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
-from .. import external, telegram
+from .. import external, telegram, totp
 from ..auth import login_required, set_password
 from ..db import execute
 from ..utils import form_bool, form_str
@@ -19,6 +19,7 @@ def index():
         "settings/index.html",
         telegram_enabled=telegram.enabled(),
         webhook_active=telegram.enabled() and telegram.webhook_active(),
+        recovery_left=totp.recovery_left(g.user["id"]) if g.user["totp_enabled"] else 0,
         bot_username=telegram.bot_username() if g.user["telegram_link_code"] else None,
     )
 
@@ -62,6 +63,73 @@ def password():
         set_password(g.user["id"], new)
         flash("Şifre değiştirildi.", "success")
     return redirect(url_for(".index"))
+
+
+# ---------- İki adımlı giriş ----------
+@bp.route("/2fa", methods=["GET", "POST"])
+@login_required
+def twofa_setup():
+    if g.user["totp_enabled"]:
+        return redirect(url_for(".index") + "#iki-adimli")
+    if request.method == "POST" or "2fa_setup" not in session:
+        # Anahtar onaylanana kadar sadece oturumda durur
+        session["2fa_setup"] = totp.new_secret()
+        if request.method == "POST":
+            return redirect(url_for(".twofa_setup"))
+    secret = session["2fa_setup"]
+    resp = make_response(render_template(
+        "settings/2fa_setup.html", qr=totp.qr_svg(totp.provisioning_uri(secret, g.user["username"])),
+        secret_text=totp.format_secret(secret)))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@bp.route("/2fa/onayla", methods=["POST"])
+@login_required
+def twofa_confirm():
+    secret = session.get("2fa_setup")
+    if not secret or g.user["totp_enabled"]:
+        return redirect(url_for(".twofa_setup"))
+    step = totp.verify(secret, request.form.get("code"))
+    if step is None:
+        flash("Kod tutmadı. Telefonun saatinin doğru olduğundan emin olup yeni kodla tekrar dene.", "error")
+        return redirect(url_for(".twofa_setup"))
+    execute("UPDATE users SET totp_secret = ?, totp_enabled = 1, totp_last_step = ? WHERE id = ?",
+            (secret, step, g.user["id"]))
+    session.pop("2fa_setup", None)
+    flash("İki adımlı giriş açıldı. Bundan sonra girişte doğrulama kodu istenecek.", "success")
+    return _show_codes(totp.new_recovery_codes(g.user["id"]))
+
+
+def _show_codes(codes):
+    resp = make_response(render_template("settings/2fa_codes.html", codes=codes))
+    resp.headers["Cache-Control"] = "no-store"  # kodlar tarayıcı önbelleğinde kalmasın
+    return resp
+
+
+def _password_ok():
+    if check_password_hash(g.user["password_hash"], request.form.get("password", "")):
+        return True
+    flash("Şifre hatalı.", "error")
+    return False
+
+
+@bp.route("/2fa/kodlar", methods=["POST"])
+@login_required
+def twofa_codes():
+    if not g.user["totp_enabled"] or not _password_ok():
+        return redirect(url_for(".index") + "#iki-adimli")
+    flash("Yeni yedek kodlar oluşturuldu; eskiler artık geçersiz.", "success")
+    return _show_codes(totp.new_recovery_codes(g.user["id"]))
+
+
+@bp.route("/2fa/kapat", methods=["POST"])
+@login_required
+def twofa_disable():
+    if g.user["totp_enabled"] and _password_ok():
+        totp.disable(g.user["id"])
+        flash("İki adımlı giriş kapatıldı.", "success")
+    return redirect(url_for(".index") + "#iki-adimli")
 
 
 # ---------- Takvim aboneliği ----------

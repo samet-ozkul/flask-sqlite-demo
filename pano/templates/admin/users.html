@@ -26,6 +26,7 @@
         <div class="grow">
           <div class="title">{{ u.display_name or u.username }} {% if u.display_name %}<span class="muted small">@{{ u.username }}</span>{% endif %}
             {% if u.is_admin %}<span class="badge good">yönetici</span>{% endif %}
+            {% if u.totp_enabled %}<span class="badge" title="İki adımlı giriş açık">🔐 2FA</span>{% endif %}
             {% if u.id == g.user.id %}<span class="badge">sen</span>{% endif %}</div>
           <div class="meta">
             <span>{{ u.created_at | localdt('%d.%m.%Y') }}</span>
@@ -44,6 +45,12 @@
               </form>
             </details>
             {{ ui.post_button(url_for('admin.toggle_admin', user_id=u.id), 'Yöneticiliği kaldır' if u.is_admin else 'Yönetici yap') }}
+            {% if u.totp_enabled %}
+              <form method="post" action="{{ url_for('admin.reset_2fa', user_id=u.id) }}" class="inline"
+                    data-confirm="{{ u.username }} için iki adımlı giriş kapatılsın mı? (telefonunu kaybettiyse)">
+                {{ ui.csrf() }}<button class="btn sm">2FA'yı kapat</button>
+              </form>
+            {% endif %}
             {{ ui.delete_button(url_for('admin.delete_user', user_id=u.id), "Sil", u.username ~ " ve TÜM verileri silinecek. Emin misin?") }}
           </div>
         {% endif %}

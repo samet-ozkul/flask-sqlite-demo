@@ -331,6 +331,18 @@ MIGRATIONS = [
     ALTER TABLE users ADD COLUMN calendar_token TEXT;
     CREATE UNIQUE INDEX idx_users_calendar_token ON users(calendar_token);
     """,
+    # 8: iki adımlı giriş (TOTP) ve yedek kodlar
+    """
+    ALTER TABLE users ADD COLUMN totp_secret TEXT;
+    ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN totp_last_step INTEGER;   -- aynı kod ikinci kez kullanılamasın
+    CREATE TABLE recovery_codes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        code_hash TEXT NOT NULL,
+        used_at TEXT
+    );
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)
