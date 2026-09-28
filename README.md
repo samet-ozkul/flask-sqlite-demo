@@ -124,6 +124,23 @@ Sonra 3. adımdaki **Static files** ayarını ekle, WSGI dosyasına yeni değiş
 3. Günlük özet ve hatırlatmalar için bir sonraki bölümdeki cron görevlerini kur.
 4. **Mesaj butonları (isteğe bağlı):** Yönetim → Durum → **Webhook'u kur**. Bundan sonra hatırlatma mesajlarında **✅ Tamamlandı** butonu çıkar; basınca iş panoda tamamlanır, buton **↩️ Geri al**'a döner. Webhook açıkken hesap bağlama da botta **Başlat**'a basınca anında olur. HTTPS gerektirir (PythonAnywhere'de Force HTTPS açık olmalı); `SECRET_KEY` değişirse webhook'u yeniden kur.
 
+### Bot komutları
+
+Webhook kuruluyken bota yazarak panoyu açmadan giriş yapabilirsin (`/yardim` hepsini listeler):
+
+| Yaz | Ne olur |
+|---|---|
+| `/harcama 250 market öğle` | Bugüne harcama ekler; kategori ilk kelimeden anlaşılır. Mesajdaki **↩️ Geri al** ile silinir |
+| `/harcama` | Bu ayın toplamı ve kategoriler |
+| `/not metin` | Not kaydeder |
+| `/ekle süt, ekmek` · `/ekle market: süt` | Alışveriş listesine ekler (liste adı verilebilir) |
+| `/yap fatura öde yarın 14:00` | Yapılacak ekler; sondaki *bugün, yarın, cuma, 25.12, 14:00, saat 9.30* anlaşılır ve zamanı gelince hatırlatılır |
+| `/liste` · `/liste market` | Açık maddeleri butonlarla gösterir; dokununca işaretlenir |
+| `/bugun` | Günün özeti |
+| Link | Sonra Bak'a kaydedilir |
+| Fotoğraf / PDF | Hangi garantiye ya da nota ekleneceği sorulur (açıklama yazarsan yeni garantinin adı olur) |
+| Düz yazı | Not / alışveriş / yapılacak / harcama olarak ne yapılacağı sorulur |
+
 ## Zamanlanmış görevler (cron-job.org, ücretsiz)
 
 PythonAnywhere ücretsiz planında zamanlanmış görev yok. Bunun yerine [cron-job.org](https://cron-job.org) gibi ücretsiz bir servis, sitendeki gizli bir adresi belirli saatlerde çağırır:

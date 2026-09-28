@@ -141,6 +141,14 @@ def form_choice(name, choices, default):
     return value if value in choices else default
 
 
+_FOLD = str.maketrans({"ı": "i", "ş": "s", "ç": "c", "ğ": "g", "ö": "o", "ü": "u", "â": "a", "î": "i", "û": "u"})
+
+
+def fold(text):
+    """Türkçe harf ve büyük/küçük harf duyarsız karşılaştırma anahtarı ('Şarj' ~ 'sarj', 'YARIN' ~ 'yarin')."""
+    return (text or "").replace("İ", "i").replace("I", "ı").lower().translate(_FOLD)
+
+
 def split_tags(value):
     return [t.strip() for t in (value or "").split(",") if t.strip()]
 

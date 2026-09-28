@@ -23,6 +23,11 @@
     <p class="muted">Yönetici henüz bir Telegram botu ayarlamamış (<code>TELEGRAM_BOT_TOKEN</code>).</p>
   {% elif g.user.telegram_chat_id %}
     <p><span class="badge good">Bağlı</span> Günlük özet, yaklaşan ödemeler ve randevular Telegram'a gelir.</p>
+    {% if webhook_active %}
+      <p class="muted small">Bota komut da yazabilirsin: <code>/harcama 250 market</code>, <code>/ekle süt, ekmek</code>,
+        <code>/yap fatura öde yarın 14:00</code>, <code>/liste</code>, <code>/bugun</code>. Tümü için botta <code>/yardim</code>.
+        Link ya da fatura fotoğrafı göndermek de işe yarar.</p>
+    {% endif %}
     <div class="row-flex">
       {{ ui.post_button(url_for('settings.telegram_test'), "Test mesajı gönder") }}
       {{ ui.post_button(url_for('settings.telegram_unlink'), "Bağlantıyı kaldır", "danger") }}

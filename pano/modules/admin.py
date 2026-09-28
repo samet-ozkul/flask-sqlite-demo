@@ -6,7 +6,7 @@ import time
 from flask import (Blueprint, current_app, flash, g, redirect, render_template, request, send_file,
                    session, url_for)
 
-from .. import backup as backup_lib, telegram
+from .. import backup as backup_lib, bot_commands, telegram
 from ..auth import admin_required, create_user, large_upload, registration_open, set_password, validate_new_user
 from ..db import SCHEMA_VERSION, execute, get_db, query, query_one
 from ..external import purge_cache
@@ -83,7 +83,11 @@ def telegram_webhook():
                 return redirect(url_for(".index"))
             telegram.set_webhook(url)
             execute("INSERT OR REPLACE INTO app_state (key, value) VALUES ('telegram_webhook', ?)", (url,))
-            flash("Webhook kuruldu: hatırlatmalarda “✅ Tamamlandı” butonu çıkacak.", "success")
+            try:
+                telegram.set_commands(bot_commands.COMMANDS)  # Telegram'daki "/" menüsü
+            except telegram.TelegramError:
+                pass
+            flash("Webhook kuruldu: hatırlatmalarda “✅ Tamamlandı” butonu çıkacak, bot komutları (/yardim) açıldı.", "success")
     except telegram.TelegramError as e:
         flash(f"Telegram hatası: {e}", "error")
     return redirect(url_for(".index"))
