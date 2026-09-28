@@ -7,7 +7,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 |---|---|
 | 🏠 Pano | Günün özeti: hava durumu, döviz kuru, yaklaşan ödemeler/tarihler, bugünkü alışkanlıklar ve ilaçlar, hızlı harcama ve hızlı not |
 | 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) |
-| 💰 Para | **Harcamalar** (aylık özet, kategori grafiği) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) |
+| 💰 Para | **Harcamalar** (aylık özet, kategori grafiği, bütçe limiti, Excel/CSV) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) |
 | 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) |
 | 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) |
 | ⚙️ Altyapı | Kullanıcı yönetimi, tek tıkla yedek al/geri yükle, disk kullanımı, Telegram günlük özeti, telefona uygulama olarak yükleme (PWA) |
@@ -161,6 +161,12 @@ cron-job.org'da saat dilimini **Europe/Istanbul** yapmayı unutma.
 **Fatura hatırlatmaları:** “Telegram'dan hatırlat” işaretli ödenmemiş faturalar için son günden bir gün önce ve son gün 09:00'da mesaj gelir. **✅ Ödendi** butonu faturayı öder, tekrarlıysa sonraki ayı ekler ve harcamalara yazar; **↩️ Geri al** bunların hepsini geri alır.
 
 **Önemli günler:** Seçilen gün sayısı kadar önce ve o gün 09:00'da mesaj gelir (“🎂 7 gün sonra: Annemin doğum günü (60. yaş)”); panoda 30 gün önceden görünür.
+
+**Bütçe:** Harcamalar → 🎯 Bütçe'den toplam ve kategori bazında aylık limit konur; harcamalar sayfasında doluluk çubukları görünür, %80'e ve %100'e ulaşınca (her ay bir kez) Telegram uyarısı gelir. Bottan harcama eklerken ilgili bütçe durumu da yazılır.
+
+**Aylık rapor:** Her ayın 1'inde günlük özetle birlikte geçen ayın raporu gelir: toplam ve önceki aya göre değişim, kategoriler, bütçe sonuçları, ödenen faturalar, abonelikler, alışkanlık başarı oranları. Bottan `/rapor` (geçen ay) ya da `/rapor bu ay`.
+
+**Excel/CSV:** Harcamalar sayfasındaki **⬇️ Excel** o ayı indirir (`?ay=tumu` ile hepsi). Dosya Türkçe Excel'de doğrudan açılır (UTF-8, `;` ayırıcı, virgüllü ondalık).
 
 **Kur alarmı:** Kurlar sayfasında “Dolar 50 ₺ üstüne çıkınca” gibi alarm kurulur; tetiklenince mesaj gelir ve alarm kapanır. Kaynak Avrupa Merkez Bankası referans kuru olduğundan günde bir kez (iş günleri) güncellenir.
 

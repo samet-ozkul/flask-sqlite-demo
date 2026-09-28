@@ -30,7 +30,10 @@
 </style>
 {% endblock %}
 {% block content %}
-{{ ui.page_header("💸 Harcamalar") }}
+{% call ui.page_header("💸 Harcamalar") %}
+  <a class="btn sm" href="{{ url_for('expenses.budget') }}">🎯 Bütçe</a>
+  <a class="btn sm" href="{{ url_for('expenses.export', ay=month_param) }}" title="Bu ayı Excel/CSV olarak indir">⬇️ Excel</a>
+{% endcall %}
 
 <div class="card xp-quick">
   <form method="post" action="{{ url_for('expenses.create') }}">
@@ -94,6 +97,19 @@
     <div class="sub">{{ MONTHS_TR[prev.month - 1] }}: {{ s.prev_total | money }}</div>
   </div>
 </div>
+
+{% if budget %}
+<div class="card">
+  <h2>🎯 Bütçe <a class="more" href="{{ url_for('expenses.budget') }}">Düzenle →</a></h2>
+  {% for b in budget %}
+    <div style="margin-bottom: 10px">
+      <div class="row-flex small"><span>{% if b.category == '*' %}<b>Toplam</b>{% else %}{{ b.label }}{% endif %}</span><span class="spacer"></span>
+        <span>{{ b.spent | money }} / {{ b.limit | money }} <b>%{{ b.pct | round | int }}</b></span></div>
+      <div class="meter {{ 'full' if b.pct >= 100 else ('warn' if b.pct >= 80 else '') }}"><span style="width: {{ [b.pct, 100] | min }}%"></span></div>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
 
 {% if bars %}
 <div class="card">

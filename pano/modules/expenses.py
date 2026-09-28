@@ -4,12 +4,15 @@ Diğer modüller (faturalar, araç) "Faturalar" / "Yakıt" kategorisiyle doğrud
 expenses tablosuna satır ekler; bu yüzden CATEGORIES sabit tutulur.
 """
 import calendar
+import csv
+import io
 import math
 from datetime import date, timedelta
 from itertools import groupby
 
-from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, Response, flash, g, redirect, render_template, request, url_for
 
+from .. import budgets
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
 from ..utils import (add_months, fmt_money, form_date, form_str, month_bounds, parse_number,
@@ -162,7 +165,7 @@ def index():
         s=summary, bars=bars, year=year, month=month, prev=prev, nxt=nxt,
         prev_key=month_key(prev), next_key=month_key(nxt), is_current=is_current,
         today_total=today_total, chips=_chip_categories(uid), categories=_all_categories(uid),
-        icon=category_icon,
+        icon=category_icon, budget=budgets.month_status(uid, year, month), month_param=month_key(first),
     )
 
 
@@ -211,3 +214,61 @@ def delete(expense_id):
     execute("DELETE FROM expenses WHERE id = ? AND user_id = ?", (expense_id, g.user["id"]))
     flash("Harcama silindi.", "success")
     return redirect(url_for(".index", ay=row["date"][:7]))
+
+
+# ---------- Bütçe ----------
+@bp.route("/butce", methods=["GET", "POST"])
+@login_required
+def budget():
+    uid = g.user["id"]
+    if request.method == "POST":
+        # Alan adları "limit:<kategori>" ("limit:*" = toplam); boş bırakılan limit kaldırılır
+        limits = {key[len("limit:"):][:40]: parse_amount(value)
+                  for key, value in request.form.items() if key.startswith("limit:")}
+        budgets.save(uid, limits)
+        flash("Bütçe kaydedildi.", "success")
+        return redirect(url_for(".index"))
+    t = today()
+    since = add_months(date(t.year, t.month, 1), -3).isoformat()
+    until = date(t.year, t.month, 1).isoformat()
+    averages = {r["category"]: r["s"] / 3 for r in query(
+        "SELECT category, SUM(amount) AS s FROM expenses WHERE user_id = ? AND date >= ? AND date < ? GROUP BY category",
+        (uid, since, until))}
+    return render_template(
+        "expenses/budget.html", categories=_all_categories(uid), limits=budgets.budgets_of(uid),
+        status={r["category"]: r for r in budgets.month_status(uid, t.year, t.month)},
+        averages=averages, total_avg=sum(averages.values()), icon=category_icon, TOTAL=budgets.TOTAL,
+    )
+
+
+# ---------- Dışa aktarma ----------
+def _csv_safe(text):
+    """Excel'de formül olarak çalışmasın diye =, +, -, @ ile başlayan metnin önüne ' eklenir."""
+    text = text or ""
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
+
+@bp.route("/disa-aktar")
+@login_required
+def export():
+    """Excel'de doğrudan açılan CSV: UTF-8 BOM, ';' ayırıcı, virgüllü ondalık (Türkçe Excel ayarı)."""
+    uid = g.user["id"]
+    ay = request.args.get("ay", "")
+    if ay == "tumu":
+        rows = query("SELECT * FROM expenses WHERE user_id = ? ORDER BY date, id", (uid,))
+        filename = "harcamalar-tumu.csv"
+    else:
+        year, month = parse_month(ay)
+        start, end = month_bounds(year, month)
+        rows = query("SELECT * FROM expenses WHERE user_id = ? AND date >= ? AND date < ? ORDER BY date, id",
+                     (uid, start, end))
+        filename = f"harcamalar-{year:04d}-{month:02d}.csv"
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    writer.writerow(["Tarih", "Kategori", "Tutar (TL)", "Not"])
+    for r in rows:
+        d = date.fromisoformat(r["date"])
+        writer.writerow([d.strftime("%d.%m.%Y"), _csv_safe(r["category"]), f"{r['amount']:.2f}".replace(".", ","),
+                         _csv_safe(r["note"])])
+    return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})

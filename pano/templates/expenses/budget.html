@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Bütçe{% endblock %}
+{% block head %}
+<style>
+  .budget-table td { vertical-align: middle; }
+  .budget-table input { max-width: 150px; margin: 0; text-align: right; }
+  .budget-table .avg { font-size: .8rem; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("🎯 Aylık bütçe", "Boş bırakılan kategoride limit yok. %80 ve %100'de Telegram'dan uyarı gelir.",
+                  back=url_for('expenses.index')) }}
+
+<form method="post" class="card">
+  {{ ui.csrf() }}
+  <div class="table-wrap">
+    <table class="budget-table">
+      <tr><th>Kategori</th><th class="num">Bu ay</th><th class="num">Limit (₺)</th></tr>
+      {% set st = status.get(TOTAL) %}
+      <tr>
+        <td><b>Toplam</b><div class="muted avg">Son 3 ay ort. {{ total_avg | money }}</div></td>
+        <td class="num">{{ (st.spent if st else 0) | money }}</td>
+        <td class="num"><input name="limit:{{ TOTAL }}" inputmode="decimal" autocomplete="off"
+                               value="{{ limits[TOTAL] | num if TOTAL in limits else '' }}" placeholder="—"></td>
+      </tr>
+      {% for c in categories %}
+        {% set st = status.get(c) %}
+        <tr>
+          <td>{{ icon(c) }} {{ c }}{% if averages.get(c) %}<div class="muted avg">Son 3 ay ort. {{ averages[c] | money }}</div>{% endif %}</td>
+          <td class="num">{% if st %}{{ st.spent | money }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td class="num"><input name="limit:{{ c }}" inputmode="decimal" autocomplete="off"
+                                 value="{{ limits[c] | num if c in limits else '' }}" placeholder="—"></td>
+        </tr>
+      {% endfor %}
+    </table>
+  </div>
+  <button class="btn primary block" style="margin-top: 12px">Kaydet</button>
+</form>
+{% endblock %}
