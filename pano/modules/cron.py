@@ -15,8 +15,8 @@ from flask import Blueprint, abort, jsonify, request, url_for
 
 from .. import backup, external, telegram
 from .. import todo_reminders as todo
+from ..todo_reminders import done_buttons
 from ..db import get_db, query, query_one
-from .bot import done_buttons
 from ..reminders import medications_today, upcoming
 from ..utils import MONTHS_TR, WEEKDAYS_TR, fmt_money, now_local, rel_days, today, today_str
 

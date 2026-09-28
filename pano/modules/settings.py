@@ -18,6 +18,7 @@ def index():
     return render_template(
         "settings/index.html",
         telegram_enabled=telegram.enabled(),
+        webhook_active=telegram.enabled() and telegram.webhook_active(),
         bot_username=telegram.bot_username() if g.user["telegram_link_code"] else None,
     )
 

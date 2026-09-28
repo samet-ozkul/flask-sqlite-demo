@@ -8,23 +8,17 @@ Buton verisi (callback_data):
   done:<madde_id>  -> yapılacak işi tamamla, butonu "Geri al" yap
   undo:<madde_id>  -> yeniden aç, butonu "Tamamlandı" yap
 """
+import logging
 import secrets
 
 from flask import Blueprint, abort, jsonify, request
 
-from .. import telegram
+from .. import bot_commands, telegram
 from ..auth import csrf_exempt
 from ..db import execute, query, query_one
+from ..todo_reminders import done_buttons, undo_buttons
 
 bp = Blueprint("bot", __name__, url_prefix="/telegram")
-
-
-def done_buttons(item_id):
-    return [[("✅ Tamamlandı", f"done:{item_id}")]]
-
-
-def undo_buttons(item_id):
-    return [[("↩️ Geri al", f"undo:{item_id}")]]
 
 
 @bp.route("/webhook", methods=["POST"])
@@ -41,21 +35,26 @@ def webhook():
             _handle_callback(update["callback_query"])
         elif "message" in update:
             _handle_message(update["message"])
-    except telegram.TelegramError:
-        pass  # Telegram hata alırsa aynı güncellemeyi tekrar tekrar gönderir; her durumda 200 dön
+    except Exception:
+        # Telegram hata alırsa aynı güncellemeyi tekrar tekrar gönderir; kaydet ve her durumda 200 dön
+        logging.getLogger(__name__).exception("Telegram güncellemesi işlenemedi")
     return jsonify(ok=True)
 
 
 def _handle_message(msg):
     text = (msg.get("text") or "").strip()
     chat_id = str((msg.get("chat") or {}).get("id", ""))
-    if not chat_id or not text.startswith("/start"):
+    if not chat_id:
+        return
+    if not text.startswith("/start"):
+        bot_commands.handle_message(msg)
         return
     code = text[len("/start"):].strip()
     user = query_one("SELECT id FROM users WHERE telegram_link_code = ?", (code,)) if code else None
     if user:
         execute("UPDATE users SET telegram_chat_id = ?, telegram_link_code = NULL WHERE id = ?", (chat_id, user["id"]))
-        telegram.send_message(chat_id, "✅ Kişisel Pano bağlandı. Günlük özetler ve hatırlatmalar buraya gelecek.")
+        telegram.send_message(chat_id, "✅ Kişisel Pano bağlandı. Günlük özetler ve hatırlatmalar buraya gelecek.\n\n"
+                                       + bot_commands.HELP)
     elif query_one("SELECT 1 FROM users WHERE telegram_chat_id = ?", (chat_id,)):
         telegram.send_message(chat_id, "Bu sohbet zaten panoya bağlı. 👍")
     else:
@@ -67,7 +66,11 @@ def _handle_callback(cq):
     msg = cq.get("message") or {}
     chat_id = str((msg.get("chat") or {}).get("id") or (cq.get("from") or {}).get("id", ""))
     action, _, raw_id = (cq.get("data") or "").partition(":")
-    if action not in ("done", "undo") or not raw_id.isdigit():
+    if action not in ("done", "undo"):
+        if not bot_commands.handle_callback(cq, chat_id, msg.get("message_id")):
+            telegram.answer_callback(callback_id)
+        return
+    if not raw_id.isdigit():
         telegram.answer_callback(callback_id)
         return
 

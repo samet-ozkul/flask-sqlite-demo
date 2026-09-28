@@ -91,6 +91,33 @@ def answer_callback(callback_id, text=""):
     return _call("answerCallbackQuery", {"callback_query_id": callback_id, "text": text})
 
 
+def edit_message(chat_id, message_id, text_html, buttons=None):
+    params = {"chat_id": chat_id, "message_id": message_id, "text": text_html, "parse_mode": "HTML",
+              "disable_web_page_preview": "true", "reply_markup": keyboard(buttons or [])}
+    return _call("editMessageText", params)
+
+
+MAX_DOWNLOAD = 20 * 1024 * 1024  # Bot API indirme sınırı
+
+
+def download_file(file_id):
+    """Kullanıcının bota gönderdiği dosyayı indirir (bayt)."""
+    info = _call("getFile", {"file_id": file_id})
+    if info.get("file_size", 0) > MAX_DOWNLOAD:
+        raise TelegramError("Dosya çok büyük (en fazla 20 MB).")
+    url = f"https://api.telegram.org/file/bot{token()}/{info['file_path']}"
+    try:
+        with urllib.request.urlopen(url, timeout=TIMEOUT) as resp:
+            return resp.read(MAX_DOWNLOAD + 1)
+    except Exception as e:
+        raise TelegramError(f"Dosya indirilemedi: {e}")
+
+
+def set_commands(commands):
+    """Telegram'daki "/" menüsünde görünen komutlar: [(komut, açıklama), ...]"""
+    return _call("setMyCommands", {"commands": json.dumps([{"command": c, "description": d} for c, d in commands])})
+
+
 def edit_buttons(chat_id, message_id, buttons):
     return _call("editMessageReplyMarkup", {"chat_id": chat_id, "message_id": message_id,
                                             "reply_markup": keyboard(buttons or [])})

@@ -32,6 +32,15 @@ DEFAULT_DUE_TIME = os.environ.get("REMINDER_DEFAULT_TIME", "09:00")
 LATE_WINDOW = timedelta(hours=6)
 
 
+def done_buttons(item_id):
+    """Hatırlatma mesajının butonları (webhook kuruluysa gönderilir)."""
+    return [[("✅ Tamamlandı", f"done:{item_id}")]]
+
+
+def undo_buttons(item_id):
+    return [[("↩️ Geri al", f"undo:{item_id}")]]
+
+
 def parse_time(value):
     """'9:5', '09.30', '1430' -> 'HH:MM'; geçersiz/boşsa None."""
     s = (value or "").strip()
