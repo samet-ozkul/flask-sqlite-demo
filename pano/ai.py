@@ -2,13 +2,13 @@
 
 İki bağlantı yöntemi:
 - "anthropic": Claude Messages API (/v1/messages)
-- "openai":    OpenAI uyumlu Chat Completions (/chat/completions) — OpenAI, Mistral, OpenRouter,
-               Groq, DeepSeek, Together, yerel Ollama...
+- "openai":    OpenAI uyumlu Chat Completions (/chat/completions) — OpenAI, Mistral, Google Gemini,
+               OpenRouter, Groq, DeepSeek, Together, yerel Ollama...
 
 Ortam değişkenleri:
-  AI_PROVIDER   anthropic | mistral | openai | openrouter | groq | deepseek | openai-compatible
+  AI_PROVIDER   anthropic | mistral | gemini | openai | openrouter | groq | deepseek | openai-compatible
   AI_API_KEY    sağlayıcının API anahtarı
-  AI_MODEL      model adı (anthropic ve mistral için verilmezse varsayılan kullanılır)
+  AI_MODEL      model adı (anthropic, mistral ve gemini için verilmezse varsayılan kullanılır)
   AI_BASE_URL   adres (sadece openai-compatible için gerekli; diğerlerinde isteğe bağlı değiştirme)
   AI_EFFORT     Claude'da düşünme derinliği: low | medium | high (varsayılan medium)
 
@@ -29,6 +29,9 @@ PRESETS = {
                   "label": "Claude (Anthropic)"},
     "mistral": {"style": "openai", "base_url": "https://api.mistral.ai/v1", "model": "mistral-medium-latest",
                 "label": "Mistral AI"},
+    # Google AI Studio anahtarı; OpenAI uyumlu uç nokta. "-latest" takma adı Google'ın güncel Flash modelini gösterir
+    "gemini": {"style": "openai", "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+               "model": "gemini-flash-latest", "label": "Google Gemini"},
     "openai": {"style": "openai", "base_url": "https://api.openai.com/v1", "model": None, "label": "OpenAI"},
     "openrouter": {"style": "openai", "base_url": "https://openrouter.ai/api/v1", "model": None, "label": "OpenRouter"},
     "groq": {"style": "openai", "base_url": "https://api.groq.com/openai/v1", "model": None, "label": "Groq"},
