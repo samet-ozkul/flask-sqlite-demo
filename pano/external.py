@@ -83,7 +83,7 @@ def weather(lat, lon):
         q = urllib.parse.urlencode({
             "latitude": lat, "longitude": lon,
             "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
-            "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+            "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max",
             "timezone": os.environ.get("APP_TZ", "Europe/Istanbul"),
             "forecast_days": 4,
         })
@@ -102,12 +102,13 @@ def weather(lat, lon):
                     "max": round(daily["temperature_2m_max"][i]),
                     "min": round(daily["temperature_2m_min"][i]),
                     "rain": daily["precipitation_probability_max"][i],
+                    "wind_max": round(daily["wind_speed_10m_max"][i] or 0),
                 }
                 for i in range(len(daily["time"]))
             ],
         }
 
-    return cached(f"weather:{lat}:{lon}", 30 * 60, fetch)
+    return cached(f"weather2:{lat}:{lon}", 30 * 60, fetch)
 
 
 def weather_label(code):

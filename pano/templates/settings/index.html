@@ -13,6 +13,7 @@
       {{ ui.field("Şehir (hava durumu için)", "city", g.user.city, placeholder="Konya") }}
     </div>
     {{ ui.checkbox("Telegram'dan günlük özet gönder", "notify_daily", g.user.notify_daily) }}
+    {{ ui.checkbox("⚠️ Hava uyarısı: yarın yağmur, don, aşırı sıcak ya da fırtına varsa akşam haber ver", "weather_alerts", g.user.weather_alerts) }}
     <button class="btn primary">Kaydet</button>
   </form>
 </section>

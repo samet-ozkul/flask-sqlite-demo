@@ -80,6 +80,11 @@ def events_between(user_id, start, end, external=False):
         add("todo", r["id"], r["due_date"], r["text"], "☑️", "lists.detail", detail=r["list_name"],
             time=r["due_time"], list_id=r["list_id"])
 
+    from .modules.documents import KINDS as DOC_KINDS
+    for r in query("SELECT * FROM documents WHERE user_id = ? AND expires_on BETWEEN ? AND ?", (user_id, s, e)):
+        add("document", r["id"], r["expires_on"], f"{r['name']} bitiyor", DOC_KINDS[r["kind"]][1], "documents.edit",
+            detail=r["holder"], doc_id=r["id"])
+
     from .modules.events import visible_events
     for r in visible_events(user_id, " AND e.date BETWEEN ? AND ?", (s, e)):
         add("event", r["id"], r["date"], r["title"], "👨‍👩‍👧" if r["shared"] else "📅", "events.edit",

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Ekle{% endblock %}
+{% block head %}
+<style>
+  .cover { width: 46px; height: 68px; border-radius: 6px; object-fit: cover; background: var(--surface-2); flex-shrink: 0;
+           display: grid; place-items: center; font-size: 1.4rem; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header(("📚 Kitap ekle" if kind == 'book' else "🎬 Film / dizi ekle"), back=url_for('watchlist.index')) }}
+
+<form method="get" class="search">
+  <input type="hidden" name="tur" value="{{ kind }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="{{ 'Kitap adı ya da yazar' if kind == 'book' else 'Film ya da dizi adı' }}" autofocus>
+  <button class="btn primary">Ara</button>
+</form>
+{% if kind != 'book' and not tmdb %}
+  <p class="muted small">Film/dizi araması için yöneticinin ücretsiz bir TMDB anahtarı (<code>TMDB_API_KEY</code>) ayarlaması gerekiyor. Aşağıdan elle ekleyebilirsin.</p>
+{% endif %}
+{% if error %}<div class="flash warning">{{ error }}</div>{% endif %}
+
+{% if results %}
+  <div class="card">
+    <ul class="rows">
+      {% for r in results %}
+        <li>
+          {% if r.image_url %}<img class="cover" src="{{ r.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+          {% else %}<span class="cover">{{ kinds[r.kind][1] }}</span>{% endif %}
+          <div class="grow">
+            <div class="title">{{ r.title }}{% if r.year %} <span class="muted small">({{ r.year }})</span>{% endif %}</div>
+            <div class="meta"><span>{{ kinds[r.kind][0] }}</span>{% if r.creator %}<span>{{ r.creator }}</span>{% endif %}</div>
+          </div>
+          <form method="post" action="{{ url_for('watchlist.create') }}" class="inline">
+            {{ ui.csrf() }}
+            {% for f in ('kind', 'title', 'year', 'creator', 'image_url', 'external_id') %}<input type="hidden" name="{{ f }}" value="{{ r[f] }}">{% endfor %}
+            <button class="btn sm primary">＋ Ekle</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% elif q and not error %}
+  {{ ui.empty("Sonuç bulunamadı. Aşağıdan elle ekleyebilirsin.", "🔍") }}
+{% endif %}
+
+<div class="card">
+  <details class="add" {% if (kind != 'book' and not tmdb) or (q and not results) %}open{% endif %}>
+    <summary>✍️ Elle ekle</summary>
+    <form method="post" action="{{ url_for('watchlist.create') }}">
+      {{ ui.csrf() }}
+      <div class="form-row three">
+        <label class="field"><span>Tür</span>
+          <select name="kind">{% for k, (label, icon) in kinds.items() %}<option value="{{ k }}" {% if k == kind or (kind == 'movie' and k == 'movie') %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}</select>
+        </label>
+        {{ ui.field("Ad", "title", q, required=True, attrs='maxlength="200"') }}
+        {{ ui.field("Yıl", "year", attrs='maxlength="10" inputmode="numeric"') }}
+      </div>
+      {{ ui.field("Yazar / yönetmen", "creator", attrs='maxlength="120"') }}
+      <button class="btn primary">Ekle</button>
+    </form>
+  </details>
+</div>
+{% endblock %}
