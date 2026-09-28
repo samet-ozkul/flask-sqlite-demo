@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Doğrulama{% endblock %}
+{% block content %}
+<div class="auth-card card">
+  <div class="auth-logo">🔐</div>
+  <h1>Doğrulama kodu</h1>
+  <p class="muted center small">Doğrulama uygulamandaki 6 haneli kodu gir. Telefonun yanında değilse bir yedek kod da kullanabilirsin.</p>
+  <form method="post">
+    {{ ui.csrf() }}
+    {{ ui.field("Kod", "code", required=True, placeholder="123 456",
+                attrs='autofocus inputmode="numeric" autocomplete="one-time-code" maxlength="12" style="text-align:center; font-size:1.4rem; letter-spacing:.2em"') }}
+    <button class="btn primary block">Doğrula</button>
+  </form>
+  <p class="center small"><a href="{{ url_for('auth.login') }}">← Girişe dön</a></p>
+</div>
+{% endblock %}

@@ -127,6 +127,18 @@ def reset_password(user_id):
     return redirect(url_for(".users"))
 
 
+@bp.route("/kullanicilar/<int:user_id>/2fa-kapat", methods=["POST"])
+@admin_required
+def reset_2fa(user_id):
+    """Telefonunu ve yedek kodlarını kaybeden kullanıcı için."""
+    from .. import totp
+    user = query_one("SELECT username FROM users WHERE id = ?", (user_id,))
+    if user and user_id != g.user["id"]:
+        totp.disable(user_id)
+        flash(f"{user['username']} için iki adımlı giriş kapatıldı.", "success")
+    return redirect(url_for(".users"))
+
+
 @bp.route("/kullanicilar/<int:user_id>/yonetici", methods=["POST"])
 @admin_required
 def toggle_admin(user_id):

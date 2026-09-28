@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}İki adımlı giriş{% endblock %}
+{% block head %}
+<style>
+  .qr-box { display: flex; justify-content: center; margin: 10px 0; }
+  .qr-box svg { width: 220px; height: 220px; border-radius: 8px; }
+  .secret { font-family: ui-monospace, Consolas, monospace; font-size: 1.05rem; letter-spacing: .05em; text-align: center;
+            background: var(--surface-2); padding: 8px; border-radius: 8px; overflow-wrap: anywhere; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("🔐 İki adımlı girişi kur", back=url_for('settings.index') ~ '#iki-adimli') }}
+
+<div class="card">
+  <ol>
+    <li>Telefonuna bir doğrulama uygulaması kur: <b>Google Authenticator</b>, <b>Microsoft Authenticator</b> ya da benzeri.</li>
+    <li>Uygulamada <b>+</b> → <i>QR kodu tara</i> ile aşağıdaki kodu okut.</li>
+    <li>Uygulamanın gösterdiği 6 haneli kodu aşağıya yaz.</li>
+  </ol>
+  <div class="qr-box">{{ qr | safe }}</div>
+  <p class="muted small center">QR okutamıyorsan uygulamada <i>Kurulum anahtarı gir</i>'i seç ve bunu yaz:</p>
+  <div class="secret">{{ secret_text }}</div>
+  <form method="post" action="{{ url_for('settings.twofa_confirm') }}" style="margin-top: 14px">
+    {{ ui.csrf() }}
+    {{ ui.field("Uygulamadaki kod", "code", required=True, placeholder="123 456",
+                attrs='inputmode="numeric" autocomplete="one-time-code" maxlength="7" style="text-align:center; font-size:1.3rem; letter-spacing:.2em"') }}
+    <button class="btn primary block">Doğrula ve aç</button>
+  </form>
+</div>
+{% endblock %}
