@@ -155,6 +155,33 @@ def todo_reminders(secret):
         except telegram.TelegramError as e:
             result["errors"].append(f"fatura {bill['id']}: {e}")
 
+    # Önemli günler: X gün önce ve o gün (varsayılan saatten sonra)
+    from .rates import message as rate_message, mark_triggered, triggered
+    from .specialdays import mark_sent as mark_day, message as day_message, pending as pending_days
+    result["days_sent"] = 0
+    now = todo.now_local()
+    if now.strftime("%H:%M") >= todo.DEFAULT_DUE_TIME:
+        for kind, row, on, days in pending_days(now):
+            try:
+                telegram.send_message(row["chat_id"], day_message(kind, row, on, days,
+                                                                  url_for("specialdays.index", _external=True),
+                                                                  telegram.escape))
+                mark_day(row["id"], kind, on.year)
+                result["days_sent"] += 1
+            except telegram.TelegramError as e:
+                result["errors"].append(f"önemli gün {row['id']}: {e}")
+
+    # Kur alarmları (kur önbellekten; saatte en fazla birkaç istek)
+    result["rate_alerts"] = 0
+    for alert, value, chat_id in triggered():
+        try:
+            telegram.send_message(chat_id, rate_message(alert, value, url_for("rates.index", _external=True),
+                                                        telegram.escape))
+            mark_triggered(alert["id"], value)
+            result["rate_alerts"] += 1
+        except telegram.TelegramError as e:
+            result["errors"].append(f"kur alarmı {alert['id']}: {e}")
+
     # İlaçlar: doz saati geldi
     result["meds_sent"] = 0
     for med, slot, chat_id, day in scheduled.pending_meds():

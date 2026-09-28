@@ -134,6 +134,32 @@ def rates():
     return cached("rates:TRY", 3 * 3600, fetch)
 
 
+def rate_history(days=30):
+    """{'USD': [(tarih, kur), ...], 'EUR': [...], 'GBP': [...]} — son `days` günün TL karşılıkları."""
+    from datetime import timedelta
+    from .utils import today
+
+    def fetch():
+        start = (today() - timedelta(days=days)).isoformat()
+        data = None
+        for base in ("https://api.frankfurter.dev/v1", "https://api.frankfurter.app"):
+            try:
+                data = _fetch_json(f"{base}/{start}..?base=TRY&symbols=USD,EUR,GBP")
+                break
+            except Exception:
+                continue
+        if not data:
+            raise RuntimeError("kur geçmişi alınamadı")
+        out = {"USD": [], "EUR": [], "GBP": []}
+        for day in sorted(data.get("rates", {})):
+            for code, value in data["rates"][day].items():
+                if value and code in out:
+                    out[code].append((day, round(1 / value, 4)))
+        return out
+
+    return cached(f"rates:history:{days}", 6 * 3600, fetch)
+
+
 def to_try(amount, currency, rate_table=None):
     """Tutarı TL'ye çevirir; kur yoksa None."""
     if amount is None:

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ row.name }}{% endblock %}
+{% block content %}
+{% call ui.page_header(kinds[row.kind][1] ~ " " ~ row.name, back=url_for('specialdays.index')) %}
+  {{ ui.delete_button(url_for('specialdays.delete', day_id=row.id), "Sil", "Silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.field("Ad", "name", row.name, required=True, attrs='maxlength="100"') }}
+      <label class="field">
+        <span>Tür</span>
+        <select name="kind">
+          {% for k, (label, icon) in kinds.items() %}<option value="{{ k }}" {% if k == row.kind %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="form-row">
+      {{ ui.field("Tarih", "date", shown, type="date", required=True) }}
+      <label class="field">
+        <span>Hatırlat</span>
+        <select name="notify_days">
+          {% for v, label in notify_options %}<option value="{{ v }}" {% if v == row.notify_days %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    {{ ui.checkbox("Yılı bilmiyorum / önemli değil (yaş hesaplanmaz)", "no_year", row.year is none) }}
+    {{ ui.field("Not", "note", row.note, attrs='maxlength="500"') }}
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+{% endblock %}

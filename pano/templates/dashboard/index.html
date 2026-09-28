@@ -40,7 +40,7 @@
 
   {# ---------- Kurlar ---------- #}
   <section class="card">
-    <h2>Kurlar {% if rates and rates.date %}<span class="muted small">{{ rates.date | date_tr }}</span>{% endif %}</h2>
+    <h2>Kurlar <a class="more" href="{{ url_for('rates.index') }}">Grafik ve alarm →</a></h2>
     {% if rates %}
       <div class="rates">
         <div><span class="muted small">$ Dolar</span><b>{{ rates.USD | num }}</b></div>
@@ -48,7 +48,7 @@
         <div><span class="muted small">£ Sterlin</span><b>{{ rates.GBP | num }}</b></div>
         {% if gold %}<div><span class="muted small">Gram altın</span><b>{{ gold | num }}</b></div>{% endif %}
       </div>
-      <p class="muted small">Avrupa Merkez Bankası referans kuru (TL).</p>
+      <p class="muted small">Avrupa Merkez Bankası referans kuru (TL){% if rates.date %} · {{ rates.date | date_tr }}{% endif %}.</p>
     {% else %}
       <p class="muted">Kurlar şu an alınamadı.</p>
     {% endif %}

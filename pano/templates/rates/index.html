@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Kurlar{% endblock %}
+{% block head %}
+<style>
+  .rate-card .value { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rate-card svg { width: 100%; height: 44px; color: var(--primary); margin-top: 6px; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("💱 Kurlar", ("Avrupa Merkez Bankası referans kuru · " ~ (rate_date | date_tr)) if rate_date else None) }}
+
+{% if cards %}
+  <div class="grid three">
+    {% for c in cards %}
+      <section class="card rate-card">
+        <div class="muted small">{{ c.name }}</div>
+        <div class="value">{{ c.value | num }} ₺</div>
+        {% if c.change is not none %}
+          <div class="small {{ 'danger-text' if c.change > 0 else '' }}">30 gün: {{ '+' if c.change >= 0 }}{{ c.change | round(1) | num(1) }}%
+            <span class="muted">· en düşük {{ c.low | num }} · en yüksek {{ c.high | num }}</span></div>
+        {% endif %}
+        {% if c.line %}
+          <svg viewBox="0 0 220 44" preserveAspectRatio="none" aria-hidden="true"><polyline points="{{ c.line }}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        {% endif %}
+      </section>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card"><p class="muted">Kurlar şu an alınamadı.</p></div>
+{% endif %}
+
+<section class="card" style="margin-top: 14px">
+  <h2>🔔 Kur alarmları</h2>
+  <form method="post" action="{{ url_for('rates.create_alert') }}">
+    {{ ui.csrf() }}
+    <div class="form-row three">
+      <label class="field"><span>Kur</span>
+        <select name="currency">
+          {% for code, name in names.items() %}{% if code != 'XAU' or 'XAU' in values %}<option value="{{ code }}">{{ name }}</option>{% endif %}{% endfor %}
+        </select>
+      </label>
+      <label class="field"><span>Koşul</span>
+        <select name="direction">{% for k, label in directions.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select>
+      </label>
+      {{ ui.money_field("Değer (₺)", "threshold", required=True, placeholder=(values.USD | num) if values.USD else "50") }}
+    </div>
+    <button class="btn primary">Alarm kur</button>
+    <p class="muted small">Kur iş günlerinde günde bir kez güncellenir; alarm tetiklenince Telegram'dan mesaj gelir ve alarm kapanır.</p>
+  </form>
+  {% if alerts %}
+    <ul class="rows">
+      {% for a in alerts %}
+        <li class="{{ '' if a.active else 'done' }}">
+          <div class="grow">
+            <div class="title">{{ names[a.currency] }} {{ a.threshold | num }} ₺ {{ directions[a.direction] }}</div>
+            <div class="meta">
+              {% if a.active %}<span class="badge good">Aktif</span>
+                {% if values.get(a.currency) %}<span>Şu an: {{ values[a.currency] | num }} ₺</span>{% endif %}
+              {% elif a.triggered_at %}<span class="badge soon">Tetiklendi</span><span>{{ a.triggered_at | localdt }} · {{ a.triggered_value | num }} ₺</span>
+              {% else %}<span class="badge">Kapalı</span>{% endif %}
+            </div>
+          </div>
+          <span class="actions">
+            {{ ui.post_button(url_for('rates.toggle_alert', alert_id=a.id), 'Kapat' if a.active else 'Tekrar kur') }}
+            {{ ui.delete_button(url_for('rates.delete_alert', alert_id=a.id), "✕", "Alarm silinsin mi?") }}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}

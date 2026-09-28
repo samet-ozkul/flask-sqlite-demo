@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Önemli Günler{% endblock %}
+{% block content %}
+{{ ui.page_header("🎂 Önemli Günler", "Doğum günleri, yıldönümleri — her yıl hatırlatılır") }}
+
+<div class="card">
+  <details class="add" {% if not rows %}open{% endif %}>
+    <summary>＋ Yeni gün</summary>
+    <form method="post" action="{{ url_for('specialdays.create') }}">
+      {{ ui.csrf() }}
+      <div class="form-row">
+        {{ ui.field("Ad", "name", required=True, placeholder="ör. Annemin doğum günü", attrs='maxlength="100"') }}
+        <label class="field">
+          <span>Tür</span>
+          <select name="kind">
+            {% for k, (label, icon) in kinds.items() %}<option value="{{ k }}">{{ icon }} {{ label }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+      <div class="form-row">
+        {{ ui.field("Tarih", "date", type="date", required=True) }}
+        <label class="field">
+          <span>Hatırlat</span>
+          <select name="notify_days">
+            {% for v, label in notify_options %}<option value="{{ v }}" {% if v == 7 %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+      {{ ui.checkbox("Yılı bilmiyorum / önemli değil (yaş hesaplanmaz)", "no_year") }}
+      {{ ui.field("Not", "note", placeholder="İsteğe bağlı: hediye fikri…", attrs='maxlength="500"') }}
+      <button class="btn primary">Ekle</button>
+    </form>
+  </details>
+</div>
+
+{% if rows %}
+  <div class="card">
+    <ul class="rows">
+      {% for r, nxt, days, ordinal in rows %}
+        <li>
+          <span class="ico">{{ kinds[r.kind][1] }}</span>
+          <a class="grow" href="{{ url_for('specialdays.edit', day_id=r.id) }}">
+            <div class="title">{{ r.name }}</div>
+            <div class="meta">
+              <span>{{ nxt.day }} {{ months[nxt.month - 1] }}</span>
+              {% if ordinal %}<span>{{ ordinal }}</span>{% endif %}
+              {% if r.note %}<span>{{ r.note }}</span>{% endif %}
+            </div>
+          </a>
+          <span class="badge {{ 'overdue' if days == 0 else ('soon' if days <= r.notify_days else '') }}">
+            {{ 'bugün 🎉' if days == 0 else ('yarın' if days == 1 else days ~ ' gün') }}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  {{ ui.empty("Henüz eklenmiş gün yok. Doğum günlerini ekle, unutma derdi bitsin.", "🎂") }}
+{% endif %}
+{% endblock %}
