@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Pano">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -22,6 +22,7 @@
           <a href="{{ url_for(endpoint) }}" class="{{ 'active' if request.endpoint and request.endpoint.split('.')[0] == endpoint.split('.')[0] }}" title="{{ title }}">{{ icon }}<span>{{ title }}</span></a>
         {% endfor %}
       </nav>
+      <a class="search-link" href="{{ url_for('search.index') }}" title="Ara" aria-label="Ara">🔍</a>
       <details class="usermenu">
         <summary aria-label="Kullanıcı menüsü">{{ (g.user.display_name or g.user.username)[:1] | upper }}</summary>
         <div class="usermenu-panel">
@@ -55,6 +56,6 @@
   </nav>
   {% endif %}
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=1" defer></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=2" defer></script>
 </body>
 </html>

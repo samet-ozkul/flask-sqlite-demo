@@ -326,6 +326,11 @@ MIGRATIONS = [
         PRIMARY KEY (user_id, category)
     );
     """,
+    # 7: telefon takvimine abonelik (ICS) için gizli adres
+    """
+    ALTER TABLE users ADD COLUMN calendar_token TEXT;
+    CREATE UNIQUE INDEX idx_users_calendar_token ON users(calendar_token);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

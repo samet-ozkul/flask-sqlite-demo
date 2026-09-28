@@ -82,7 +82,9 @@ p { margin: .4rem 0; }
 }
 .topnav a span { display: none; }
 .topnav a:hover, .topnav a.active { background: var(--surface-2); color: var(--text); text-decoration: none; }
-.usermenu { margin-left: auto; position: relative; }
+.search-link { margin-left: auto; font-size: 1.1rem; padding: 4px 6px; border-radius: 8px; }
+.search-link:hover { background: var(--surface-2); text-decoration: none; }
+.usermenu { position: relative; }
 .usermenu summary {
   list-style: none; cursor: pointer; width: 34px; height: 34px; border-radius: 50%;
   display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-weight: 700;

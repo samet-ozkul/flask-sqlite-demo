@@ -5,6 +5,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 
 | Grup | Modüller |
 |---|---|
+| 📅 Genel | **Takvim** (tüm tarihler tek takvimde, telefon takvimine abonelik) · **Arama** (tek kutudan tüm modüller, bottan `/ara`) |
 | 🏠 Pano | Günün özeti: hava durumu, döviz kuru, yaklaşan ödemeler/tarihler, bugünkü alışkanlıklar ve ilaçlar, hızlı harcama ve hızlı not |
 | 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) |
 | 💰 Para | **Harcamalar** (aylık özet, kategori grafiği, bütçe limiti, Excel/CSV) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) |
@@ -137,6 +138,8 @@ Webhook kuruluyken bota yazarak panoyu açmadan giriş yapabilirsin (`/yardim` h
 | `/yap fatura öde yarın 14:00` | Yapılacak ekler; sondaki *bugün, yarın, cuma, 25.12, 14:00, saat 9.30* anlaşılır ve zamanı gelince hatırlatılır |
 | `/liste` · `/liste market` | Açık maddeleri butonlarla gösterir; dokununca işaretlenir |
 | `/bugun` | Günün özeti |
+| `/rapor` · `/rapor bu ay` | Aylık rapor |
+| `/ara matkap` | Her yerde arama |
 | Link | Sonra Bak'a kaydedilir |
 | Fotoğraf / PDF | Hangi garantiye ya da nota ekleneceği sorulur (açıklama yazarsan yeni garantinin adı olur) |
 | Düz yazı | Not / alışveriş / yapılacak / harcama olarak ne yapılacağı sorulur |
@@ -177,6 +180,15 @@ cron-job.org'da saat dilimini **Europe/Istanbul** yapmayı unutma.
 - **Yönetim → Yedek → Tam yedek**: veritabanı + tüm dosyalar tek bir zip. Haftada bir indirmen önerilir.
 - **Sadece veritabanı**: küçük, hızlı. Telegram otomatik yedeği de bu türdendir.
 - **Geri yükle**: zip'i seç, `EVET` yaz. Tüm veriler yedektekiyle değişir; eski sürüm yedekleri otomatik güncel şemaya taşınır.
+
+## Telefon takvimine abonelik
+
+Ayarlar → **📅 Telefon takvimine abonelik** → *Takvim adresi oluştur*. Faturalar, abonelik yenilemeleri, randevular, yapılacaklar, araç tarihleri, garanti bitişleri ve önemli günler telefon takviminde görünür (son 60 gün ve gelecek 1 yıl; takvim uygulaması saatte bir günceller).
+
+- **iPhone:** “iPhone / Mac'te aç” butonu ya da Ayarlar → Takvim → Hesaplar → Abone Olunan Takvim Ekle.
+- **Google Takvim:** bilgisayardan calendar.google.com → Diğer takvimler **+** → *URL ile* → adresi yapıştır.
+
+Adres gizli bir anahtar içerir, giriş gerektirmez; kimseyle paylaşma. *Yeni adres oluştur* eski adresi geçersiz kılar, *Kapat* aboneliği tamamen kapatır.
 
 ## Telefona uygulama olarak ekleme
 

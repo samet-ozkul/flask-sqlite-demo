@@ -2,6 +2,10 @@
 {% block title %}Menü{% endblock %}
 {% block content %}
 <h1>Menü</h1>
+<form method="get" action="{{ url_for('search.index') }}" class="search" style="margin-top: 12px">
+  <input type="search" name="q" placeholder="Her yerde ara…">
+  <button class="btn">🔍</button>
+</form>
 {% for group, items in module_groups().items() %}
   <section class="menu-group">
     <h2>{{ group }}</h2>

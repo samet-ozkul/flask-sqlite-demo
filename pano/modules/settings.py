@@ -1,7 +1,7 @@
 """⚙️ Ayarlar: profil, şehir (hava durumu), şifre, Telegram bildirimleri."""
 import secrets
 
-from flask import Blueprint, flash, g, redirect, render_template, url_for
+from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 from werkzeug.security import check_password_hash
 
 from .. import external, telegram
@@ -62,6 +62,19 @@ def password():
         set_password(g.user["id"], new)
         flash("Şifre değiştirildi.", "success")
     return redirect(url_for(".index"))
+
+
+# ---------- Takvim aboneliği ----------
+@bp.route("/takvim", methods=["POST"])
+@login_required
+def calendar_feed():
+    if request.form.get("action") == "revoke":
+        execute("UPDATE users SET calendar_token = NULL WHERE id = ?", (g.user["id"],))
+        flash("Takvim aboneliği kapatıldı; eski adres artık çalışmaz.", "success")
+    else:
+        execute("UPDATE users SET calendar_token = ? WHERE id = ?", (secrets.token_urlsafe(24), g.user["id"]))
+        flash("Takvim adresi oluşturuldu. Eski bir adres varsa artık çalışmaz.", "success")
+    return redirect(url_for(".index") + "#takvim")
 
 
 # ---------- Telegram ----------
