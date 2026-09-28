@@ -343,6 +343,10 @@ MIGRATIONS = [
         used_at TEXT
     );
     """,
+    # 9: yapay zekâ (kullanıcı açmadıkça hiçbir veri sağlayıcıya gönderilmez)
+    """
+    ALTER TABLE users ADD COLUMN ai_enabled INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

@@ -66,6 +66,18 @@
           </div>
         </li>
       {% endif %}
+      <li style="flex-wrap: wrap">
+        <span class="grow">Yapay zekâ
+          {% if ai_config %}<br><span class="muted small">{{ ai_config.label }} · <code>{{ ai_config.model }}</code></span>
+          {% else %}<br><span class="muted small">{{ ai_missing }}</span>{% endif %}
+        </span>
+        {% if ai_config %}
+          <span class="badge good">Ayarlı</span>
+          <form method="post" action="{{ url_for('admin.ai_test') }}" class="inline" style="width: 100%; margin-top: 6px">
+            {{ ui.csrf() }}<button class="btn sm">Bağlantıyı test et</button>
+          </form>
+        {% else %}<span class="badge">Yok</span>{% endif %}
+      </li>
       <li><span class="grow">Cron adresi (günlük özet)</span>{% if cron_enabled %}<span class="badge good">Ayarlı</span>{% else %}<span class="badge">Yok</span>{% endif %}</li>
       <li><span class="grow">Herkese açık kayıt</span>{% if registration %}<span class="badge soon">Açık</span>{% else %}<span class="badge good">Kapalı</span>{% endif %}</li>
     </ul>

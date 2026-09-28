@@ -11,13 +11,14 @@ Buton verisi (callback_data):
 import json
 import logging
 import secrets
+import time
 
 from flask import Blueprint, abort, jsonify, request
 
 from .. import bot_commands, scheduled, telegram
 from .. import todo_reminders as todo
 from ..auth import csrf_exempt
-from ..db import execute, query, query_one
+from ..db import execute, get_db, query, query_one
 from ..todo_reminders import done_buttons, undo_buttons
 
 bp = Blueprint("bot", __name__, url_prefix="/telegram")
@@ -32,6 +33,9 @@ def webhook():
     if not secrets.compare_digest(given, telegram.webhook_secret()):
         abort(403)
     update = request.get_json(silent=True) or {}
+    # Telegram cevap gecikirse (yapay zekâ çağrısı) aynı güncellemeyi tekrar gönderebilir: bir kez işle
+    if update.get("update_id") is not None and not _first_time(update["update_id"]):
+        return jsonify(ok=True)
     try:
         if "callback_query" in update:
             _handle_callback(update["callback_query"])
@@ -41,6 +45,14 @@ def webhook():
         # Telegram hata alırsa aynı güncellemeyi tekrar tekrar gönderir; kaydet ve her durumda 200 dön
         logging.getLogger(__name__).exception("Telegram güncellemesi işlenemedi")
     return jsonify(ok=True)
+
+
+def _first_time(update_id):
+    db = get_db()
+    cur = db.execute("INSERT OR IGNORE INTO cache (key, value, expires_at) VALUES (?, '1', ?)",
+                     (f"tg:update:{update_id}", time.time() + 2 * 86400))
+    db.commit()
+    return cur.rowcount == 1
 
 
 def _handle_message(msg):

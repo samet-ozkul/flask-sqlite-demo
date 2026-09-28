@@ -51,6 +51,24 @@
   {% endif %}
 </section>
 
+<section class="card" id="yapay-zeka">
+  <h2>🤖 Yapay zekâ</h2>
+  {% if not ai_config %}
+    <p class="muted">Yönetici henüz bir yapay zekâ sağlayıcısı ayarlamamış (<code>AI_PROVIDER</code>, <code>AI_API_KEY</code>).</p>
+  {% else %}
+    <p class="muted small">Açınca: fiş/fatura fotoğrafından tutar ve kategori okunur, bota düz yazı yazdığında
+      (“yarın 3'te dişçiyi ara”, “markete 250 verdim”) ne kaydedileceğini kendisi anlar, <code>/sor</code> ile verilerine soru sorabilirsin.</p>
+    <p class="flash warning small">Bu özellikler kullanıldığında gönderdiğin fotoğraf, mesaj ve soruyu cevaplamak için
+      verilerinin kısa bir özeti (harcamalar, yaklaşan ödemeler, listeler, son notlar vb.)
+      <b>{{ ai_config.label }}</b> sunucularına gönderilir. Model: <code>{{ ai_config.model }}</code>.</p>
+    <form method="post" action="{{ url_for('settings.ai_toggle') }}">
+      {{ ui.csrf() }}
+      {{ ui.checkbox("Yapay zekâ özelliklerini kullan", "ai_enabled", g.user.ai_enabled) }}
+      <button class="btn">Kaydet</button>
+    </form>
+  {% endif %}
+</section>
+
 <section class="card" id="takvim">
   <h2>📅 Telefon takvimine abonelik</h2>
   <p class="muted small">Faturalar, abonelikler, randevular, yapılacaklar, araç tarihleri ve önemli günler telefonundaki takvimde görünür; takvim uygulaması saatte bir günceller.</p>

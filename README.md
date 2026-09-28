@@ -116,6 +116,11 @@ Sonra 3. adımdaki **Static files** ayarını ekle, WSGI dosyasına yeni değiş
 | `STORAGE_QUOTA_MB` | – | Veritabanı + dosyalar için üst sınır (varsayılan 350) |
 | `ALLOW_REGISTRATION` | – | `1` ise herkes kayıt olabilir (varsayılan kapalı) |
 | `APP_TZ` | – | Saat dilimi (varsayılan `Europe/Istanbul`) |
+| `AI_PROVIDER` | – | Yapay zekâ sağlayıcısı: `anthropic`, `mistral`, `openai`, `openrouter`, `groq`, `deepseek`, `openai-compatible` |
+| `AI_API_KEY` | – | Sağlayıcının API anahtarı |
+| `AI_MODEL` | – | Model (verilmezse `anthropic` → `claude-opus-5`, `mistral` → `mistral-medium-latest`; diğerlerinde gerekli) |
+| `AI_BASE_URL` | – | Sadece `openai-compatible` için (ör. yerel Ollama `http://localhost:11434/v1`) |
+| `AI_EFFORT` | – | Claude'da düşünme derinliği `low` / `medium` / `high` (varsayılan `medium`) |
 | `REMINDER_DEFAULT_TIME` | – | Saati girilmemiş yapılacaklar için hatırlatma saati (varsayılan `09:00`) |
 | `DATABASE_PATH`, `UPLOAD_DIR` | – | Varsayılan: proje klasöründe `app.db` ve `uploads/` |
 
@@ -181,6 +186,26 @@ cron-job.org'da saat dilimini **Europe/Istanbul** yapmayı unutma.
 - **Yönetim → Yedek → Tam yedek**: veritabanı + tüm dosyalar tek bir zip. Haftada bir indirmen önerilir.
 - **Sadece veritabanı**: küçük, hızlı. Telegram otomatik yedeği de bu türdendir.
 - **Geri yükle**: zip'i seç, `EVET` yaz. Tüm veriler yedektekiyle değişir; eski sürüm yedekleri otomatik güncel şemaya taşınır.
+
+## Yapay zekâ (isteğe bağlı)
+
+Sağlayıcıdan bağımsızdır; ek paket kurmaz. Claude kendi API'siyle, diğerleri (Mistral, OpenAI, OpenRouter, Groq, DeepSeek, Ollama…) OpenAI uyumlu API ile bağlanır. Hepsi PythonAnywhere ücretsiz izin listesinde (Google Gemini'nin kendi adresi değil; OpenRouter üzerinden kullanılabilir).
+
+WSGI dosyasına örnek:
+```python
+os.environ["AI_PROVIDER"] = "mistral"          # ya da "anthropic"
+os.environ["AI_API_KEY"] = "SAĞLAYICI_ANAHTARI"
+# os.environ["AI_MODEL"] = "mistral-small-latest"   # isteğe bağlı
+```
+Yönetim → Durum → **Bağlantıyı test et** ile kontrol et. Her kullanıcı **Ayarlar → 🤖 Yapay zekâ**'dan kendisi açar; açmayan kullanıcının hiçbir verisi sağlayıcıya gönderilmez.
+
+| Özellik | Nasıl |
+|---|---|
+| Fişten harcama / fatura | Bota fotoğraf → **🧾 Fişi oku** → tutar, mağaza, tarih, kategori (faturada son ödeme tarihi) okunur, tek dokunuşla kaydedilir. Web'de Harcamalar → **📷 Fişten ekle** |
+| Doğal dil | Bota düz yazı: “yarın 3'te dişçiyi ara”, “markete 250 verdim”, “perşembe 14:30 diş randevum var”, “süt ve ekmek almam lazım” → onay kartı → **✅ Kaydet** |
+| Soru sor | “bu ay markete ne kadar harcadım?” ya da `/sor ...` → verilerinin kısa özetinden cevap |
+
+Soru cevaplarken harcamalar, yaklaşan ödemeler, listeler, alışkanlıklar, son ölçümler ve son notların kısa bir özeti sağlayıcıya gönderilir. Maliyet sağlayıcı ve modele göre değişir (Claude Opus 5'te fiş başına yaklaşık 1-2 sent).
 
 ## Telefon takvimine abonelik
 
