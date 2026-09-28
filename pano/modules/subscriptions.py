@@ -4,6 +4,7 @@ from datetime import timedelta
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
 from .. import external
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query
 from ..reminders import advance_subscriptions
@@ -169,6 +170,6 @@ def toggle(sub_id):
 def delete(sub_id):
     uid = g.user["id"]
     sub = owned_or_404("subscriptions", sub_id, uid)
-    execute("DELETE FROM subscriptions WHERE id = ? AND user_id = ?", (sub_id, uid))
-    flash(f"{sub['name']} aboneliği silindi.", "success")
+    trash.move(uid, "subscriptions", f"🔁 {sub['name']}", ("subscriptions", sub_id))
+    flash(trash.notice(f"{sub['name']} aboneliği"), "success")
     return redirect(url_for(".index"))

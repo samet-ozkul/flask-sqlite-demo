@@ -10,6 +10,7 @@ from datetime import date, timedelta
 
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
 from ..utils import (MONTHS_TR, WEEKDAYS_TR_SHORT, add_months, fmt_date, form_choice, form_str, local_dt,
@@ -237,7 +238,7 @@ def archive(habit_id):
 @login_required
 def delete(habit_id):
     habit = owned_or_404("habits", habit_id, g.user["id"])
-    execute("DELETE FROM habit_logs WHERE habit_id = ?", (habit_id,))
-    execute("DELETE FROM habits WHERE id = ? AND user_id = ?", (habit_id, g.user["id"]))
-    flash(f"{habit['name']} silindi.", "success")
+    trash.move(g.user["id"], "habits", f"{habit['icon']} {habit['name']}", ("habits", habit_id),
+               children=[("habit_logs", "habit_id = ?")])
+    flash(trash.notice(habit["name"]), "success")
     return redirect(url_for("habits.index"))

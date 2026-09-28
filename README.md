@@ -11,14 +11,15 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 | 💰 Para | **Harcamalar** (aylık özet, kategori grafiği, bütçe limiti, Excel/CSV) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) · **Varlıklar** (nakit, döviz, altın; güncel TL değeri ve 90 günlük grafik) · **Hedefler** (birikim hedefi, ayda ne kadar, tahmini bitiş) · **Ortak Harcama** (Splitwise benzeri: kim ne ödedi, kim kime borçlu) |
 | 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) · **Belgeler** (pasaport, ehliyet, kimlik, ruhsat, poliçe bitiş tarihleri; 1 hafta–6 ay önceden Telegram hatırlatması) |
 | 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Günlük** (her gün bir satır ve ruh hali emojisi, ay takvimi, “1 yıl önce bugün”, akşam Telegram'dan “Bugün nasıldı?”) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) · **İzleme / Okuma** (film, dizi, kitap listesi; kapaklı arama, puan) |
-| ⚙️ Altyapı | Kullanıcı yönetimi, tek tıkla yedek al/geri yükle, disk kullanımı, Telegram günlük özeti, telefona uygulama olarak yükleme (PWA) |
+| ⚙️ Altyapı | Kullanıcı yönetimi, tek tıkla yedek al/geri yükle, disk kullanımı, Telegram günlük özeti, telefona uygulama olarak yükleme (PWA) · **Çöp kutusu** (silinen kayıt 30 gün saklanır, tek tıkla geri gelir) · **Tema** (otomatik / açık / koyu) · **Pano düzeni** (kartları seç ve sırala) |
 
 ## 512 MB disk nasıl korunuyor?
 
 - Fotoğraflar en fazla 1600 px'e küçültülüp JPEG olarak kaydedilir (tipik fatura fotoğrafı 3-5 MB → ~250 KB), konum (EXIF/GPS) bilgisi silinir. Listelerde ~30 KB'lık küçük önizleme gösterilir.
 - PDF en fazla 3 MB. Veritabanı + dosyalar toplamı `STORAGE_QUOTA_MB`'yi (varsayılan 350) aşınca yükleme reddedilir.
 - Yedekler sunucuda **saklanmaz**: indirilir ya da Telegram'a gönderilir.
-- Yönetim → **Temizlik**: sahipsiz dosyaları siler, veritabanını sıkıştırır (VACUUM).
+- Silinen kayıtların ek dosyaları çöp kutusunda 30 gün durur, sonra günlük cron ile kalıcı silinir; acele varsa **Çöp kutusu → Boşalt**.
+- Yönetim → **Temizlik**: sahipsiz dosyaları siler (çöp kutusundakilere dokunmaz), veritabanını sıkıştırır (VACUUM).
 - Yönetim sayfası tüm ev klasörünü ölçebilir; pip önbelleği şişerse `rm -rf ~/.cache/pip`.
 
 ## Güvenlik
@@ -161,7 +162,7 @@ PythonAnywhere ücretsiz planında zamanlanmış görev yok. Bunun yerine [cron-
 
 | Görev | Adres | Önerilen zaman |
 |---|---|---|
-| Günlük özet (hava, yaklaşan ödemeler, randevular, ilaçlar) | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/gunluk` | Her gün 08:00 (`0 8 * * *`) |
+| Günlük özet (hava, yaklaşan ödemeler, randevular, ilaçlar) + 30 günü dolan çöpü temizleme | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/gunluk` | Her gün 08:00 (`0 8 * * *`) |
 | Yapılacak, fatura, belge, ilaç, günlük hatırlatmaları ve akşam hava uyarısı | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
 | Veritabanı yedeğini yöneticilere Telegram'dan gönder | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/yedek` | Haftada bir, Pazar 03:00 (`0 3 * * 0`) |
 

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Çöp kutusu{% endblock %}
+{% block content %}
+{% call ui.page_header("🗑️ Çöp kutusu", "Silinen kayıtlar " ~ keep_days ~ " gün saklanır, sonra kendiliğinden silinir") %}
+  {% if items %}{{ ui.delete_button(url_for('trashbin.empty'), "Boşalt", "Çöp kutusundaki her şey kalıcı olarak silinsin mi?", small=True) }}{% endif %}
+{% endcall %}
+
+{% if items %}
+  <div class="card">
+    <ul class="rows">
+      {% for it in items %}
+        <li>
+          <div class="grow">
+            <div class="title">{{ it.label }}</div>
+            <div class="meta"><span>Silindi: {{ it.deleted_at | localdt }}</span><span>{{ it.left }} gün sonra kalıcı silinir</span></div>
+          </div>
+          <span class="actions">
+            {{ ui.post_button(url_for('trashbin.restore', trash_id=it.id), "↩️ Geri getir", "ok") }}
+            {{ ui.delete_button(url_for('trashbin.delete', trash_id=it.id), "✕", "Kalıcı olarak silinsin mi?") }}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  {{ ui.empty("Çöp kutusu boş.", "🗑️") }}
+{% endif %}
+{% endblock %}

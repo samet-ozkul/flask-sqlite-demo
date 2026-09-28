@@ -16,6 +16,7 @@ from flask import Blueprint, abort, flash, g, redirect, render_template, request
 
 from .. import telegram
 from .. import todo_reminders as todo
+from .. import trash
 from ..auth import login_required
 from ..db import execute, get_db, query, query_one
 from ..utils import form_bool, form_choice, form_date, form_str, redirect_back
@@ -288,8 +289,9 @@ def delete_item(item_id):
     item = _item_or_404(item_id, uid)
     if not _can_edit(item, uid):
         abort(403)
-    execute("DELETE FROM list_items WHERE id = ?", (item_id,))
-    flash("Madde silindi.", "success")
+    lst = query_one("SELECT name FROM lists WHERE id = ?", (item["list_id"],))
+    trash.move(uid, "lists", f"☑️ {item['text']} ({lst['name']})", ("list_items", item_id))
+    flash(trash.notice("Madde"), "success")
     return redirect_back("lists.detail", list_id=item["list_id"])
 
 
@@ -324,9 +326,6 @@ def update(list_id):
 def delete(list_id):
     uid = g.user["id"]
     lst = list_or_404(list_id, uid, owner_only=True)
-    db = get_db()
-    db.execute("DELETE FROM list_items WHERE list_id = ?", (list_id,))
-    db.execute("DELETE FROM lists WHERE id = ? AND user_id = ?", (list_id, uid))
-    db.commit()
-    flash(f"“{lst['name']}” listesi silindi.", "success")
+    trash.move(uid, "lists", f"🛒 {lst['name']} listesi", ("lists", list_id), children=[("list_items", "list_id = ?")])
+    flash(trash.notice(f"“{lst['name']}” listesi"), "success")
     return redirect(url_for("lists.index"))

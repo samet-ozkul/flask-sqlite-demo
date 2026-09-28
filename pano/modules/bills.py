@@ -1,6 +1,7 @@
 """🧾 Faturalar: son ödeme tarihi, her ay tekrarlanan faturalar, ödenince harcamaya ekleme."""
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, get_db, owned_or_404, query, query_one
 from ..reminders import next_bill_date
@@ -169,6 +170,6 @@ def unpay(bill_id):
 def delete(bill_id):
     uid = g.user["id"]
     bill = owned_or_404("bills", bill_id, uid)
-    execute("DELETE FROM bills WHERE id = ? AND user_id = ?", (bill_id, uid))
-    flash(f"{bill['name']} faturası silindi.", "success")
+    trash.move(uid, "bills", f"🧾 {bill['name']} ({fmt_date(bill['due_date'])})", ("bills", bill_id))
+    flash(trash.notice(f"{bill['name']} faturası"), "success")
     return redirect(url_for(".index", sekme="odenen") if bill["paid"] else url_for(".index"))

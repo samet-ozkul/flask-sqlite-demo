@@ -20,6 +20,7 @@
   <h2>Hesap</h2>
   <div class="tiles">
     <a class="tile" href="{{ url_for('settings.index') }}"><span>⚙️</span>Ayarlar</a>
+    <a class="tile" href="{{ url_for('trashbin.index') }}"><span>🗑️</span>Çöp kutusu</a>
     {% if g.user.is_admin %}
       <a class="tile" href="{{ url_for('admin.index') }}"><span>🛠️</span>Yönetim</a>
       <a class="tile" href="{{ url_for('admin.backup') }}"><span>💾</span>Yedek</a>

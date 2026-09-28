@@ -4,9 +4,10 @@ Bitişe 30 gün kala pano ve Telegram özetinde hatırlatılır (reminders.py).
 """
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query
-from ..storage import attachments_for, delete_for, first_thumbs
+from ..storage import attachments_for, first_thumbs
 from ..utils import add_months, form_date, form_float, form_int, form_str, parse_date, today_str
 
 bp = Blueprint("warranty", __name__, url_prefix="/garanti")
@@ -138,7 +139,6 @@ def detail(warranty_id):
 @login_required
 def delete(warranty_id):
     w = owned_or_404("warranties", warranty_id, g.user["id"])
-    delete_for("warranty", warranty_id)
-    execute("DELETE FROM warranties WHERE id = ? AND user_id = ?", (warranty_id, g.user["id"]))
-    flash(f"{w['product']} silindi.", "success")
+    trash.move(g.user["id"], "warranty", f"🛡️ {w['product']}", ("warranties", warranty_id), entity="warranty")
+    flash(trash.notice(w["product"]), "success")
     return redirect(url_for(".index"))

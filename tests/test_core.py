@@ -174,10 +174,12 @@ def test_uploads_and_quota(app):
     with app.app_context():
         from pano.db import query_one
         assert query_one("SELECT COUNT(*) AS n FROM attachments WHERE entity_id = ?", (nid,))["n"] == 1
-    # not silinince ek dosyaları da silinir
+    # not silinince çöp kutusuna gider; ek dosyaları kutu boşaltılınca silinir
     path = os.path.join(app.config["UPLOAD_DIR"], att["filename"])
     assert os.path.exists(path)
     c.post(f"/notlar/{nid}/sil")
+    assert os.path.exists(path)
+    c.post("/cop-kutusu/bosalt")
     assert not os.path.exists(path)
     print("  uploads/quota OK")
 

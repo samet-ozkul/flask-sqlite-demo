@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="tr">
+<html lang="tr"{% if g.user and g.user.theme in ("light", "dark") %} data-theme="{{ g.user.theme }}"{% endif %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Pano">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -28,6 +28,14 @@
         <div class="usermenu-panel">
           <div class="muted small">{{ g.user.display_name or g.user.username }}</div>
           <a href="{{ url_for('settings.index') }}">⚙️ Ayarlar</a>
+          <a href="{{ url_for('trashbin.index') }}">🗑️ Çöp kutusu</a>
+          {% set theme = g.user.theme if g.user.theme in THEMES else 'auto' %}
+          <form method="post" action="{{ url_for('settings.theme') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <input type="hidden" name="theme" value="{{ THEME_NEXT[theme] }}">
+            <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+            <button class="linklike" title="Temayı değiştir">{{ THEMES[theme] }}</button>
+          </form>
           {% if g.user.is_admin %}<a href="{{ url_for('admin.index') }}">🛠️ Yönetim</a>{% endif %}
           <form method="post" action="{{ url_for('auth.logout') }}">
             <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
@@ -56,6 +64,6 @@
   </nav>
   {% endif %}
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=2" defer></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=3" defer></script>
 </body>
 </html>

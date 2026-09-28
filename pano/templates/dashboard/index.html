@@ -11,8 +11,10 @@
   <div class="flash warning">Depolama alanının %{{ disk.percent }}'i dolu ({{ disk.used | size }} / {{ disk.quota | size }}). <a href="{{ url_for('admin.backup') }}">Yedek al ve temizle</a></div>
 {% endif %}
 
-<div class="grid two">
-  {# ---------- Hava durumu ---------- #}
+{# Kartlar Ayarlar → Pano düzeni'nde seçilen sırayla #}
+<div class="grid two dash">
+{% for card in cards %}
+  {% if card == 'weather' %}
   <section class="card">
     <h2>Hava durumu {% if g.user.city %}<span class="muted small">{{ g.user.city }}</span>{% endif %}</h2>
     {% if weather %}
@@ -38,7 +40,7 @@
     {% endif %}
   </section>
 
-  {# ---------- Kurlar ---------- #}
+  {% elif card == 'rates' %}
   <section class="card">
     <h2>Kurlar <a class="more" href="{{ url_for('rates.index') }}">Grafik ve alarm →</a></h2>
     {% if rates %}
@@ -53,28 +55,26 @@
       <p class="muted">Kurlar şu an alınamadı.</p>
     {% endif %}
   </section>
-</div>
 
-{# ---------- Yaklaşanlar ---------- #}
-<section class="card" style="margin-top: 14px">
-  <h2>Yaklaşanlar <span class="muted small">7 gün · araç ve garanti 30 gün</span></h2>
-  {% if upcoming %}
-    <ul class="rows">
-      {% for it in upcoming %}
-        <li>
-          <span class="ico">{{ it.icon }}</span>
-          <a class="grow" href="{{ it.url }}"><div class="title">{{ it.title }}</div>{% if it.detail %}<div class="meta">{{ it.detail }}</div>{% endif %}</a>
-          <span class="badge {{ it.date | urgency(3 if it.icon not in ['🚗', '🛡️'] else 7) }}">{{ it.date | rel_days }}</span>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    {{ ui.empty("Yaklaşan ödeme, randevu veya son tarih yok.", "🎉") }}
-  {% endif %}
-</section>
+  {% elif card == 'upcoming' %}
+  <section class="card wide">
+    <h2>Yaklaşanlar <span class="muted small">7 gün · araç ve garanti 30 gün</span></h2>
+    {% if upcoming %}
+      <ul class="rows">
+        {% for it in upcoming %}
+          <li>
+            <span class="ico">{{ it.icon }}</span>
+            <a class="grow" href="{{ it.url }}"><div class="title">{{ it.title }}</div>{% if it.detail %}<div class="meta">{{ it.detail }}</div>{% endif %}</a>
+            <span class="badge {{ it.date | urgency(3 if it.icon not in ['🚗', '🛡️'] else 7) }}">{{ it.date | rel_days }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      {{ ui.empty("Yaklaşan ödeme, randevu veya son tarih yok.", "🎉") }}
+    {% endif %}
+  </section>
 
-<div class="grid two">
-  {# ---------- Bugün ---------- #}
+  {% elif card == 'today' %}
   <section class="card">
     <h2>Bugün <a class="more" href="{{ url_for('habits.index') }}">Alışkanlıklar →</a></h2>
     {% if habits %}
@@ -109,7 +109,7 @@
     {% endif %}
   </section>
 
-  {# ---------- Yapılacaklar ---------- #}
+  {% elif card == 'todos' %}
   <section class="card">
     <h2>Yapılacaklar <a class="more" href="{{ url_for('lists.index') }}">Listeler →</a></h2>
     {% if todos %}
@@ -132,10 +132,28 @@
       <p><a href="{{ url_for('lists.detail', list_id=s.id) }}">🛒 {{ s.name }}</a> <span class="pill-count">{{ s.open_count }} ürün</span></p>
     {% endfor %}
   </section>
-</div>
 
-{# ---------- Hızlı ekle ---------- #}
-<div class="grid two" style="margin-top: 14px">
+  {% elif card == 'money' and money %}
+  <section class="card">
+    <h2>💰 Varlıklar ve hedefler <a class="more" href="{{ url_for('assets.index' if money.assets else 'goals.index') }}">Ayrıntı →</a></h2>
+    {% if money.assets %}
+      <p><span class="muted small">Toplam varlık</span><br><b style="font-size: 1.5rem">{{ money.assets.total | money }}</b>
+        {% if money.assets.missing %}<span class="muted small"> · {{ money.assets.missing }} varlığın fiyatı alınamadı</span>{% endif %}</p>
+    {% endif %}
+    {% if money.goals %}
+      <div class="bars">
+        {% for gl in money.goals %}
+          <div class="bar-row">
+            <a class="bar-label" href="{{ url_for('goals.detail', goal_id=gl.goal.id) }}">{{ gl.goal.icon }} {{ gl.goal.name }}</a>
+            <span class="bar-track"><span class="bar-fill" style="width: {{ [gl.pct, 100] | min | round(1) }}%"></span></span>
+            <span class="bar-value">%{{ gl.pct | int }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+
+  {% elif card == 'quick_expense' %}
   <section class="card">
     <h2>💸 Hızlı harcama <a class="more" href="{{ url_for('expenses.index') }}">{{ month_name }}: {{ month_spent | money }}</a></h2>
     <form method="post" action="{{ url_for('expenses.create') }}">
@@ -157,6 +175,7 @@
     {% endif %}
   </section>
 
+  {% elif card == 'quick_note' %}
   <section class="card">
     <h2>📝 Hızlı not</h2>
     <form method="post" action="{{ url_for('notes.create') }}">
@@ -168,14 +187,21 @@
       </div>
     </form>
   </section>
+
+  {% elif card == 'modules' %}
+  <section class="wide" style="margin-top: 4px">
+    <div class="tiles">
+      {% for _m, endpoint, title, icon, _g in MODULES %}
+        <a class="tile" href="{{ url_for(endpoint) }}"><span>{{ icon }}</span>{{ title }}</a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+{% endfor %}
 </div>
 
-{# ---------- Modüller ---------- #}
-<section style="margin-top: 18px">
-  <div class="tiles">
-    {% for _m, endpoint, title, icon, _g in MODULES %}
-      <a class="tile" href="{{ url_for(endpoint) }}"><span>{{ icon }}</span>{{ title }}</a>
-    {% endfor %}
-  </div>
-</section>
+{% if not cards %}
+  {{ ui.empty("Panoda hiç kart seçili değil.", "🧩") }}
+{% endif %}
+<p class="muted small" style="text-align: center; margin-top: 18px"><a href="{{ url_for('settings.index') }}#pano-duzeni">🧩 Panoyu düzenle</a></p>
 {% endblock %}

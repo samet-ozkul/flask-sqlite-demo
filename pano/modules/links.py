@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from flask import Blueprint, flash, g, render_template, request
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
 from ..utils import form_bool, form_str, normalize_tags, redirect_back
@@ -177,7 +178,7 @@ def edit(link_id):
 @bp.route("/<int:link_id>/sil", methods=["POST"])
 @login_required
 def delete(link_id):
-    owned_or_404("links", link_id, g.user["id"])
-    execute("DELETE FROM links WHERE id = ? AND user_id = ?", (link_id, g.user["id"]))
-    flash("Link silindi.", "success")
+    link = owned_or_404("links", link_id, g.user["id"])
+    trash.move(g.user["id"], "links", "🔖 " + (link["title"] or link["url"]), ("links", link_id))
+    flash(trash.notice("Link"), "success")
     return redirect_back("links.index")

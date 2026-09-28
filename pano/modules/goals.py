@@ -11,6 +11,7 @@ import math
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
 from ..utils import (MONTHS_TR, add_months, fmt_money, form_choice, form_date, form_float, form_str,
@@ -289,9 +290,9 @@ def edit(goal_id):
 def delete(goal_id):
     uid = g.user["id"]
     goal = owned_or_404("goals", goal_id, uid)
-    execute("DELETE FROM goal_entries WHERE goal_id = ?", (goal_id,))
-    execute("DELETE FROM goals WHERE id = ? AND user_id = ?", (goal_id, uid))
-    flash(f"{goal['icon']} {goal['name']} silindi.", "success")
+    trash.move(uid, "goals", f"{goal['icon']} {goal['name']}", ("goals", goal_id),
+               children=[("goal_entries", "goal_id = ?")])
+    flash(trash.notice(f"{goal['icon']} {goal['name']}"), "success")
     return redirect(url_for("goals.index"))
 
 
