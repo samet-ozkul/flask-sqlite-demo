@@ -114,6 +114,21 @@ def test_claude_request():
     print("  Claude request OK")
 
 
+def test_gemini_preset():
+    set_env(AI_PROVIDER="gemini", AI_API_KEY="AIza-test")
+    cfg = ai.config()
+    assert (cfg["model"], cfg["style"]) == ("gemini-flash-latest", "openai")
+    REPLIES.append({"choices": [{"message": {"content": "Merhaba"}, "finish_reason": "stop"}]})
+    with app.app_context():
+        assert ai.complete_text("sistem", "selam") == "Merhaba"
+    url, headers, body = REQUESTS[-1]
+    assert url == "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    assert headers["Authorization"] == "Bearer AIza-test" and body["model"] == "gemini-flash-latest"
+    set_env(AI_PROVIDER="gemini", AI_API_KEY="AIza-test", AI_MODEL="gemini-flash-lite-latest")
+    assert ai.config()["model"] == "gemini-flash-lite-latest"
+    print("  gemini preset OK")
+
+
 def test_mistral_request():
     set_env(AI_PROVIDER="mistral", AI_API_KEY="ms-key")
     REPLIES.append(openai_reply({"x": 3}))
@@ -331,6 +346,7 @@ def test_web():
 if __name__ == "__main__":
     test_config()
     test_claude_request()
+    test_gemini_preset()
     test_mistral_request()
     test_telegram_receipt()
     test_natural_language()

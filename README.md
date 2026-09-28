@@ -119,9 +119,9 @@ Sonra 3. adımdaki **Static files** ayarını ekle, WSGI dosyasına yeni değiş
 | `STORAGE_QUOTA_MB` | – | Veritabanı + dosyalar için üst sınır (varsayılan 350) |
 | `ALLOW_REGISTRATION` | – | `1` ise herkes kayıt olabilir (varsayılan kapalı) |
 | `APP_TZ` | – | Saat dilimi (varsayılan `Europe/Istanbul`) |
-| `AI_PROVIDER` | – | Yapay zekâ sağlayıcısı: `anthropic`, `mistral`, `openai`, `openrouter`, `groq`, `deepseek`, `openai-compatible` |
+| `AI_PROVIDER` | – | Yapay zekâ sağlayıcısı: `anthropic`, `mistral`, `gemini`, `openai`, `openrouter`, `groq`, `deepseek`, `openai-compatible` |
 | `AI_API_KEY` | – | Sağlayıcının API anahtarı |
-| `AI_MODEL` | – | Model (verilmezse `anthropic` → `claude-opus-5`, `mistral` → `mistral-medium-latest`; diğerlerinde gerekli) |
+| `AI_MODEL` | – | Model (verilmezse `anthropic` → `claude-opus-5`, `mistral` → `mistral-medium-latest`, `gemini` → `gemini-flash-latest`; diğerlerinde gerekli) |
 | `AI_BASE_URL` | – | Sadece `openai-compatible` için (ör. yerel Ollama `http://localhost:11434/v1`) |
 | `AI_EFFORT` | – | Claude'da düşünme derinliği `low` / `medium` / `high` (varsayılan `medium`) |
 | `REMINDER_DEFAULT_TIME` | – | Saati girilmemiş yapılacaklar için hatırlatma saati (varsayılan `09:00`) |
@@ -201,14 +201,15 @@ cron-job.org'da saat dilimini **Europe/Istanbul** yapmayı unutma.
 
 ## Yapay zekâ (isteğe bağlı)
 
-Sağlayıcıdan bağımsızdır; ek paket kurmaz. Claude kendi API'siyle, diğerleri (Mistral, OpenAI, OpenRouter, Groq, DeepSeek, Ollama…) OpenAI uyumlu API ile bağlanır. Hepsi PythonAnywhere ücretsiz izin listesinde (Google Gemini'nin kendi adresi değil; OpenRouter üzerinden kullanılabilir).
+Sağlayıcıdan bağımsızdır; ek paket kurmaz. Claude kendi API'siyle, diğerleri (Mistral, Google Gemini, OpenAI, OpenRouter, Groq, DeepSeek, Ollama…) OpenAI uyumlu API ile bağlanır. Hepsi PythonAnywhere ücretsiz izin listesinde (Gemini `.googleapis.com` kaydıyla).
 
 WSGI dosyasına örnek:
 ```python
-os.environ["AI_PROVIDER"] = "mistral"          # ya da "anthropic"
+os.environ["AI_PROVIDER"] = "gemini"           # ya da "mistral", "anthropic"
 os.environ["AI_API_KEY"] = "SAĞLAYICI_ANAHTARI"
-# os.environ["AI_MODEL"] = "mistral-small-latest"   # isteğe bağlı
+# os.environ["AI_MODEL"] = "gemini-flash-lite-latest"   # isteğe bağlı
 ```
+**Google Gemini:** anahtar [Google AI Studio → API Keys](https://aistudio.google.com/apikey)'ten alınır; ücretsiz katmanda dakikalık/günlük istek sınırı vardır. Ücretsiz katmanda gönderilen içerik Google tarafından ürün geliştirmede kullanılabilir; bunu istemiyorsan faturalandırmayı aç ya da başka sağlayıcı seç.
 Yönetim → Durum → **Bağlantıyı test et** ile kontrol et. Her kullanıcı **Ayarlar → 🤖 Yapay zekâ**'dan kendisi açar; açmayan kullanıcının hiçbir verisi sağlayıcıya gönderilmez.
 
 | Özellik | Nasıl |
