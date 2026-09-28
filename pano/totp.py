@@ -62,10 +62,14 @@ def provisioning_uri(secret, account):
 
 
 def qr_svg(data):
-    """Beyaz zeminli SVG QR (koyu temada da okunur)."""
+    """Beyaz zeminli, ölçeklenebilir SVG QR (koyu temada da okunur).
+
+    omitsize: sabit width/height yerine viewBox yazılır; yoksa CSS küçültmek yerine kırpar
+    (uzun kullanıcı adında QR büyüyüp kutuya sığmayınca köşeler kesiliyordu).
+    """
     buf = io.BytesIO()
-    segno.make(data, error="m").save(buf, kind="svg", scale=5, border=3, dark="#000", light="#fff",
-                                     xmldecl=False, svgclass="qr")
+    segno.make(data, error="m").save(buf, kind="svg", scale=5, border=4, dark="#000", light="#fff",
+                                     xmldecl=False, svgclass="qr", omitsize=True)
     return buf.getvalue().decode("utf-8")
 
 

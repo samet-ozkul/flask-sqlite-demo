@@ -38,7 +38,10 @@ def test_rfc6238_vectors():
     code = totp.code_now(secret, at=now)
     assert totp.verify(secret, f"{code[:3]} {code[3:]}", at=now) == now // 30  # boşluklu yazım
     assert "otpauth://totp/" in totp.provisioning_uri(secret, "admin") and "issuer=" in totp.provisioning_uri(secret, "admin")
-    assert totp.qr_svg("x").startswith("<svg")
+    svg = totp.qr_svg(totp.provisioning_uri(secret, "cok.uzun.bir.kullanici_adi"))
+    head = re.search(r"<svg[^>]*>", svg).group(0)
+    # Sabit boyut olursa CSS küçültmek yerine kırpar: viewBox olmalı, width/height olmamalı
+    assert svg.startswith("<svg") and "viewBox=" in head and "width=" not in head and "height=" not in head
     print("  RFC 6238 OK")
 
 
