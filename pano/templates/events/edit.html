@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ e.title }}{% endblock %}
+{% block content %}
+{% call ui.page_header("📅 " ~ e.title, ("Ekleyen: " ~ (e.owner_display or e.owner_username)) if not is_owner else None,
+                       back=url_for('events.index')) %}
+  {% if is_owner %}{{ ui.delete_button(url_for('events.delete', event_id=e.id), "Sil", "Etkinlik silinsin mi?") }}{% endif %}
+{% endcall %}
+
+<div class="card">
+  {% if is_owner %}
+    <form method="post">
+      {{ ui.csrf() }}
+      {{ ui.field("Başlık", "title", e.title, required=True, attrs='maxlength="150"') }}
+      <div class="form-row three">
+        {{ ui.field("Tarih", "date", e.date, type="date", required=True) }}
+        {{ ui.field("Saat", "time", e.time, type="time", hint="Boşsa tüm gün (" ~ default_time ~ "'da hatırlatılır)") }}
+        {{ ui.field("Yer", "place", e.place, attrs='maxlength="150"') }}
+      </div>
+      <label class="field"><span>🔔 Telegram hatırlatması</span>
+        <select name="remind">
+          {% for v, label in remind_options %}
+            <option value="{{ v }}" {% if (e.remind_before is none and v == '') or (e.remind_before is not none and v == e.remind_before | string) %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {{ ui.field("Not", "note", e.note, attrs='maxlength="1000"') }}
+      {{ ui.checkbox("👨‍👩‍👧 Paylaşılan (herkes görsün, Telegram'ı bağlı herkese hatırlatılsın)", "shared", e.shared) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  {% else %}
+    <p><b>{{ e.date | date_tr(True) }}{% if e.time %} · {{ e.time }}{% endif %}</b></p>
+    {% if e.place %}<p>📍 {{ e.place }}</p>{% endif %}
+    {% if e.note %}<p class="muted">{{ e.note }}</p>{% endif %}
+    <p class="muted small">Bu etkinliği sadece ekleyen kişi düzenleyebilir.</p>
+  {% endif %}
+</div>
+{% endblock %}

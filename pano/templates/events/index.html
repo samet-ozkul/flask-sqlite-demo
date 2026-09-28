@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Etkinlikler{% endblock %}
+{% block content %}
+{% call ui.page_header("📅 Etkinlikler", "Aile ve ev için ortak takvim: paylaşılan etkinlikleri herkes görür") %}
+  <a class="btn sm" href="{{ url_for('calendar.index') }}">Takvim →</a>
+{% endcall %}
+
+<div class="card">
+  <details class="add" {% if not upcoming %}open{% endif %}>
+    <summary>＋ Yeni etkinlik</summary>
+    <form method="post" action="{{ url_for('events.create') }}">
+      {{ ui.csrf() }}
+      {{ ui.field("Başlık", "title", required=True, placeholder="ör. Annemlerde akşam yemeği", attrs='maxlength="150"') }}
+      <div class="form-row three">
+        {{ ui.field("Tarih", "date", today, type="date", required=True) }}
+        {{ ui.field("Saat", "time", type="time", hint="Boşsa tüm gün (" ~ default_time ~ "'da hatırlatılır)") }}
+        {{ ui.field("Yer", "place", placeholder="İsteğe bağlı", attrs='maxlength="150"') }}
+      </div>
+      <label class="field"><span>🔔 Telegram hatırlatması</span>
+        <select name="remind">{% for v, label in remind_options %}<option value="{{ v }}" {% if v == default_remind %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      </label>
+      {{ ui.field("Not", "note", placeholder="İsteğe bağlı", attrs='maxlength="1000"') }}
+      {{ ui.checkbox("👨‍👩‍👧 Paylaşılan (herkes görsün, Telegram'ı bağlı herkese hatırlatılsın)", "shared", True) }}
+      <button class="btn primary">Ekle</button>
+    </form>
+  </details>
+</div>
+
+{% macro event_row(e, past=False) -%}
+  <li class="{{ 'done' if past }}">
+    <span class="ico">{{ '👨‍👩‍👧' if e.shared else '📅' }}</span>
+    <a class="grow" href="{{ url_for('events.edit', event_id=e.id) }}">
+      <div class="title">{{ e.title }}</div>
+      <div class="meta">
+        <span>{{ e.date | date_tr(True) }}{% if e.time %} · {{ e.time }}{% endif %}</span>
+        {% if e.place %}<span>📍 {{ e.place }}</span>{% endif %}
+        {% if e.user_id != g.user.id %}<span>👤 {{ e.owner_display or e.owner_username }}</span>{% endif %}
+        {% if e.remind_before is not none and not past %}<span>🔔 {{ remind_label(e.remind_before) }}</span>{% endif %}
+      </div>
+    </a>
+    {% if not past %}{{ ui.due_badge(e.date, 3) }}{% endif %}
+  </li>
+{%- endmacro %}
+
+<div class="card">
+  <h2>Yaklaşanlar</h2>
+  {% if upcoming %}
+    <ul class="rows">{% for e in upcoming %}{{ event_row(e) }}{% endfor %}</ul>
+  {% else %}
+    {{ ui.empty("Yaklaşan etkinlik yok.", "📅") }}
+  {% endif %}
+</div>
+
+{% if past %}
+  <details class="card">
+    <summary><b>Geçmiş</b> <span class="pill-count">{{ past | length }}</span></summary>
+    <ul class="rows">{% for e in past %}{{ event_row(e, True) }}{% endfor %}</ul>
+  </details>
+{% endif %}
+{% endblock %}

@@ -106,7 +106,7 @@ def read_receipt(image_bytes):
 
 
 # ---------- Doğal dil ----------
-INTENT_ACTIONS = ["expense", "todo", "appointment", "shopping", "note", "question", "unknown"]
+INTENT_ACTIONS = ["expense", "todo", "appointment", "event", "shopping", "note", "question", "unknown"]
 
 
 def _intent_schema():
@@ -134,6 +134,7 @@ action:
 - expense: yapılmış bir harcama ("markete 250 verdim", "benzin 1800"). amount ve category doldur, text = kısa açıklama.
 - todo: yapılacak bir iş ("yarın 3'te dişçiyi ara"). text = iş; tarih/saat varsa date/time.
 - appointment: doktor/hastane/diş randevusu ("perşembe 14:30 dişçi randevum var"). text = randevu başlığı, place = yer (varsa), date ve time.
+- event: aile/ev etkinliği, buluşma, davet, doğum günü partisi (doktor değil) ("cumartesi 19:00 annemlerde yemek"). text = başlık, place = yer (varsa), date ve time.
 - shopping: alınacaklar ("süt ve ekmek almam lazım"). items = ürünler (her biri kısa), list_name = kullanıcı liste adı söylediyse.
 - note: hatırlanacak bilgi ("wifi şifresi kutunun arkasında"). text = notun kendisi.
 - question: kullanıcının kendi verisi hakkında soru ("bu ay ne kadar harcadım?", "sıradaki faturam ne?"). text = soru.
@@ -171,7 +172,7 @@ def parse_intent(user, text):
     # Eksik bilgiyle kayıt önerme
     if (action == "expense" and not out["amount"]) or (action == "shopping" and not out["items"]) \
             or (action in ("todo", "note", "appointment") and not out["text"]) \
-            or (action == "appointment" and not out["date"]):
+            or (action in ("appointment", "event") and not out["date"]) or (action == "event" and not out["text"]):
         out["action"] = "unknown"
     return out
 

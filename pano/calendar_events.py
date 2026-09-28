@@ -80,6 +80,11 @@ def events_between(user_id, start, end, external=False):
         add("todo", r["id"], r["due_date"], r["text"], "☑️", "lists.detail", detail=r["list_name"],
             time=r["due_time"], list_id=r["list_id"])
 
+    from .modules.events import visible_events
+    for r in visible_events(user_id, " AND e.date BETWEEN ? AND ?", (s, e)):
+        add("event", r["id"], r["date"], r["title"], "👨‍👩‍👧" if r["shared"] else "📅", "events.edit",
+            detail=r["place"], time=r["time"], event_id=r["id"])
+
     from .modules.specialdays import KINDS, occurrence, ordinal_text
     for r in query("SELECT * FROM special_days WHERE user_id = ?", (user_id,)):
         for year in range(start.year, end.year + 1):

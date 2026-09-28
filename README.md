@@ -5,9 +5,9 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 
 | Grup | Modüller |
 |---|---|
-| 📅 Genel | **Takvim** (tüm tarihler tek takvimde, telefon takvimine abonelik) · **Arama** (tek kutudan tüm modüller, bottan `/ara`) |
+| 📅 Genel | **Takvim** (tüm tarihler tek takvimde, telefon takvimine abonelik) · **Etkinlikler** (aileyle paylaşılan ortak takvim, Telegram hatırlatması) · **Arama** (tek kutudan tüm modüller, bottan `/ara`) |
 | 🏠 Pano | Günün özeti: hava durumu, döviz kuru, yaklaşan ödemeler/tarihler, bugünkü alışkanlıklar ve ilaçlar, hızlı harcama ve hızlı not |
-| 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) |
+| 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, paylaşılan listede işi birine atama, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) |
 | 💰 Para | **Harcamalar** (aylık özet, kategori grafiği, bütçe limiti, Excel/CSV) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) · **Varlıklar** (nakit, döviz, altın; güncel TL değeri ve 90 günlük grafik) · **Hedefler** (birikim hedefi, ayda ne kadar, tahmini bitiş) · **Ortak Harcama** (Splitwise benzeri: kim ne ödedi, kim kime borçlu) |
 | 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) |
 | 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) |
@@ -142,6 +142,8 @@ Webhook kuruluyken bota yazarak panoyu açmadan giriş yapabilirsin (`/yardim` h
 | `/not metin` | Not kaydeder |
 | `/ekle süt, ekmek` · `/ekle market: süt` | Alışveriş listesine ekler (liste adı verilebilir) |
 | `/yap fatura öde yarın 14:00` | Yapılacak ekler; sondaki *bugün, yarın, cuma, 25.12, 14:00, saat 9.30* anlaşılır ve zamanı gelince hatırlatılır |
+| `/yap ... @ayse` | İşi birine atar (paylaşılan listeye); ona Telegram'dan haber gider |
+| `/etkinlik piknik pazar 11:00` | Ortak takvime etkinlik ekler |
 | `/liste` · `/liste market` | Açık maddeleri butonlarla gösterir; dokununca işaretlenir |
 | `/bugun` | Günün özeti |
 | `/rapor` · `/rapor bu ay` | Aylık rapor |

@@ -26,8 +26,9 @@ def _todos(user_id):
     return query(
         "SELECT i.*, l.name AS list_name FROM list_items i JOIN lists l ON l.id = i.list_id"
         " WHERE i.done = 0 AND i.due_date IS NOT NULL AND i.due_date <= ? AND (l.user_id = ? OR l.shared = 1)"
+        " AND (i.assignee_id IS NULL OR i.assignee_id = ?)"
         " ORDER BY i.due_date, i.id LIMIT 8",
-        (today_str(), user_id),
+        (today_str(), user_id, user_id),
     )
 
 

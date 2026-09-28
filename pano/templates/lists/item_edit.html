@@ -41,6 +41,16 @@
         </select>
         <small class="muted">Tamamlanınca bir sonraki tarihle yenisi eklenir. Tarih gerekir.</small>
       </label>
+      {% if users %}
+        <label class="field">
+          <span>➡️ Kime atansın</span>
+          <select name="assignee">
+            <option value="">Kimseye</option>
+            {% for uid, name in users %}<option value="{{ uid }}" {% if item.assignee_id == uid %}selected{% endif %}>{{ name }}{{ ' (sen)' if uid == g.user.id }}</option>{% endfor %}
+          </select>
+          <small class="muted">Atanan kişiye Telegram'dan haber gider; hatırlatmalar da ona gelir.</small>
+        </label>
+      {% endif %}
       {% if item.pre_sent_at or item.due_sent_at %}
         <p class="muted small">Gönderilen: {% if item.pre_sent_at and item.remind_before %}⏰ {{ item.pre_sent_at | localdt }} {% endif %}{% if item.due_sent_at %}🔔 {{ item.due_sent_at | localdt }}{% endif %}.
           Tarih, saat ya da hatırlatma değişirse yeniden gönderilir.</p>

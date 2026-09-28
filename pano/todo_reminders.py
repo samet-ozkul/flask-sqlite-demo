@@ -214,9 +214,9 @@ def mark_sent(item_id, kind):
 
 
 def recipient_chat_id(item):
-    """Maddeyi ekleyen kişi (Telegram bağlıysa), yoksa liste sahibi."""
+    """Atanan kişi, yoksa maddeyi ekleyen kişi, yoksa liste sahibi (Telegram'ı bağlı olan ilki)."""
     db = get_db()
-    for uid in (item["created_by"], item["owner_id"]):
+    for uid in (item["assignee_id"], item["created_by"], item["owner_id"]):
         if uid:
             row = db.execute("SELECT telegram_chat_id FROM users WHERE id = ?", (uid,)).fetchone()
             if row and row["telegram_chat_id"]:

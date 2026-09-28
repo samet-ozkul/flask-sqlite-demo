@@ -54,6 +54,12 @@
           {% for v, label in repeat_options %}<option value="{{ v }}">🔁 {{ label }}</option>{% endfor %}
         </select>
       </div>
+      {% if users %}
+        <select name="assignee" aria-label="Kime" title="Kime atansın" style="margin-top: 8px">
+          <option value="">👤 Kimseye atanmasın</option>
+          {% for uid, name in users %}<option value="{{ uid }}">➡️ {{ name }}{{ ' (sen)' if uid == g.user.id }}</option>{% endfor %}
+        </select>
+      {% endif %}
       <button class="btn primary block" style="margin-top: 8px">＋ Ekle</button>
       <small class="muted">
         Hatırlatma ve tekrar için tarih seç; saat boşsa {{ default_time }}. Tekrarlayan iş tamamlanınca sonraki otomatik eklenir.
@@ -73,7 +79,7 @@
     <div class="grow">
       <div class="title">{{ i.text }}{% if i.qty %} <span class="qty-badge">{{ i.qty }}</span>{% endif %}</div>
       {% set other = i.created_by and i.created_by != g.user.id and i.creator_username %}
-      {% if (i.due_date and not done) or other or done %}
+      {% if (i.due_date and not done) or other or done or i.assignee_id %}
         <div class="meta">
           {% if i.due_date and not done %}
             {{ ui.due_badge(i.due_date) }}
@@ -81,6 +87,7 @@
             {% if i.remind_before is not none %}<span title="Telegram hatırlatması">🔔 {{ remind_label(i.remind_before) }}</span>{% endif %}
             {% if i.repeat %}<span title="Tekrarlanır">🔁 {{ repeat_label(i.repeat) }}</span>{% endif %}
           {% endif %}
+          {% if i.assignee_id and not done %}<span title="Atanan kişi" {% if i.assignee_id == g.user.id %}style="color: var(--primary); font-weight: 600"{% endif %}>➡️ {{ i.assignee_display or i.assignee_username }}</span>{% endif %}
           {% if other %}<span>👤 {{ i.creator_display or i.creator_username }}</span>{% endif %}
           {% if done and i.done_at %}<span>✓ {{ i.done_at | localdt }}</span>{% endif %}
         </div>

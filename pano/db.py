@@ -425,6 +425,25 @@ MIGRATIONS = [
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     """,
+    # 11: iş atama ve aile etkinlikleri (ortak takvim)
+    """
+    ALTER TABLE list_items ADD COLUMN assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    CREATE TABLE events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        date TEXT NOT NULL,
+        time TEXT,
+        place TEXT NOT NULL DEFAULT '',
+        note TEXT NOT NULL DEFAULT '',
+        shared INTEGER NOT NULL DEFAULT 1,
+        remind_before INTEGER,
+        pre_sent_at TEXT,
+        due_sent_at TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_events_date ON events(date);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)
