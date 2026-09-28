@@ -148,13 +148,19 @@ PythonAnywhere ücretsiz planında zamanlanmış görev yok. Bunun yerine [cron-
 | Görev | Adres | Önerilen zaman |
 |---|---|---|
 | Günlük özet (hava, yaklaşan ödemeler, randevular, ilaçlar) | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/gunluk` | Her gün 08:00 (`0 8 * * *`) |
-| Yapılacaklar hatırlatmaları | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
+| Yapılacak, fatura ve ilaç hatırlatmaları | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
 | Veritabanı yedeğini yöneticilere Telegram'dan gönder | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/yedek` | Haftada bir, Pazar 03:00 (`0 3 * * 0`) |
 
 Günlük özet aynı gün ikinci kez çağrılsa da tekrar gönderilmez. `CRON_SECRET`'ı kimseyle paylaşma.
 cron-job.org'da saat dilimini **Europe/Istanbul** yapmayı unutma.
 
-**Yapılacaklar hatırlatmaları:** Maddeye tarih, isteğe bağlı saat ve hatırlatma zamanı (zamanı gelince / 15 dk / 1 saat / 3 saat / 1 gün önce) verilir. “… önce” seçilirse iki mesaj gelir: süre yaklaşınca ⏰ ve zamanı gelince 🔔. Mesaj maddeyi ekleyen kişiye (Telegram'ı bağlı değilse liste sahibine) gider. Hatırlatmalar cron çağrısı sıklığına göre en fazla 5 dakika gecikir; cron 6 saatten uzun süre çalışmazsa kaçan eski hatırlatmalar toplu gönderilmez. Tarih/saat/hatırlatma değiştirilince mesajlar yeniden gönderilebilir.
+**Yapılacaklar hatırlatmaları:** Maddeye tarih, isteğe bağlı saat ve hatırlatma zamanı (zamanı gelince / 15 dk / 1 saat / 3 saat / 1 gün önce) verilir. “… önce” seçilirse iki mesaj gelir: süre yaklaşınca ⏰ ve zamanı gelince 🔔. Mesaj maddeyi ekleyen kişiye (Telegram'ı bağlı değilse liste sahibine) gider. Hatırlatmalar cron çağrısı sıklığına göre en fazla 5 dakika gecikir; cron 6 saatten uzun süre çalışmazsa kaçan eski hatırlatmalar toplu gönderilmez. Tarih/saat/hatırlatma değiştirilince mesajlar yeniden gönderilebilir. Mesajdaki **⏰ 1 saat ertele** / **📅 Yarına** butonları işi erteler.
+
+**Tekrarlayan işler:** Yapılacağa *her gün / hafta içi / her hafta / her ay / her yıl* tekrarı verilebilir (bottan: `/yap çöpü at pazartesi 20:00 her hafta`). Tamamlanınca bir sonraki tarihle yenisi eklenir; geri alınırsa o yenisi silinir.
+
+**Fatura hatırlatmaları:** “Telegram'dan hatırlat” işaretli ödenmemiş faturalar için son günden bir gün önce ve son gün 09:00'da mesaj gelir. **✅ Ödendi** butonu faturayı öder, tekrarlıysa sonraki ayı ekler ve harcamalara yazar; **↩️ Geri al** bunların hepsini geri alır.
+
+**İlaç hatırlatmaları:** “Doz saatlerinde Telegram'dan hatırlat” işaretli ilaçlar için her doz saatinde (en fazla 2 saat gecikmeyle) mesaj gelir; **✅ Aldım** ile işaretlenir. Sağlık → İlaçlar'da bugünkü dozlar işaretlenebilir ve son 7 günün uyumu görünür.
 
 ## Yedekleme
 

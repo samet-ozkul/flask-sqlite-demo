@@ -20,6 +20,7 @@ def _form_values():
         "amount_raw": form_str("amount", 50),
         "due_date": form_date("due_date"),
         "recurring": form_bool("recurring"),
+        "remind": form_bool("remind"),
         "note": form_str("note", 500),
     }
 
@@ -84,8 +85,8 @@ def create():
         flash(error, "error")
         return redirect_back("bills.index")
     execute(
-        "INSERT INTO bills (user_id, name, amount, due_date, recurring, note) VALUES (?, ?, ?, ?, ?, ?)",
-        (g.user["id"], v["name"], v["amount"], v["due_date"], v["recurring"], v["note"]),
+        "INSERT INTO bills (user_id, name, amount, due_date, recurring, remind, note) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (g.user["id"], v["name"], v["amount"], v["due_date"], v["recurring"], v["remind"], v["note"]),
     )
     flash(f"{v['name']} faturası eklendi.", "success")
     return redirect_back("bills.index")
@@ -102,13 +103,43 @@ def edit(bill_id):
         if error:
             flash(error, "error")
             return redirect(url_for(".edit", bill_id=bill_id))
+        # Tarih değiştiyse hatırlatmalar yeni tarihe göre tekrar gönderilebilsin
+        reset = ", pre_sent_at = NULL, due_sent_at = NULL" if v["due_date"] != bill["due_date"] else ""
         execute(
-            "UPDATE bills SET name = ?, amount = ?, due_date = ?, recurring = ?, note = ? WHERE id = ? AND user_id = ?",
-            (v["name"], v["amount"], v["due_date"], v["recurring"], v["note"], bill_id, uid),
+            "UPDATE bills SET name = ?, amount = ?, due_date = ?, recurring = ?, remind = ?, note = ?" + reset
+            + " WHERE id = ? AND user_id = ?",
+            (v["name"], v["amount"], v["due_date"], v["recurring"], v["remind"], v["note"], bill_id, uid),
         )
         flash("Fatura güncellendi.", "success")
         return redirect(url_for(".index", sekme="odenen") if bill["paid"] else url_for(".index"))
     return render_template("bills/edit.html", bill=bill)
+
+
+def pay_bill(user_id, bill, add_expense=True):
+    """Faturayı öde: tekrarlıysa sonrakini oluştur, istenirse harcamaya ekle (web ve Telegram ortak).
+    {'messages', 'next_id', 'expense_id'} döner."""
+    t = today_str()
+    db = get_db()
+    db.execute("UPDATE bills SET paid = 1, paid_at = ? WHERE id = ? AND user_id = ?", (t, bill["id"], user_id))
+    result = {"messages": [f"{bill['name']} ödendi."], "next_id": None, "expense_id": None}
+    if bill["recurring"]:
+        next_due = next_bill_date(bill["due_date"])
+        exists = db.execute("SELECT 1 FROM bills WHERE user_id = ? AND name = ? AND due_date = ?",
+                            (user_id, bill["name"], next_due)).fetchone()
+        if not exists:
+            result["next_id"] = db.execute(
+                "INSERT INTO bills (user_id, name, amount, due_date, recurring, remind, note) VALUES (?, ?, ?, ?, 1, ?, ?)",
+                (user_id, bill["name"], bill["amount"], next_due, bill["remind"], bill["note"]),
+            ).lastrowid
+            result["messages"].append(f"Sonraki fatura {fmt_date(next_due)} tarihine eklendi.")
+    if bill["amount"] and add_expense:
+        result["expense_id"] = db.execute(
+            "INSERT INTO expenses (user_id, amount, category, note, date) VALUES (?, ?, 'Faturalar', ?, ?)",
+            (user_id, bill["amount"], bill["name"], t),
+        ).lastrowid
+        result["messages"].append("Harcamalara eklendi.")
+    db.commit()
+    return result
 
 
 @bp.route("/<int:bill_id>/ode", methods=["POST"])
@@ -119,28 +150,7 @@ def pay(bill_id):
     if bill["paid"]:
         flash("Bu fatura zaten ödenmiş.", "warning")
         return redirect_back("bills.index")
-    t = today_str()
-    db = get_db()
-    db.execute("UPDATE bills SET paid = 1, paid_at = ? WHERE id = ? AND user_id = ?", (t, bill_id, uid))
-    messages = [f"{bill['name']} ödendi."]
-    if bill["recurring"]:
-        next_due = next_bill_date(bill["due_date"])
-        exists = db.execute("SELECT 1 FROM bills WHERE user_id = ? AND name = ? AND due_date = ?",
-                            (uid, bill["name"], next_due)).fetchone()
-        if not exists:
-            db.execute(
-                "INSERT INTO bills (user_id, name, amount, due_date, recurring, note) VALUES (?, ?, ?, ?, 1, ?)",
-                (uid, bill["name"], bill["amount"], next_due, bill["note"]),
-            )
-            messages.append(f"Sonraki fatura {fmt_date(next_due)} tarihine eklendi.")
-    if bill["amount"] and form_bool("add_expense"):
-        db.execute(
-            "INSERT INTO expenses (user_id, amount, category, note, date) VALUES (?, ?, 'Faturalar', ?, ?)",
-            (uid, bill["amount"], bill["name"], t),
-        )
-        messages.append("Harcamalara eklendi.")
-    db.commit()
-    flash(" ".join(messages), "success")
+    flash(" ".join(pay_bill(uid, bill, form_bool("add_expense"))["messages"]), "success")
     return redirect_back("bills.index")
 
 

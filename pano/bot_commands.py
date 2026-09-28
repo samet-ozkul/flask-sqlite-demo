@@ -46,6 +46,7 @@ HELP = """<b>Kişisel Pano komutları</b>
 🛒 <code>/ekle süt, ekmek</code> — alışveriş listesine ekle
     <code>/ekle market: süt</code> — belirli listeye
 ☑️ <code>/yap fatura öde yarın 14:00</code> — yapılacak ekle
+    <code>/yap çöpü at pazartesi 20:00 her hafta</code> — tekrarlayan
 📋 <code>/liste</code> ya da <code>/liste market</code> — açık maddeler
 ☀️ <code>/bugun</code> — günün özeti
 
@@ -63,6 +64,19 @@ DATE_RE = re.compile(r"^(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?$")
 WEEKDAYS = {"pazartesi": 0, "sali": 1, "carsamba": 2, "persembe": 3, "cuma": 4, "cumartesi": 5, "pazar": 6}
 DEFAULT_LIST_NAMES = {"shopping": "Alışveriş", "todo": "Yapılacaklar"}
 KIND_ICONS = {"shopping": "🛒", "todo": "☑️"}
+# /yap sonunda tekrar ifadesi: "her gün", "hafta içi", "her hafta", "her ay", "her yıl"
+REPEAT_PHRASES = [("hafta ici her gun", "weekdays"), ("her gun", "daily"), ("hafta ici", "weekdays"),
+                  ("her hafta", "weekly"), ("her ay", "monthly"), ("her yil", "yearly")]
+
+
+def parse_repeat_phrase(text):
+    """'çöpü at her hafta pazartesi' değil, 'çöpü at pazartesi her hafta' -> ('çöpü at pazartesi', 'weekly')."""
+    words = text.split()
+    for phrase, value in REPEAT_PHRASES:
+        n = len(phrase.split())
+        if len(words) > n and fold(" ".join(words[-n:])) == phrase:
+            return " ".join(words[:-n]), value
+    return text, None
 
 
 # ---------- Ortak ----------
@@ -339,20 +353,24 @@ def cmd_todo(user, chat_id, rest):
         telegram.send_message(chat_id, "Örnek: <code>/yap faturayı öde yarın 14:00</code>")
         return
     lst, text = _split_target(user["id"], rest, "todo")
+    text, repeat = parse_repeat_phrase(text)
     task, due_date, due_time = parse_when(text)
+    if repeat and not due_date:
+        due_date = today().isoformat()  # tekrar için başlangıç tarihi gerekir
     if not task:
         telegram.send_message(chat_id, "Yapılacak işi yazmayı unuttun. Örnek: <code>/yap ilaç al 21:00</code>")
         return
     remind = 0 if due_date else None
     item_id = execute(
-        "INSERT INTO list_items (list_id, text, due_date, due_time, remind_before, created_by) VALUES (?, ?, ?, ?, ?, ?)",
-        (lst["id"], task[:200], due_date, due_time, remind, user["id"]),
+        "INSERT INTO list_items (list_id, text, due_date, due_time, remind_before, repeat, created_by)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (lst["id"], task[:200], due_date, due_time, remind, repeat, user["id"]),
     ).lastrowid
     lines = [f"☑️ <b>{esc(task)}</b> · {esc(lst['name'])}"]
     if due_date:
         when = fmt_date(due_date, True) + (f" {due_time}" if due_time else "")
         hint = "" if due_time else f" ({todo.DEFAULT_DUE_TIME})"
-        lines.append(f"📅 {when} · 🔔 zamanı gelince{hint}")
+        lines.append(f"📅 {when} · 🔔 zamanı gelince{hint}" + (f" · 🔁 {todo.repeat_label(repeat)}" if repeat else ""))
     telegram.send_message(chat_id, "\n".join(lines), buttons=todo.done_buttons(item_id))
 
 
@@ -411,8 +429,7 @@ def cb_list_item(user, chat_id, message_id, callback_id, data):
     if item is None:
         telegram.answer_callback(callback_id, "Madde bulunamadı.")
         return
-    execute("UPDATE list_items SET done = 1 - done,"
-            " done_at = CASE WHEN done = 0 THEN CURRENT_TIMESTAMP ELSE NULL END WHERE id = ?", (item["id"],))
+    todo.set_done(item["id"], not item["done"])
     telegram.answer_callback(callback_id, ("↩️ " if item["done"] else "✅ ") + item["text"][:40])
     lst = query_one("SELECT * FROM lists WHERE id = ?", (item["list_id"],))
     try:

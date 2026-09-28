@@ -4,7 +4,7 @@
 """
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from helpers import Client, make_app  # noqa: E402

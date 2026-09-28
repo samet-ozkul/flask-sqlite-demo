@@ -44,7 +44,7 @@
       </div>
       <div class="form-row">
         {{ ui.field("Son ödeme tarihi", "due_date", today_str(), "date", True) }}
-        <div>{{ ui.checkbox("Her ay tekrarlanır", "recurring", True) }}</div>
+        <div>{{ ui.checkbox("Her ay tekrarlanır", "recurring", True) }}{{ ui.checkbox("🔔 Telegram'dan hatırlat (1 gün önce ve son gün)", "remind", True) }}</div>
       </div>
       {{ ui.field("Not", "note", placeholder="Abone no, ödeme yöntemi… (isteğe bağlı)") }}
       <button class="btn primary">Kaydet</button>

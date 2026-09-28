@@ -2,7 +2,7 @@
 
 PythonAnywhere ücretsiz planında zamanlanmış görev olmadığı için:
   GET /cron/<CRON_SECRET>/gunluk      -> herkese Telegram günlük özeti (günde bir kez)
-  GET /cron/<CRON_SECRET>/hatirlatma  -> yapılacaklar hatırlatmaları (5 dakikada bir)
+  GET /cron/<CRON_SECRET>/hatirlatma  -> yapılacak, fatura ve ilaç hatırlatmaları (5 dakikada bir)
   GET /cron/<CRON_SECRET>/yedek       -> yöneticilere Telegram'dan veritabanı yedeği
 CRON_SECRET ayarlı değilse bu adresler 404 döner.
 """
@@ -13,7 +13,7 @@ import time
 
 from flask import Blueprint, abort, jsonify, request, url_for
 
-from .. import backup, external, telegram
+from .. import backup, external, scheduled, telegram
 from .. import todo_reminders as todo
 from ..todo_reminders import done_buttons
 from ..db import get_db, query, query_one
@@ -112,7 +112,7 @@ def daily(secret):
 
 @bp.route("/<secret>/hatirlatma")
 def todo_reminders(secret):
-    """Yapılacaklar hatırlatmaları. Sık çağrılmalı (ör. 5 dakikada bir); iş yoksa hemen döner."""
+    """Yapılacaklar, fatura ve ilaç hatırlatmaları. Sık çağrılmalı (ör. 5 dakikada bir); iş yoksa hemen döner."""
     _check_secret(secret)
     if not telegram.enabled():
         return jsonify(error="TELEGRAM_BOT_TOKEN ayarlı değil"), 400
@@ -135,6 +135,37 @@ def todo_reminders(secret):
             result["sent"] += 1
         except telegram.TelegramError as e:
             result["errors"].append(f"madde {item['id']}: {e}")
+
+    # Faturalar: yarın / bugün son gün
+    bills, stale_bills = scheduled.pending_bills()
+    result["bills_sent"], result["stale"] = 0, result["stale"] + len(stale_bills)
+    for bill in stale_bills:
+        scheduled.mark_bill(bill["id"], "due")
+    for kind, bill in bills:
+        chat_id = scheduled.chat_of(bill["user_id"])
+        if not chat_id:
+            result["no_telegram"] += 1
+            continue
+        try:
+            telegram.send_message(chat_id, scheduled.bill_message(kind, bill, url_for("bills.index", _external=True),
+                                                                  telegram.escape),
+                                  buttons=scheduled.bill_buttons(bill["id"]) if with_buttons else None)
+            scheduled.mark_bill(bill["id"], kind)
+            result["bills_sent"] += 1
+        except telegram.TelegramError as e:
+            result["errors"].append(f"fatura {bill['id']}: {e}")
+
+    # İlaçlar: doz saati geldi
+    result["meds_sent"] = 0
+    for med, slot, chat_id, day in scheduled.pending_meds():
+        log = scheduled.ensure_log(med["id"], day, slot)
+        try:
+            telegram.send_message(chat_id, scheduled.med_message(med, slot, telegram.escape),
+                                  buttons=scheduled.med_buttons(log["id"]) if with_buttons else None)
+            scheduled.mark_med_sent(log["id"])
+            result["meds_sent"] += 1
+        except telegram.TelegramError as e:
+            result["errors"].append(f"ilaç {med['id']}: {e}")
     return jsonify(result)
 
 
