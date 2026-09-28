@@ -19,9 +19,11 @@ MODULES = [
     ("car", "car.index", "Araç", "🚗", "Ev ve araç"),
     ("warranty", "warranty.index", "Garanti", "🛡️", "Ev ve araç"),
     ("inventory", "inventory.index", "Ev Envanteri", "📦", "Ev ve araç"),
+    ("documents", "documents.index", "Belgeler", "🪪", "Ev ve araç"),
     ("habits", "habits.index", "Alışkanlıklar", "🔥", "Kişisel"),
     ("health", "health.index", "Sağlık", "🩺", "Kişisel"),
     ("recipes", "recipes.index", "Tarifler", "🍲", "Kişisel"),
+    ("watchlist", "watchlist.index", "İzleme / Okuma", "🎬", "Kişisel"),
     ("specialdays", "specialdays.index", "Önemli Günler", "🎂", "Kişisel"),
 ]
 

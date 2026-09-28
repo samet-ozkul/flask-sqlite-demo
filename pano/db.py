@@ -444,6 +444,42 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_events_date ON events(date);
     """,
+    # 12: belge geçerlilik tarihleri, izleme/okuma listesi, hava uyarısı tercihi
+    """
+    CREATE TABLE documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'other'
+            CHECK (kind IN ('passport', 'license', 'id', 'vehicle', 'insurance', 'residence', 'other')),
+        holder TEXT NOT NULL DEFAULT '',
+        expires_on TEXT NOT NULL,
+        notify_days INTEGER NOT NULL DEFAULT 30,
+        sent_for TEXT,
+        day_sent_for TEXT,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_documents_user ON documents(user_id, expires_on);
+    CREATE TABLE watchlist (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('movie', 'series', 'book')),
+        title TEXT NOT NULL,
+        year TEXT NOT NULL DEFAULT '',
+        creator TEXT NOT NULL DEFAULT '',
+        image_url TEXT NOT NULL DEFAULT '',
+        external_id TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'want' CHECK (status IN ('want', 'doing', 'done')),
+        rating INTEGER,
+        note TEXT NOT NULL DEFAULT '',
+        started_at TEXT,
+        finished_at TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_watchlist_user ON watchlist(user_id, status);
+    ALTER TABLE users ADD COLUMN weather_alerts INTEGER NOT NULL DEFAULT 1;
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

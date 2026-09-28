@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ doc.name }}{% endblock %}
+{% block content %}
+{% call ui.page_header(kinds[doc.kind][1] ~ " " ~ doc.name, back=url_for('documents.index')) %}
+  {{ ui.delete_button(url_for('documents.delete', doc_id=doc.id), "Sil", "Belge silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      <label class="field"><span>Tür</span>
+        <select name="kind">{% for k, (label, icon) in kinds.items() %}<option value="{{ k }}" {% if k == doc.kind %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}</select>
+      </label>
+      {{ ui.field("Ad", "name", doc.name, attrs='maxlength="100"') }}
+    </div>
+    <div class="form-row three">
+      {{ ui.field("Kimin", "holder", doc.holder, attrs='maxlength="60"') }}
+      {{ ui.field("Bitiş tarihi", "expires_on", doc.expires_on, type="date", required=True, hint="Belgeyi yenilediysen yeni tarihi yaz") }}
+      <label class="field"><span>Hatırlat</span>
+        <select name="notify_days">{% for v, label in notify_options %}<option value="{{ v }}" {% if v == doc.notify_days %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      </label>
+    </div>
+    {{ ui.field("Not", "note", doc.note, attrs='maxlength="500"') }}
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+{% endblock %}

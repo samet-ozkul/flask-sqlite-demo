@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}İzleme / okuma{% endblock %}
+{% block head %}
+<style>
+  .cover { width: 46px; height: 68px; border-radius: 6px; object-fit: cover; background: var(--surface-2); flex-shrink: 0;
+           display: grid; place-items: center; font-size: 1.4rem; }
+  .stars { color: var(--warn); letter-spacing: 1px; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🎬 İzleme ve okuma listesi") %}
+  <a class="btn sm primary" href="{{ url_for('watchlist.search', tur='book') }}">📚 Kitap ekle</a>
+  <a class="btn sm primary" href="{{ url_for('watchlist.search', tur='movie') }}">🎬 Film / dizi ekle</a>
+{% endcall %}
+
+<div class="tabs">
+  <a href="{{ url_for('watchlist.index') }}" class="{{ 'active' if not kind and not status }}">Tümü</a>
+  {% for k, (label, icon) in kinds.items() %}<a href="{{ url_for('watchlist.index', tur=k) }}" class="{{ 'active' if kind == k }}">{{ icon }} {{ label }}</a>{% endfor %}
+  {% for s, label in statuses.items() %}<a href="{{ url_for('watchlist.index', durum=s) }}" class="{{ 'active' if status == s }}">{{ status_icons[s] }} {{ label }} <span class="pill-count">{{ counts.get(s, 0) }}</span></a>{% endfor %}
+</div>
+
+{% if items %}
+  <div class="card">
+    <ul class="rows">
+      {% for it in items %}
+        <li class="{{ 'done' if it.status == 'done' }}">
+          {% if it.image_url %}<img class="cover" src="{{ it.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+          {% else %}<span class="cover">{{ kinds[it.kind][1] }}</span>{% endif %}
+          <a class="grow" href="{{ url_for('watchlist.edit', item_id=it.id) }}">
+            <div class="title">{{ it.title }}{% if it.year %} <span class="muted small">({{ it.year }})</span>{% endif %}</div>
+            <div class="meta">
+              <span>{{ kinds[it.kind][1] }} {{ kinds[it.kind][0] }}</span>
+              {% if it.creator %}<span>{{ it.creator }}</span>{% endif %}
+              {% if it.rating %}<span class="stars">{{ '★' * it.rating }}{{ '☆' * (5 - it.rating) }}</span>{% endif %}
+              {% if it.finished_at %}<span>✅ {{ it.finished_at | date_tr }}</span>{% endif %}
+            </div>
+          </a>
+          <form method="post" action="{{ url_for('watchlist.set_status', item_id=it.id) }}" class="inline">
+            {{ ui.csrf() }}
+            {% if it.status == 'want' %}<input type="hidden" name="status" value="doing"><button class="btn sm" title="Başladım">▶️</button>
+            {% elif it.status == 'doing' %}<input type="hidden" name="status" value="done"><button class="btn sm ok" title="Bitirdim">✅</button>
+            {% endif %}
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  {{ ui.empty("Liste boş. İzlemek ya da okumak istediklerini ekle.", "🎬") }}
+{% endif %}
+{% endblock %}

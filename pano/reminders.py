@@ -85,6 +85,12 @@ def upcoming(user_id, days=7, long_days=30):
         detail = r["list_name"] + (f" · {r['due_time']}" if r["due_time"] else "")
         add("☑️", r["text"], r["due_date"], "lists.detail", detail=detail, list_id=r["lid"])
 
+    from .modules.documents import KINDS as DOC_KINDS
+    for r in query("SELECT * FROM documents WHERE user_id = ? AND expires_on BETWEEN ? AND ?",
+                   (user_id, (t - timedelta(days=30)).isoformat(), later)):
+        add(DOC_KINDS[r["kind"]][1], f"{r['name']} bitiyor", r["expires_on"], "documents.edit", detail=r["holder"],
+            doc_id=r["id"])
+
     from .modules.events import visible_events
     for e in visible_events(user_id, " AND e.date BETWEEN ? AND ?", (ts, soon)):
         detail = " · ".join(x for x in (e["time"] or "", e["place"]) if x)

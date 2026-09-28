@@ -31,6 +31,7 @@ def profile():
     display_name = form_str("display_name", 40)
     city = form_str("city", 80)
     notify = form_bool("notify_daily")
+    alerts = form_bool("weather_alerts")
     lat, lon = g.user["lat"], g.user["lon"]
     if not city:
         lat = lon = None
@@ -42,8 +43,8 @@ def profile():
         else:
             city, lat, lon = place["name"], place["lat"], place["lon"]
     execute(
-        "UPDATE users SET display_name = ?, city = ?, lat = ?, lon = ?, notify_daily = ? WHERE id = ?",
-        (display_name, city, lat, lon, notify, g.user["id"]),
+        "UPDATE users SET display_name = ?, city = ?, lat = ?, lon = ?, notify_daily = ?, weather_alerts = ? WHERE id = ?",
+        (display_name, city, lat, lon, notify, alerts, g.user["id"]),
     )
     flash("Ayarlar kaydedildi.", "success")
     return redirect(url_for(".index"))

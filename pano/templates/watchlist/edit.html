@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ item.title }}{% endblock %}
+{% block content %}
+{% call ui.page_header(kinds[item.kind][1] ~ " " ~ item.title, back=url_for('watchlist.index')) %}
+  {{ ui.delete_button(url_for('watchlist.delete', item_id=item.id), "Sil", "Listeden silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  {% if item.image_url %}<p><img src="{{ item.image_url }}" alt="" style="max-width: 140px; border-radius: 8px" referrerpolicy="no-referrer"></p>{% endif %}
+  <form method="post">
+    {{ ui.csrf() }}
+    <div class="form-row three">
+      <label class="field"><span>Tür</span>
+        <select name="kind">{% for k, (label, icon) in kinds.items() %}<option value="{{ k }}" {% if k == item.kind %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}</select>
+      </label>
+      {{ ui.field("Ad", "title", item.title, required=True, attrs='maxlength="200"') }}
+      {{ ui.field("Yıl", "year", item.year, attrs='maxlength="10"') }}
+    </div>
+    <div class="form-row three">
+      {{ ui.field("Yazar / yönetmen", "creator", item.creator, attrs='maxlength="120"') }}
+      <label class="field"><span>Durum</span>
+        <select name="status">{% for s, label in statuses.items() %}<option value="{{ s }}" {% if s == item.status %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      </label>
+      <label class="field"><span>Puan</span>
+        <select name="rating"><option value="">—</option>{% for n in range(1, 6) %}<option value="{{ n }}" {% if item.rating == n %}selected{% endif %}>{{ '★' * n }}</option>{% endfor %}</select>
+      </label>
+    </div>
+    {{ ui.textarea("Not", "note", item.note, rows=3) }}
+    <button class="btn primary">Kaydet</button>
+  </form>
+  <p class="muted small">{% if item.started_at %}Başlangıç {{ item.started_at | date_tr }}{% endif %}{% if item.finished_at %} · Bitiş {{ item.finished_at | date_tr }}{% endif %}</p>
+</div>
+{% endblock %}

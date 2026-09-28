@@ -14,7 +14,7 @@ from datetime import timedelta
 
 from flask import Blueprint, abort, jsonify, request, url_for
 
-from .. import backup, budgets, external, scheduled, telegram
+from .. import backup, budgets, external, scheduled, telegram, weather_alerts
 from .. import todo_reminders as todo
 from ..todo_reminders import done_buttons
 from ..db import get_db, query, query_one
@@ -56,6 +56,8 @@ def build_daily_message(user, site_url):
         d0 = weather["days"][0]
         rain = f", yağış %{d0['rain']}" if d0.get("rain") else ""
         lines.append(f"{icon} {esc(user['city'])}: {d0['min']}°/{d0['max']}°, {label}{rain}")
+        if user["weather_alerts"]:
+            lines += [f"⚠️ {esc(a)}" for a in weather_alerts.alerts(d0)]
 
     items = upcoming(user["id"], days=3, long_days=7)
     if items:
@@ -210,6 +212,29 @@ def todo_reminders(secret):
                 result["days_sent"] += 1
             except telegram.TelegramError as e:
                 result["errors"].append(f"önemli gün {row['id']}: {e}")
+
+    # Belgeler: bitişe X gün kala ve bittiği gün (varsayılan saatten sonra)
+    from .documents import mark_sent as mark_doc, message as doc_message, pending as pending_docs
+    result["documents_sent"] = 0
+    if now.strftime("%H:%M") >= todo.DEFAULT_DUE_TIME:
+        for kind, doc, left in pending_docs(now):
+            try:
+                telegram.send_message(doc["chat_id"], doc_message(kind, doc, left, url_for("documents.index", _external=True),
+                                                                  telegram.escape))
+                mark_doc(doc, kind)
+                result["documents_sent"] += 1
+            except telegram.TelegramError as e:
+                result["errors"].append(f"belge {doc['id']}: {e}")
+
+    # Hava uyarısı: akşam, yarın için yağmur / don / sıcak / fırtına (günde bir kez)
+    result["weather_alerts"] = 0
+    for user, day, found in weather_alerts.pending(now):
+        try:
+            telegram.send_message(user["telegram_chat_id"], weather_alerts.message(user, day, found, telegram.escape))
+            weather_alerts.mark_sent(user["id"], now.date().isoformat())
+            result["weather_alerts"] += 1
+        except telegram.TelegramError as e:
+            result["errors"].append(f"hava {user['username']}: {e}")
 
     # Bütçe uyarıları (%80 ve %100, her ay bir kez)
     result["budget_alerts"] = 0

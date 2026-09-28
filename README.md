@@ -9,8 +9,8 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 | 🏠 Pano | Günün özeti: hava durumu, döviz kuru, yaklaşan ödemeler/tarihler, bugünkü alışkanlıklar ve ilaçlar, hızlı harcama ve hızlı not |
 | 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, paylaşılan listede işi birine atama, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) |
 | 💰 Para | **Harcamalar** (aylık özet, kategori grafiği, bütçe limiti, Excel/CSV) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) · **Varlıklar** (nakit, döviz, altın; güncel TL değeri ve 90 günlük grafik) · **Hedefler** (birikim hedefi, ayda ne kadar, tahmini bitiş) · **Ortak Harcama** (Splitwise benzeri: kim ne ödedi, kim kime borçlu) |
-| 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) |
-| 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) |
+| 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) · **Belgeler** (pasaport, ehliyet, kimlik, ruhsat, poliçe bitiş tarihleri; 1 hafta–6 ay önceden Telegram hatırlatması) |
+| 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) · **İzleme / Okuma** (film, dizi, kitap listesi; kapaklı arama, puan) |
 | ⚙️ Altyapı | Kullanıcı yönetimi, tek tıkla yedek al/geri yükle, disk kullanımı, Telegram günlük özeti, telefona uygulama olarak yükleme (PWA) |
 
 ## 512 MB disk nasıl korunuyor?
@@ -81,6 +81,7 @@ Testler: `python tests/test_core.py` (ve `tests/` altındaki diğer `test_*.py` 
    # os.environ["TELEGRAM_BOT_TOKEN"] = "123456:ABC..."
    # os.environ["CRON_SECRET"] = "BURAYA_URETTIGIN_CRON_SECRET"
    # os.environ["GOLDAPI_KEY"] = "goldapi.io anahtarı (gram altın için)"
+   # os.environ["TMDB_API_KEY"] = "themoviedb.org anahtarı (film/dizi araması için)"
 
    from app import app as application
    ```
@@ -113,6 +114,7 @@ Sonra 3. adımdaki **Static files** ayarını ekle, WSGI dosyasına yeni değiş
 | `TELEGRAM_BOT_TOKEN` | – | Telegram bildirimleri için bot anahtarı |
 | `CRON_SECRET` | – | `/cron/<CRON_SECRET>/...` adreslerini açar |
 | `GOLDAPI_KEY` | – | Panoda gram altın fiyatı (goldapi.io ücretsiz plan, 8 saatte bir sorgulanır) |
+| `TMDB_API_KEY` | – | İzleme listesinde film/dizi araması (themoviedb.org ücretsiz; v3 anahtarı ya da v4 okuma belirteci). Kitap araması anahtarsız çalışır |
 | `STORAGE_QUOTA_MB` | – | Veritabanı + dosyalar için üst sınır (varsayılan 350) |
 | `ALLOW_REGISTRATION` | – | `1` ise herkes kayıt olabilir (varsayılan kapalı) |
 | `APP_TZ` | – | Saat dilimi (varsayılan `Europe/Istanbul`) |
@@ -159,7 +161,7 @@ PythonAnywhere ücretsiz planında zamanlanmış görev yok. Bunun yerine [cron-
 | Görev | Adres | Önerilen zaman |
 |---|---|---|
 | Günlük özet (hava, yaklaşan ödemeler, randevular, ilaçlar) | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/gunluk` | Her gün 08:00 (`0 8 * * *`) |
-| Yapılacak, fatura ve ilaç hatırlatmaları | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
+| Yapılacak, fatura, belge, ilaç hatırlatmaları ve akşam hava uyarısı | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
 | Veritabanı yedeğini yöneticilere Telegram'dan gönder | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/yedek` | Haftada bir, Pazar 03:00 (`0 3 * * 0`) |
 
 Günlük özet aynı gün ikinci kez çağrılsa da tekrar gönderilmez. `CRON_SECRET`'ı kimseyle paylaşma.
@@ -170,6 +172,10 @@ cron-job.org'da saat dilimini **Europe/Istanbul** yapmayı unutma.
 **Tekrarlayan işler:** Yapılacağa *her gün / hafta içi / her hafta / her ay / her yıl* tekrarı verilebilir (bottan: `/yap çöpü at pazartesi 20:00 her hafta`). Tamamlanınca bir sonraki tarihle yenisi eklenir; geri alınırsa o yenisi silinir.
 
 **Fatura hatırlatmaları:** “Telegram'dan hatırlat” işaretli ödenmemiş faturalar için son günden bir gün önce ve son gün 09:00'da mesaj gelir. **✅ Ödendi** butonu faturayı öder, tekrarlıysa sonraki ayı ekler ve harcamalara yazar; **↩️ Geri al** bunların hepsini geri alır.
+
+**Belgeler:** Seçilen süre kadar önce (1 hafta – 6 ay) ve bittiği gün 09:00'da mesaj gelir (“🛂 30 gün sonra bitiyor: Pasaport (Ayşe)”); panoda ve takvimde 30 gün önceden görünür. Belge yenilenip tarih değiştirilince hatırlatmalar yeni tarihe göre kurulur. Gizlilik için belge numarası ya da fotoğrafı saklanmaz.
+
+**Hava uyarısı:** Ayarlarda şehri olan kullanıcılara, yarın yağmur (≥%60), kar, gök gürültülü sağanak, don (≤0°), aşırı sıcak (≥35°) ya da kuvvetli rüzgâr (≥50 km/s) bekleniyorsa akşam 20:00'den sonra bir kez mesaj gelir; bugünün uyarıları günlük özette de yazar. Ayarlar'dan kapatılabilir.
 
 **Önemli günler:** Seçilen gün sayısı kadar önce ve o gün 09:00'da mesaj gelir (“🎂 7 gün sonra: Annemin doğum günü (60. yaş)”); panoda 30 gün önceden görünür.
 
