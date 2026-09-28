@@ -133,7 +133,7 @@ p { margin: .4rem 0; }
   padding: 16px; box-shadow: var(--shadow); margin-bottom: 14px;
 }
 .card > h2:first-child { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.card h2 a.more { font-size: .82rem; font-weight: 500; }
+.card h2 a.more, .card h3 a.more { font-size: .82rem; font-weight: 500; }
 .grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
 .grid > .card { margin-bottom: 0; }
 @media (min-width: 700px) {

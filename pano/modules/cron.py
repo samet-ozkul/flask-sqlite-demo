@@ -236,6 +236,21 @@ def todo_reminders(secret):
         except telegram.TelegramError as e:
             result["errors"].append(f"hava {user['username']}: {e}")
 
+    # Günlük: belirlenen saatte, o gün yazılmadıysa "Bugün nasıldı?" (butonlar webhook kuruluysa)
+    from . import journal
+    result["journal_asked"] = 0
+    for user in journal.pending(now):
+        day = now.date().isoformat()
+        try:
+            telegram.send_message(user["telegram_chat_id"],
+                                  journal.ask_message(url_for("journal.index", _external=True), telegram.escape,
+                                                      interactive=with_buttons),
+                                  buttons=journal.mood_buttons(day) if with_buttons else None)
+            journal.mark_asked(user["id"], day)
+            result["journal_asked"] += 1
+        except telegram.TelegramError as e:
+            result["errors"].append(f"günlük {user['username']}: {e}")
+
     # Bütçe uyarıları (%80 ve %100, her ay bir kez)
     result["budget_alerts"] = 0
     for user, row in budgets.pending_alerts(now):

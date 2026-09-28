@@ -10,7 +10,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 | 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, paylaşılan listede işi birine atama, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) |
 | 💰 Para | **Harcamalar** (aylık özet, kategori grafiği, bütçe limiti, Excel/CSV) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) · **Varlıklar** (nakit, döviz, altın; güncel TL değeri ve 90 günlük grafik) · **Hedefler** (birikim hedefi, ayda ne kadar, tahmini bitiş) · **Ortak Harcama** (Splitwise benzeri: kim ne ödedi, kim kime borçlu) |
 | 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) · **Belgeler** (pasaport, ehliyet, kimlik, ruhsat, poliçe bitiş tarihleri; 1 hafta–6 ay önceden Telegram hatırlatması) |
-| 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) · **İzleme / Okuma** (film, dizi, kitap listesi; kapaklı arama, puan) |
+| 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Günlük** (her gün bir satır ve ruh hali emojisi, ay takvimi, “1 yıl önce bugün”, akşam Telegram'dan “Bugün nasıldı?”) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) · **İzleme / Okuma** (film, dizi, kitap listesi; kapaklı arama, puan) |
 | ⚙️ Altyapı | Kullanıcı yönetimi, tek tıkla yedek al/geri yükle, disk kullanımı, Telegram günlük özeti, telefona uygulama olarak yükleme (PWA) |
 
 ## 512 MB disk nasıl korunuyor?
@@ -146,13 +146,14 @@ Webhook kuruluyken bota yazarak panoyu açmadan giriş yapabilirsin (`/yardim` h
 | `/yap fatura öde yarın 14:00` | Yapılacak ekler; sondaki *bugün, yarın, cuma, 25.12, 14:00, saat 9.30* anlaşılır ve zamanı gelince hatırlatılır |
 | `/yap ... @ayse` | İşi birine atar (paylaşılan listeye); ona Telegram'dan haber gider |
 | `/etkinlik piknik pazar 11:00` | Ortak takvime etkinlik ekler |
+| `/gunluk bugün yürüyüşe çıktım` · `/gunluk 😄 ...` | Bugünün günlüğüne ekler; başa ruh hali emojisi (😞 😕 😐 🙂 😄) konabilir |
 | `/liste` · `/liste market` | Açık maddeleri butonlarla gösterir; dokununca işaretlenir |
 | `/bugun` | Günün özeti |
 | `/rapor` · `/rapor bu ay` | Aylık rapor |
 | `/ara matkap` | Her yerde arama |
 | Link | Sonra Bak'a kaydedilir |
 | Fotoğraf / PDF | Hangi garantiye ya da nota ekleneceği sorulur (açıklama yazarsan yeni garantinin adı olur) |
-| Düz yazı | Not / alışveriş / yapılacak / harcama olarak ne yapılacağı sorulur |
+| Düz yazı | Not / alışveriş / yapılacak / harcama / günlük olarak ne yapılacağı sorulur |
 
 ## Zamanlanmış görevler (cron-job.org, ücretsiz)
 
@@ -161,7 +162,7 @@ PythonAnywhere ücretsiz planında zamanlanmış görev yok. Bunun yerine [cron-
 | Görev | Adres | Önerilen zaman |
 |---|---|---|
 | Günlük özet (hava, yaklaşan ödemeler, randevular, ilaçlar) | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/gunluk` | Her gün 08:00 (`0 8 * * *`) |
-| Yapılacak, fatura, belge, ilaç hatırlatmaları ve akşam hava uyarısı | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
+| Yapılacak, fatura, belge, ilaç, günlük hatırlatmaları ve akşam hava uyarısı | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
 | Veritabanı yedeğini yöneticilere Telegram'dan gönder | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/yedek` | Haftada bir, Pazar 03:00 (`0 3 * * 0`) |
 
 Günlük özet aynı gün ikinci kez çağrılsa da tekrar gönderilmez. `CRON_SECRET`'ı kimseyle paylaşma.
@@ -176,6 +177,8 @@ cron-job.org'da saat dilimini **Europe/Istanbul** yapmayı unutma.
 **Belgeler:** Seçilen süre kadar önce (1 hafta – 6 ay) ve bittiği gün 09:00'da mesaj gelir (“🛂 30 gün sonra bitiyor: Pasaport (Ayşe)”); panoda ve takvimde 30 gün önceden görünür. Belge yenilenip tarih değiştirilince hatırlatmalar yeni tarihe göre kurulur. Gizlilik için belge numarası ya da fotoğrafı saklanmaz.
 
 **Hava uyarısı:** Ayarlarda şehri olan kullanıcılara, yarın yağmur (≥%60), kar, gök gürültülü sağanak, don (≤0°), aşırı sıcak (≥35°) ya da kuvvetli rüzgâr (≥50 km/s) bekleniyorsa akşam 20:00'den sonra bir kez mesaj gelir; bugünün uyarıları günlük özette de yazar. Ayarlar'dan kapatılabilir.
+
+**Günlük:** Günlük sayfasında akşam hatırlatması açılırsa, o gün yazılmadıysa seçilen saatte “📓 Bugün nasıldı?” diye sorulur; emojiye dokunmak ruh halini kaydeder (webhook kuruluysa). Panodaki “Bugün” kartından da tek dokunuşla girilebilir.
 
 **Önemli günler:** Seçilen gün sayısı kadar önce ve o gün 09:00'da mesaj gelir (“🎂 7 gün sonra: Annemin doğum günü (60. yaş)”); panoda 30 gün önceden görünür.
 

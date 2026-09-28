@@ -90,6 +90,15 @@
       <p class="muted small">Takip ettiğin alışkanlık yok. <a href="{{ url_for('habits.index') }}">Ekle</a></p>
     {% endif %}
 
+    <h3 style="margin-top: 14px; display: flex; justify-content: space-between; align-items: center">📓 Bugün nasıldı? <a class="more" href="{{ url_for('journal.index') }}">Günlük →</a></h3>
+    <form method="post" action="{{ url_for('journal.quick_mood') }}" class="habit-chips mood-chips">
+      {{ ui.csrf() }}<input type="hidden" name="next" value="dashboard">
+      {% for n, (emoji, label) in moods.items() %}
+        <button class="habit-chip {{ 'on' if journal_today and journal_today.mood == n }}" name="mood" value="{{ n }}" title="{{ label }}">{{ emoji }}</button>
+      {% endfor %}
+    </form>
+    {% if journal_today and journal_today.text %}<p class="muted small">{{ journal_today.text | truncate(120) }}</p>{% endif %}
+
     {% if meds %}
       <h3 style="margin-top: 14px">💊 İlaçlar</h3>
       <ul class="rows">

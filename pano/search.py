@@ -12,6 +12,11 @@ from .utils import fmt_date, fmt_money, fold
 ROW_LIMIT = 1000
 
 
+def _mood(n):
+    from .modules.journal import MOODS
+    return MOODS.get(n, ("", ""))[0]
+
+
 def _sources(user_id):
     """(etiket, ikon, sorgu, parametreler, aranan alanlar, başlık, ayrıntı, adres)"""
     return [
@@ -73,6 +78,9 @@ def _sources(user_id):
          ("title", "creator", "note", "year"), lambda r: r["title"] + (" ✓" if r["status"] == "done" else ""),
          lambda r: " · ".join(x for x in (r["year"], r["creator"]) if x),
          lambda r: url_for("watchlist.edit", item_id=r["id"])),
+        ("Günlük", "📓", "SELECT * FROM journal WHERE user_id = ? ORDER BY date DESC LIMIT ?", (user_id,),
+         ("text",), lambda r: fmt_date(r["date"], True) + (" " + _mood(r["mood"]) if r["mood"] else ""),
+         lambda r: r["text"], lambda r: url_for("journal.index", ay=r["date"][:7], gun=r["date"])),
         ("Önemli Günler", "🎂", "SELECT * FROM special_days WHERE user_id = ? LIMIT ?", (user_id,),
          ("name", "note"), lambda r: r["name"], lambda r: f"{r['day']:02d}.{r['month']:02d}",
          lambda r: url_for("specialdays.edit", day_id=r["id"])),
