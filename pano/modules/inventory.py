@@ -4,9 +4,10 @@ Arama Türkçe harf ve büyük/küçük harf duyarsızdır ("sarj" -> "Şarj ale
 """
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query
-from ..storage import attachments_for, delete_for, first_thumbs
+from ..storage import attachments_for, first_thumbs
 from ..utils import form_int, form_str, redirect_back
 
 bp = Blueprint("inventory", __name__, url_prefix="/envanter")
@@ -126,7 +127,6 @@ def qty(item_id):
 @login_required
 def delete(item_id):
     item = owned_or_404("inventory", item_id, g.user["id"])
-    delete_for("inventory", item_id)
-    execute("DELETE FROM inventory WHERE id = ? AND user_id = ?", (item_id, g.user["id"]))
-    flash(f"{item['name']} silindi.", "success")
+    trash.move(g.user["id"], "inventory", f"📦 {item['name']}", ("inventory", item_id), entity="inventory")
+    flash(trash.notice(item["name"]), "success")
     return redirect(url_for(".index"))

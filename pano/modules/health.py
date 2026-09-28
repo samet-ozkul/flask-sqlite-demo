@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
 from .. import scheduled, telegram
@@ -291,8 +292,8 @@ def med_toggle(med_id):
 @login_required
 def med_delete(med_id):
     med = owned_or_404("medications", med_id, g.user["id"])
-    execute("DELETE FROM medications WHERE id = ? AND user_id = ?", (med_id, g.user["id"]))
-    flash(f"{med['name']} silindi.", "success")
+    trash.move(g.user["id"], "health", f"💊 {med['name']}", ("medications", med_id), children=[("med_logs", "med_id = ?")])
+    flash(trash.notice(med["name"]), "success")
     return _back("ilac")
 
 
@@ -348,7 +349,7 @@ def appt_toggle(appt_id):
 @bp.route("/randevu/<int:appt_id>/sil", methods=["POST"])
 @login_required
 def appt_delete(appt_id):
-    owned_or_404("appointments", appt_id, g.user["id"])
-    execute("DELETE FROM appointments WHERE id = ? AND user_id = ?", (appt_id, g.user["id"]))
-    flash("Randevu silindi.", "success")
+    appt = owned_or_404("appointments", appt_id, g.user["id"])
+    trash.move(g.user["id"], "health", f"🩺 {appt['title']} ({appt['starts_at'][:10]})", ("appointments", appt_id))
+    flash(trash.notice("Randevu"), "success")
     return _back("randevu")

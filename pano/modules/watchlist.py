@@ -11,6 +11,7 @@ import urllib.request
 
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query
 from ..utils import form_choice, form_int, form_str, redirect_back, today_str
@@ -173,6 +174,6 @@ def set_status(item_id):
 @login_required
 def delete(item_id):
     item = owned_or_404("watchlist", item_id, g.user["id"])
-    execute("DELETE FROM watchlist WHERE id = ? AND user_id = ?", (item_id, g.user["id"]))
-    flash(f"{item['title']} silindi.", "success")
+    trash.move(g.user["id"], "watchlist", f"{KINDS[item['kind']][1]} {item['title']}", ("watchlist", item_id))
+    flash(trash.notice(item["title"]), "success")
     return redirect(url_for(".index"))

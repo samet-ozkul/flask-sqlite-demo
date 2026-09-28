@@ -1,9 +1,10 @@
 """🍲 Tarifler: malzemeler, hazırlanış (Markdown), fotoğraf ve alışveriş listesine aktarma."""
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query
-from ..storage import attachments_for, delete_for, first_thumbs
+from ..storage import attachments_for, first_thumbs
 from ..utils import form_str, normalize_tags
 from .lists import TEXT_MAX, accessible_lists, add_items, list_or_404
 
@@ -174,7 +175,6 @@ def to_list(recipe_id):
 def delete(recipe_id):
     uid = g.user["id"]
     recipe = owned_or_404("recipes", recipe_id, uid)
-    delete_for("recipe", recipe_id)
-    execute("DELETE FROM recipes WHERE id = ? AND user_id = ?", (recipe_id, uid))
-    flash(f"“{recipe['title']}” tarifi silindi.", "success")
+    trash.move(uid, "recipes", f"🍲 {recipe['title']}", ("recipes", recipe_id), entity="recipe")
+    flash(trash.notice(f"“{recipe['title']}” tarifi"), "success")
     return redirect(url_for("recipes.index"))

@@ -1,6 +1,7 @@
 """🤝 Borç / Alacak: kime ne verdim, kimden ne aldım; vade, kapatma, kişi bazında net durum."""
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
 from ..utils import (CURRENCIES, form_choice, form_date, form_str, redirect_back, today_str)
@@ -160,6 +161,6 @@ def reopen(debt_id):
 def delete(debt_id):
     uid = g.user["id"]
     debt = owned_or_404("debts", debt_id, uid)
-    execute("DELETE FROM debts WHERE id = ? AND user_id = ?", (debt_id, uid))
-    flash("Kayıt silindi.", "success")
+    trash.move(uid, "debts", f"🤝 {debt['person']}", ("debts", debt_id))
+    flash(trash.notice("Kayıt"), "success")
     return redirect(url_for(".index", sekme=_tab_for(debt)))

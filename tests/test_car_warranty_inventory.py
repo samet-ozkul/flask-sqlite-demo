@@ -218,6 +218,8 @@ assert r.status_code == 302
 assert db_one("SELECT 1 x FROM vehicles WHERE id = ?", (vid2,)) is None
 assert db_one("SELECT COUNT(*) n FROM vehicle_logs WHERE vehicle_id = ?", (vid2,))["n"] == 0
 assert db_one("SELECT 1 x FROM attachments WHERE id = ?", (att["id"],)) is None
+assert all(os.path.exists(p) for p in att_paths(att))  # çöp kutusundayken dosyalar durur
+c.post("/cop-kutusu/bosalt")
 assert not any(os.path.exists(p) for p in att_paths(att))
 assert c.get(f"/arac/{vid2}").status_code == 404
 
@@ -312,8 +314,16 @@ r = c.post(f"/garanti/{wid}/sil")
 assert r.status_code == 302
 assert db_one("SELECT 1 x FROM warranties WHERE id = ?", (wid,)) is None
 assert db_one("SELECT COUNT(*) n FROM attachments WHERE entity = 'warranty' AND entity_id = ?", (wid,))["n"] == 0
-assert not any(os.path.exists(p) for p in paths)
+assert all(os.path.exists(p) for p in paths)  # çöp kutusundayken dosyalar durur
 assert c.get(f"/garanti/{wid}").status_code == 404
+# Çöp kutusundan geri getir: garanti ve eki aynı id'lerle döner
+tid = db_one("SELECT id FROM trash WHERE module = 'warranty' ORDER BY id DESC")["id"]
+c.post(f"/cop-kutusu/{tid}/geri")
+assert db_one("SELECT product FROM warranties WHERE id = ?", (wid,))["product"] == "Bulaşık makinesi"
+assert c.get(f"/dosya/{att['id']}/kucuk").status_code == 200
+c.post(f"/garanti/{wid}/sil")
+c.post("/cop-kutusu/bosalt")
+assert not any(os.path.exists(p) for p in paths)
 
 # ======================================================================
 # EV ENVANTERİ
@@ -395,6 +405,7 @@ paths = att_paths(att)
 c.post(f"/envanter/{mid}/sil")
 assert db_one("SELECT 1 x FROM inventory WHERE id = ?", (mid,)) is None
 assert db_one("SELECT 1 x FROM attachments WHERE id = ?", (att["id"],)) is None
+c.post("/cop-kutusu/bosalt")
 assert not any(os.path.exists(p) for p in paths)
 
 # ======================================================================

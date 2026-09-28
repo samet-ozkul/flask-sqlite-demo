@@ -7,9 +7,24 @@ from werkzeug.security import check_password_hash
 from .. import ai, external, telegram, totp
 from ..auth import login_required, set_password
 from ..db import execute
-from ..utils import form_bool, form_str
+from ..utils import form_bool, form_choice, form_str, redirect_back
 
 bp = Blueprint("settings", __name__, url_prefix="/ayarlar")
+
+THEMES = {"auto": "🌓 Tema: otomatik", "dark": "🌙 Tema: koyu", "light": "☀️ Tema: açık"}
+THEME_NEXT = {"auto": "dark", "dark": "light", "light": "auto"}  # menüdeki buton sırayla değiştirir
+
+
+@bp.app_context_processor
+def _theme_context():
+    return {"THEMES": THEMES, "THEME_NEXT": THEME_NEXT}
+
+
+def _layout(user):
+    """Ayarlardaki pano düzeni listesi: [(anahtar, ad, görünür)] — önce seçilenler sırasıyla, sonra gizliler."""
+    from .dashboard import CARDS, CARD_TITLES, card_keys
+    keys = card_keys(user)
+    return [(k, CARD_TITLES[k], True) for k in keys] + [(k, t, False) for k, t in CARDS if k not in keys]
 
 
 @bp.route("/")
@@ -22,6 +37,7 @@ def index():
         recovery_left=totp.recovery_left(g.user["id"]) if g.user["totp_enabled"] else 0,
         ai_config=ai.config(),
         bot_username=telegram.bot_username() if g.user["telegram_link_code"] else None,
+        layout=_layout(g.user),
     )
 
 
@@ -65,6 +81,31 @@ def password():
         set_password(g.user["id"], new)
         flash("Şifre değiştirildi.", "success")
     return redirect(url_for(".index"))
+
+
+# ---------- Görünüm ----------
+@bp.route("/tema", methods=["POST"])
+@login_required
+def theme():
+    execute("UPDATE users SET theme = ? WHERE id = ?", (form_choice("theme", THEMES, "auto"), g.user["id"]))
+    return redirect_back("settings.index")
+
+
+@bp.route("/pano", methods=["POST"])
+@login_required
+def dashboard_layout():
+    from .dashboard import CARD_TITLES
+    if request.form.get("reset"):
+        value = None
+        flash("Pano varsayılan düzene döndü.", "success")
+    else:
+        shown = set(request.form.getlist("show"))
+        order = list(dict.fromkeys(k for k in request.form.getlist("order") if k in CARD_TITLES))
+        order += [k for k in CARD_TITLES if k not in order]
+        value = ",".join(k for k in order if k in shown)
+        flash("Pano düzeni kaydedildi.", "success")
+    execute("UPDATE users SET dashboard_cards = ? WHERE id = ?", (value, g.user["id"]))
+    return redirect(url_for(".index") + "#pano-duzeni")
 
 
 # ---------- Yapay zekâ ----------

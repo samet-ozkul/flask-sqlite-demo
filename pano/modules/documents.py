@@ -8,6 +8,7 @@ from datetime import date
 
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query
 from ..utils import days_until, form_choice, form_date, form_int, form_str
@@ -84,8 +85,8 @@ def edit(doc_id):
 @login_required
 def delete(doc_id):
     doc = owned_or_404("documents", doc_id, g.user["id"])
-    execute("DELETE FROM documents WHERE id = ? AND user_id = ?", (doc_id, g.user["id"]))
-    flash(f"{doc['name']} silindi.", "success")
+    trash.move(g.user["id"], "documents", f"{KINDS[doc['kind']][1]} {doc['name']}", ("documents", doc_id))
+    flash(trash.notice(doc["name"]), "success")
     return redirect(url_for(".index"))
 
 

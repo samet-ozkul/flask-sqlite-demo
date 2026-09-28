@@ -167,13 +167,6 @@ def first_thumbs(entity, ids):
     return {r["entity_id"]: r for r in rows}
 
 
-def delete_for(entity, entity_id):
-    """Bir kayıt silinirken eklerini de siler. Kaydı silen rota bunu çağırmalı."""
-    for row in attachments_for(entity, entity_id):
-        _remove_files(row)
-    execute("DELETE FROM attachments WHERE entity = ? AND entity_id = ?", (entity, entity_id))
-
-
 def delete_user_files(user_id):
     shutil.rmtree(os.path.join(upload_dir(), str(user_id)), ignore_errors=True)
 
@@ -191,7 +184,8 @@ def cleanup_orphans():
             execute("DELETE FROM attachments WHERE id = ?", (row["id"],))
             removed += 1
             freed += row["size"]
-    known = set()
+    from .trash import kept_files
+    known = kept_files()  # çöp kutusundaki kayıtların dosyaları geri getirilebilsin diye durur
     for row in query("SELECT filename, thumb FROM attachments"):
         known.add(row["filename"])
         if row["thumb"]:

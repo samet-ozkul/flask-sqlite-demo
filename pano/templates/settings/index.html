@@ -18,6 +18,40 @@
   </form>
 </section>
 
+<section class="card" id="gorunum">
+  <h2>🎨 Görünüm</h2>
+  <form method="post" action="{{ url_for('settings.theme') }}" class="row-flex">
+    {{ ui.csrf() }}
+    {% for value, label in THEMES.items() %}
+      <label class="check"><input type="radio" name="theme" value="{{ value }}" {% if (g.user.theme or 'auto') == value %}checked{% endif %} data-autosubmit> {{ label | replace('Tema: ', '') }}</label>
+    {% endfor %}
+    <noscript><button class="btn sm">Kaydet</button></noscript>
+  </form>
+  <p class="muted small">Otomatik: telefonun ya da bilgisayarın açık/koyu ayarına uyar. Kullanıcı menüsünden de değiştirilebilir.</p>
+</section>
+
+<section class="card" id="pano-duzeni">
+  <h2>🧩 Pano düzeni</h2>
+  <form method="post" action="{{ url_for('settings.dashboard_layout') }}">
+    {{ ui.csrf() }}
+    <ul class="rows layout-list">
+      {% for key, title, shown in layout %}
+        <li>
+          <input type="hidden" name="order" value="{{ key }}">
+          <label class="check"><input type="checkbox" name="show" value="{{ key }}" {% if shown %}checked{% endif %}> {{ title }}</label>
+          <button class="btn sm" data-move="up" title="Yukarı" aria-label="Yukarı">↑</button>
+          <button class="btn sm" data-move="down" title="Aşağı" aria-label="Aşağı">↓</button>
+        </li>
+      {% endfor %}
+    </ul>
+    <div class="row-flex" style="margin-top: 10px">
+      <button class="btn primary">Kaydet</button>
+      <button class="btn sm" name="reset" value="1">Varsayılana dön</button>
+    </div>
+  </form>
+  <p class="muted small">İşareti kaldırılan kart panoda gösterilmez; ↑ ↓ ile sırayı değiştir.</p>
+</section>
+
 <section class="card" id="telegram">
   <h2>Telegram bildirimleri</h2>
   {% if not telegram_enabled %}

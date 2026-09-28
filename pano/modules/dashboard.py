@@ -42,55 +42,93 @@ def _shopping(user_id):
     )
 
 
+# Pano kartları: (anahtar, ayarlardaki ad). Sıra ve görünürlük users.dashboard_cards'ta (virgülle ayrılmış anahtarlar).
+CARDS = [
+    ("weather", "☀️ Hava durumu"),
+    ("rates", "💱 Kurlar"),
+    ("upcoming", "📌 Yaklaşanlar"),
+    ("today", "🔥 Bugün: alışkanlıklar, günlük, ilaçlar"),
+    ("todos", "☑️ Yapılacaklar ve alışveriş"),
+    ("money", "💰 Varlıklar ve hedefler"),
+    ("quick_expense", "💸 Hızlı harcama"),
+    ("quick_note", "📝 Hızlı not"),
+    ("modules", "▦ Modül kısayolları"),
+]
+CARD_TITLES = dict(CARDS)
+WIDE_CARDS = {"upcoming", "modules"}
+
+
+def card_keys(user):
+    """Kullanıcının seçtiği kartlar, sırasıyla. Hiç seçim yapmadıysa hepsi."""
+    raw = user["dashboard_cards"]
+    if raw is None:
+        return [k for k, _ in CARDS]
+    return list(dict.fromkeys(k for k in raw.split(",") if k in CARD_TITLES))
+
+
+def _money(user_id):
+    """Varlık toplamı ve aktif hedefler; ikisi de yoksa None (kart gösterilmez)."""
+    from .assets import total_value
+    from .goals import summary
+    has_assets = query_one("SELECT 1 FROM assets WHERE user_id = ? LIMIT 1", (user_id,)) is not None
+    goals = summary(user_id)[:3]
+    if not has_assets and not goals:
+        return None
+    return {"assets": total_value(user_id) if has_assets else None, "goals": goals}
+
+
 @bp.route("/")
 @login_required
 def index():
     uid = g.user["id"]
     now = now_local()
     t = today()
+    cards = card_keys(g.user)
+    data = {}
 
-    weather = external.weather(g.user["lat"], g.user["lon"])
-    rates = external.rates()
-    gold = external.gold_gram_try()
-
-    # Modüller arası bağımlılığı açılışta değil burada kuruyoruz
-    from .expenses import CATEGORIES
-    from .habits import today_status
-
-    start, end = month_bounds(t.year, t.month)
-    month_spent = query_one(
-        "SELECT COALESCE(SUM(amount), 0) AS s FROM expenses WHERE user_id = ? AND date >= ? AND date < ?",
-        (uid, start, end),
-    )["s"]
-    pending = query_one(
-        "SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS s FROM bills WHERE user_id = ? AND paid = 0",
-        (uid,),
-    )
-
-    disk = usage() if g.user["is_admin"] else None
-    from .journal import MOODS
-    journal_today = query_one("SELECT * FROM journal WHERE user_id = ? AND date = ?", (uid, t.isoformat()))
+    # Sadece gösterilen kartların verisi toplanır (dış servislere gereksiz istek gitmez)
+    if "weather" in cards:
+        data["weather"] = external.weather(g.user["lat"], g.user["lon"])
+        data["weather_label"] = external.weather_label
+    if "rates" in cards:
+        data["rates"] = external.rates()
+        data["gold"] = external.gold_gram_try()
+    if "upcoming" in cards:
+        data["upcoming"] = upcoming(uid, days=7, long_days=30)[:12]
+    if "today" in cards:
+        from .habits import today_status
+        from .journal import MOODS
+        data["habits"] = today_status(uid)
+        data["meds"] = medications_today(uid)
+        data["moods"] = MOODS
+        data["journal_today"] = query_one("SELECT * FROM journal WHERE user_id = ? AND date = ?", (uid, t.isoformat()))
+    if "todos" in cards:
+        data["todos"] = _todos(uid)
+        data["shopping"] = _shopping(uid)
+    if "money" in cards:
+        data["money"] = _money(uid)
+    if "quick_expense" in cards:
+        from .expenses import CATEGORIES
+        start, end = month_bounds(t.year, t.month)
+        data["categories"] = CATEGORIES
+        data["month_name"] = MONTHS_TR[t.month - 1]
+        data["month_spent"] = query_one(
+            "SELECT COALESCE(SUM(amount), 0) AS s FROM expenses WHERE user_id = ? AND date >= ? AND date < ?",
+            (uid, start, end),
+        )["s"]
+        data["pending"] = query_one(
+            "SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS s FROM bills WHERE user_id = ? AND paid = 0",
+            (uid,),
+        )
 
     return render_template(
         "dashboard/index.html",
         greeting=_greeting(now.hour),
         date_label=f"{t.day} {MONTHS_TR[t.month - 1]}, {WEEKDAYS_TR[t.weekday()]}",
-        weather=weather,
-        weather_label=external.weather_label,
-        rates=rates,
-        gold=gold,
-        upcoming=upcoming(uid, days=7, long_days=30)[:12],
-        habits=today_status(uid),
-        meds=medications_today(uid),
-        todos=_todos(uid),
-        shopping=_shopping(uid),
-        categories=CATEGORIES,
-        month_spent=month_spent,
-        month_name=MONTHS_TR[t.month - 1],
-        pending=pending,
-        disk=disk,
-        moods=MOODS,
-        journal_today=journal_today,
+        cards=cards,
+        wide_cards=WIDE_CARDS,
+        disk=usage() if g.user["is_admin"] else None,
+        **data,
     )
 
 

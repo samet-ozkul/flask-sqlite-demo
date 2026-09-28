@@ -126,7 +126,9 @@ def daily(secret):
     for row in query("SELECT DISTINCT user_id FROM assets"):
         record_snapshot(row["user_id"])
 
-    # Ufak bakım: eski önbellek ve giriş denemesi kayıtları
+    # Ufak bakım: 30 günü dolan çöp, eski önbellek ve giriş denemesi kayıtları
+    from .. import trash
+    result["trash_purged"] = trash.purge()
     external.purge_cache()
     db = get_db()
     db.execute("DELETE FROM login_attempts WHERE first_at < ?", (time.time() - 86400,))

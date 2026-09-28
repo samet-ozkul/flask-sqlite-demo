@@ -173,6 +173,8 @@ def test_recipes():
     assert r.status_code == 302 and loc(r).endswith("/tarifler/")
     assert db_one("SELECT * FROM recipes WHERE id = ?", (rid,)) is None
     assert db_one("SELECT * FROM attachments WHERE entity = 'recipe' AND entity_id = ?", (rid,)) is None
+    assert os.path.exists(path)  # çöp kutusundayken dosya durur
+    admin.post("/cop-kutusu/bosalt")
     assert not os.path.exists(path)
     assert admin.get(f"/tarifler/{rid}").status_code == 404
 

@@ -493,6 +493,20 @@ MIGRATIONS = [
     );
     ALTER TABLE users ADD COLUMN journal_reminder TEXT;
     """,
+    # 14: geri dönüşüm kutusu, tema ve pano düzeni
+    """
+    CREATE TABLE trash (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        module TEXT NOT NULL,
+        label TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        deleted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_trash_user ON trash(user_id, deleted_at);
+    ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'auto';
+    ALTER TABLE users ADD COLUMN dashboard_cards TEXT;
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

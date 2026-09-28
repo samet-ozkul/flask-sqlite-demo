@@ -8,9 +8,10 @@ import re
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
-from ..storage import attachments_for, delete_for, first_thumbs
+from ..storage import attachments_for, first_thumbs
 from ..utils import form_bool, form_choice, form_date, form_float, form_str, today, today_str
 
 bp = Blueprint("car", __name__, url_prefix="/arac")
@@ -164,10 +165,9 @@ def update(vehicle_id):
 @login_required
 def delete(vehicle_id):
     vehicle = owned_or_404("vehicles", vehicle_id, g.user["id"])
-    delete_for("vehicle", vehicle_id)
-    execute("DELETE FROM vehicle_logs WHERE vehicle_id = ?", (vehicle_id,))
-    execute("DELETE FROM vehicles WHERE id = ? AND user_id = ?", (vehicle_id, g.user["id"]))
-    flash(f"{vehicle['name']} silindi.", "success")
+    trash.move(g.user["id"], "car", f"🚗 {vehicle['name']}", ("vehicles", vehicle_id),
+               children=[("vehicle_logs", "vehicle_id = ?")], entity="vehicle")
+    flash(trash.notice(vehicle["name"]), "success")
     return redirect(url_for(".index"))
 
 
@@ -214,8 +214,8 @@ def add_log(vehicle_id):
 @bp.route("/<int:vehicle_id>/kayit/<int:log_id>/sil", methods=["POST"])
 @login_required
 def delete_log(vehicle_id, log_id):
-    owned_or_404("vehicles", vehicle_id, g.user["id"])
-    _own_log_or_404(vehicle_id, log_id)
-    execute("DELETE FROM vehicle_logs WHERE id = ? AND vehicle_id = ?", (log_id, vehicle_id))
-    flash("Kayıt silindi.", "success")
+    vehicle = owned_or_404("vehicles", vehicle_id, g.user["id"])
+    log = _own_log_or_404(vehicle_id, log_id)
+    trash.move(g.user["id"], "car", f"🚗 {vehicle['name']} · {log['date']} kaydı", ("vehicle_logs", log_id))
+    flash(trash.notice("Kayıt"), "success")
     return redirect(url_for(".detail", vehicle_id=vehicle_id))

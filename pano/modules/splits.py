@@ -21,6 +21,7 @@ user_groups(user_id), group_or_404(group_id, user_id).
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
 from .. import telegram
+from .. import trash
 from ..auth import login_required
 from ..db import execute, get_db, query, query_one
 from ..utils import fmt_money, fold, form_date, form_int, form_str, today_str
@@ -395,15 +396,12 @@ def update(group_id):
 @login_required
 def delete(group_id):
     group = group_or_404(group_id, g.user["id"], owner_only=True)
-    db = get_db()
-    db.execute("DELETE FROM split_shares WHERE expense_id IN (SELECT id FROM split_expenses WHERE group_id = ?)",
-               (group_id,))
-    db.execute("DELETE FROM split_settlements WHERE group_id = ?", (group_id,))
-    db.execute("DELETE FROM split_expenses WHERE group_id = ?", (group_id,))
-    db.execute("DELETE FROM split_members WHERE group_id = ?", (group_id,))
-    db.execute("DELETE FROM split_groups WHERE id = ?", (group_id,))
-    db.commit()
-    flash(f"“{group['name']}” grubu silindi.", "success")
+    # Geri getirirken sıra önemli: üyeler -> harcamalar -> paylar -> ödemeler
+    trash.move(g.user["id"], "splits", f"👥 {group['name']} grubu", ("split_groups", group_id), children=[
+        ("split_members", "group_id = ?"), ("split_expenses", "group_id = ?"),
+        ("split_shares", "expense_id IN (SELECT id FROM split_expenses WHERE group_id = ?)"),
+        ("split_settlements", "group_id = ?")])
+    flash(trash.notice(f"“{group['name']}” grubu"), "success")
     return redirect(url_for("splits.index"))
 
 

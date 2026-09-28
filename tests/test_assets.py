@@ -271,7 +271,7 @@ def test_edit_delete():
     # Silme
     araba = asset("Araba")
     r = C.post(f"/varliklar/{araba['id']}/sil", follow_redirects=True)
-    assert "Araba silindi" in r.get_data(as_text=True) and asset("Araba") is None
+    assert "Araba çöp kutusuna taşındı" in r.get_data(as_text=True) and asset("Araba") is None
     assert C.get(f"/varliklar/{araba['id']}").status_code == 404
     assert C.post(f"/varliklar/{araba['id']}/sil").status_code == 404
     print("  edit/delete OK")

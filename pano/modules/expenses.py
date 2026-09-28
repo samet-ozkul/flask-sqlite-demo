@@ -13,6 +13,7 @@ from itertools import groupby
 from flask import Blueprint, Response, flash, g, redirect, render_template, request, url_for
 
 from .. import ai, assistant, budgets
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
 from ..utils import (add_months, fmt_money, form_date, form_str, month_bounds, parse_number,
@@ -212,8 +213,9 @@ def edit(expense_id):
 @login_required
 def delete(expense_id):
     row = owned_or_404("expenses", expense_id, g.user["id"])
-    execute("DELETE FROM expenses WHERE id = ? AND user_id = ?", (expense_id, g.user["id"]))
-    flash("Harcama silindi.", "success")
+    trash.move(g.user["id"], "expenses", f"💸 {row['note'] or row['category']} · {fmt_money(row['amount'])}",
+               ("expenses", expense_id))
+    flash(trash.notice("Harcama"), "success")
     return redirect(url_for(".index", ay=row["date"][:7]))
 
 

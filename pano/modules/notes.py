@@ -7,9 +7,10 @@ Diğer modüller için referans yapı:
 """
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query
-from ..storage import attachments_for, delete_for
+from ..storage import attachments_for
 from ..utils import form_bool, form_str, normalize_tags
 
 bp = Blueprint("notes", __name__, url_prefix="/notlar")
@@ -89,8 +90,8 @@ def toggle_pin(note_id):
 @bp.route("/<int:note_id>/sil", methods=["POST"])
 @login_required
 def delete(note_id):
-    owned_or_404("notes", note_id, g.user["id"])
-    delete_for("note", note_id)
-    execute("DELETE FROM notes WHERE id = ? AND user_id = ?", (note_id, g.user["id"]))
-    flash("Not silindi.", "success")
+    note = owned_or_404("notes", note_id, g.user["id"])
+    label = note["title"] or " ".join(note["content"].split())[:50] or "Not"
+    trash.move(g.user["id"], "notes", "📝 " + label, ("notes", note_id), entity="note")
+    flash(trash.notice("Not"), "success")
     return redirect(url_for(".index"))

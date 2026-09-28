@@ -7,6 +7,7 @@
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
 from .. import todo_reminders as todo
+from .. import trash
 from ..auth import login_required
 from ..db import execute, query, query_one
 from ..utils import form_bool, form_date, form_str, now_local, today_str
@@ -113,8 +114,8 @@ def edit(event_id):
 @login_required
 def delete(event_id):
     event = _event_or_404(event_id, g.user["id"], owner_only=True)
-    execute("DELETE FROM events WHERE id = ?", (event_id,))
-    flash(f"{event['title']} silindi.", "success")
+    trash.move(g.user["id"], "events", f"📅 {event['title']} ({event['date']})", ("events", event_id))
+    flash(trash.notice(event["title"]), "success")
     return redirect(url_for(".index"))
 
 

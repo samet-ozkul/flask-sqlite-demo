@@ -15,6 +15,7 @@ from datetime import timedelta
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
 from .. import external
+from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query
 from ..utils import (CURRENCIES, fmt_money, fmt_number, form_choice, form_float, form_str, parse_date,
@@ -264,6 +265,6 @@ def edit(asset_id):
 def delete(asset_id):
     uid = g.user["id"]
     asset = owned_or_404("assets", asset_id, uid)
-    execute("DELETE FROM assets WHERE id = ? AND user_id = ?", (asset_id, uid))
-    flash(f"{asset['name']} silindi.", "success")
+    trash.move(uid, "assets", f"💰 {asset['name']}", ("assets", asset_id))
+    flash(trash.notice(asset["name"]), "success")
     return redirect(url_for(".index"))
