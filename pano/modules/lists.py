@@ -70,24 +70,25 @@ def split_items(text, kind):
     return out[:MAX_BATCH]
 
 
-def add_items(list_id, texts, user_id, qty="", due_date=None, due_time=None, remind_before=None):
+def add_items(list_id, texts, user_id, qty="", due_date=None, due_time=None, remind_before=None, repeat=None):
     db = get_db()
     for text in texts:
         db.execute(
-            "INSERT INTO list_items (list_id, text, qty, due_date, due_time, remind_before, created_by)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (list_id, text, qty, due_date, due_time, remind_before, user_id),
+            "INSERT INTO list_items (list_id, text, qty, due_date, due_time, remind_before, repeat, created_by)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (list_id, text, qty, due_date, due_time, remind_before, repeat, user_id),
         )
     db.commit()
     return len(texts)
 
 
 def _due_fields():
-    """Formdaki son tarih, saat ve hatırlatma. Tarih yoksa saat ve hatırlatma anlamsız."""
+    """Formdaki son tarih, saat, hatırlatma ve tekrar. Tarih yoksa diğerleri anlamsız."""
     due_date = form_date("due_date")
     if not due_date:
-        return None, None, None
-    return due_date, todo.parse_time(request.form.get("due_time")), todo.parse_remind(request.form.get("remind"))
+        return None, None, None, None
+    return (due_date, todo.parse_time(request.form.get("due_time")), todo.parse_remind(request.form.get("remind")),
+            todo.parse_repeat(request.form.get("repeat")))
 
 
 def _can_edit(item, user_id):
@@ -161,6 +162,7 @@ def detail(list_id):
         "lists/detail.html", lst=lst, open_items=open_items, done_items=done_items, done_count=done_count,
         is_owner=lst["user_id"] == uid, kinds=KINDS, icons=KIND_ICONS,
         remind_options=todo.REMIND_OPTIONS, default_remind=todo.DEFAULT_REMIND, remind_label=todo.remind_label,
+        repeat_options=todo.REPEAT_OPTIONS, repeat_label=todo.repeat_label,
         default_time=todo.DEFAULT_DUE_TIME, telegram_enabled=telegram.enabled(),
     )
 
@@ -173,8 +175,11 @@ def add_item(list_id):
     if not texts:
         flash("Madde boş olamaz.", "warning")
         return redirect_back("lists.detail", list_id=list_id)
-    due_date, due_time, remind = _due_fields() if lst["kind"] == "todo" else (form_date("due_date"), None, None)
-    n = add_items(list_id, texts, g.user["id"], form_str("qty", QTY_MAX), due_date, due_time, remind)
+    if lst["kind"] == "todo":
+        due_date, due_time, remind, repeat = _due_fields()
+    else:
+        due_date, due_time, remind, repeat = form_date("due_date"), None, None, None
+    n = add_items(list_id, texts, g.user["id"], form_str("qty", QTY_MAX), due_date, due_time, remind, repeat)
     flash(f"“{texts[0]}” eklendi." if n == 1 else f"{n} madde eklendi.", "success")
     return redirect_back("lists.detail", list_id=list_id)
 
@@ -183,12 +188,7 @@ def add_item(list_id):
 @login_required
 def toggle_item(item_id):
     item = _item_or_404(item_id, g.user["id"])
-    # SET içindeki "done" eski değeri gösterir
-    execute(
-        "UPDATE list_items SET done = 1 - done,"
-        " done_at = CASE WHEN done = 0 THEN CURRENT_TIMESTAMP ELSE NULL END WHERE id = ?",
-        (item_id,),
-    )
+    todo.set_done(item_id, not item["done"])  # tekrarlayan maddede sonrakini de oluşturur
     # Liste sayfasında her dokunuşta mesaj göstermeyelim; başka sayfadan (pano) gelindiyse bildir
     if request.form.get("next") or request.args.get("next"):
         flash(f"“{item['text']}” " + ("tamamlandı." if not item["done"] else "yeniden açıldı."), "success")
@@ -209,20 +209,21 @@ def edit_item(item_id):
             flash("Madde boş olamaz.", "warning")
             return redirect(url_for("lists.edit_item", item_id=item_id))
         if lst["kind"] == "todo":
-            due_date, due_time, remind = _due_fields()
+            due_date, due_time, remind, repeat = _due_fields()
         else:
-            due_date, due_time, remind = form_date("due_date"), None, None
+            due_date, due_time, remind, repeat = form_date("due_date"), None, None, None
         # Zaman ya da hatırlatma değiştiyse hatırlatmalar yeniden gönderilebilsin
         changed = (due_date, due_time, remind) != (item["due_date"], item["due_time"], item["remind_before"])
         execute(
-            "UPDATE list_items SET text = ?, qty = ?, due_date = ?, due_time = ?, remind_before = ?"
+            "UPDATE list_items SET text = ?, qty = ?, due_date = ?, due_time = ?, remind_before = ?, repeat = ?"
             + (", pre_sent_at = NULL, due_sent_at = NULL" if changed else "") + " WHERE id = ?",
-            (text, form_str("qty", QTY_MAX), due_date, due_time, remind, item_id),
+            (text, form_str("qty", QTY_MAX), due_date, due_time, remind, repeat, item_id),
         )
         flash("Madde güncellendi.", "success")
         return redirect_back("lists.detail", list_id=item["list_id"])
     return render_template(
         "lists/item_edit.html", item=item, lst=lst, remind_options=todo.REMIND_OPTIONS,
+        repeat_options=todo.REPEAT_OPTIONS,
         default_time=todo.DEFAULT_DUE_TIME, telegram_enabled=telegram.enabled(),
     )
 

@@ -17,6 +17,7 @@
     {{ ui.field("Saatler", "times", med.times, placeholder="08:00, 20:00", attrs='maxlength="200" autocomplete="off"',
                 hint="Virgülle ayırın. 8, 8.30, 20:00 gibi yazımlar düzeltilir.") }}
     {{ ui.field("Not", "note", med.note, attrs='maxlength="500"') }}
+    {{ ui.checkbox("🔔 Doz saatlerinde Telegram'dan hatırlat", "notify", med.notify) }}
     <button class="btn primary block">Kaydet</button>
   </form>
 </div>

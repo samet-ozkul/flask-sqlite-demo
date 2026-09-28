@@ -32,6 +32,15 @@
           {% elif not g.user.telegram_chat_id %}<a href="{{ url_for('settings.index') }}#telegram">Telegram'ı bağla</a>.{% endif %}
         </small>
       </label>
+      <label class="field">
+        <span>🔁 Tekrar</span>
+        <select name="repeat">
+          {% for v, label in repeat_options %}
+            <option value="{{ v }}" {% if (item.repeat or '') == v %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <small class="muted">Tamamlanınca bir sonraki tarihle yenisi eklenir. Tarih gerekir.</small>
+      </label>
       {% if item.pre_sent_at or item.due_sent_at %}
         <p class="muted small">Gönderilen: {% if item.pre_sent_at and item.remind_before %}⏰ {{ item.pre_sent_at | localdt }} {% endif %}{% if item.due_sent_at %}🔔 {{ item.due_sent_at | localdt }}{% endif %}.
           Tarih, saat ya da hatırlatma değişirse yeniden gönderilir.</p>

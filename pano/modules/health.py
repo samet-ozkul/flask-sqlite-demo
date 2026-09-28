@@ -10,7 +10,7 @@ from flask import Blueprint, flash, g, redirect, render_template, request, url_f
 
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
-from ..reminders import medications_today
+from .. import scheduled, telegram
 from ..utils import fmt_number, form_choice, form_float, form_str, now_local, redirect_back, today
 
 bp = Blueprint("health", __name__, url_prefix="/saglik")
@@ -155,8 +155,9 @@ def index():
         meds = query("SELECT * FROM medications WHERE user_id = ? ORDER BY name COLLATE NOCASE", (uid,))
         ctx["active_meds"] = [m for m in meds if m["active"]]
         ctx["inactive_meds"] = [m for m in meds if not m["active"]]
-        ctx["schedule"] = medications_today(uid)
-        ctx["now_hm"] = now_s[11:16]
+        ctx["doses"] = scheduled.today_doses(uid)
+        ctx["adherence"] = {m["id"]: scheduled.adherence(m) for m in ctx["active_meds"]}
+        ctx["telegram_ready"] = telegram.enabled() and bool(g.user["telegram_chat_id"])
     else:
         ctx["upcoming"] = query(
             "SELECT * FROM appointments WHERE user_id = ? AND done = 0 AND starts_at >= ? ORDER BY starts_at, id",
@@ -228,7 +229,7 @@ def _med_form():
     """(değerler, hata)"""
     times, error = normalize_times(form_str("times", 200))
     v = {"name": form_str("name", 100), "dose": form_str("dose", 100), "times": times,
-         "note": form_str("note", 500)}
+         "note": form_str("note", 500), "notify": 1 if request.form.get("notify") else 0}
     if not v["name"]:
         error = "İlaç adı boş olamaz."
     return v, error
@@ -241,8 +242,8 @@ def med_create():
     if error:
         flash(error, "error")
         return _back("ilac")
-    execute("INSERT INTO medications (user_id, name, dose, times, note) VALUES (?, ?, ?, ?, ?)",
-            (g.user["id"], v["name"], v["dose"], v["times"], v["note"]))
+    execute("INSERT INTO medications (user_id, name, dose, times, note, notify) VALUES (?, ?, ?, ?, ?, ?)",
+            (g.user["id"], v["name"], v["dose"], v["times"], v["note"], v["notify"]))
     flash(f"💊 {v['name']} eklendi.", "success")
     return _back("ilac")
 
@@ -256,11 +257,25 @@ def med_edit(med_id):
         if error:
             flash(error, "error")
             return redirect(url_for("health.med_edit", med_id=med_id))
-        execute("UPDATE medications SET name = ?, dose = ?, times = ?, note = ? WHERE id = ? AND user_id = ?",
-                (v["name"], v["dose"], v["times"], v["note"], med_id, g.user["id"]))
+        execute("UPDATE medications SET name = ?, dose = ?, times = ?, note = ?, notify = ? WHERE id = ? AND user_id = ?",
+                (v["name"], v["dose"], v["times"], v["note"], v["notify"], med_id, g.user["id"]))
         flash("İlaç güncellendi.", "success")
         return _back("ilac")
     return render_template("health/med_edit.html", med=med)
+
+
+@bp.route("/ilac/<int:med_id>/aldim", methods=["POST"])
+@login_required
+def med_take(med_id):
+    """Bugünkü bir dozu alındı / alınmadı olarak işaretler (Telegram'daki "Aldım" ile aynı kayıt)."""
+    med = owned_or_404("medications", med_id, g.user["id"])
+    slot = form_str("slot", 5)
+    if slot not in scheduled.med_slots(med):
+        flash("Geçersiz saat.", "error")
+        return _back("ilac")
+    log = scheduled.ensure_log(med_id, today().isoformat(), slot)
+    scheduled.set_med_taken(log["id"], not log["taken_at"])
+    return _back("ilac")
 
 
 @bp.route("/ilac/<int:med_id>/durum", methods=["POST"])

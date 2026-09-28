@@ -1,20 +1,23 @@
 {% import "_macros.html" as ui %}
-{# İlaçlar sekmesi: active_meds, inactive_meds, schedule [(saat, ilaç)], now_hm #}
+{# İlaçlar sekmesi: active_meds, inactive_meds, doses (bugünkü dozlar), adherence {id: (alınan, planlanan)} #}
 
-{% if schedule %}
-  {% set ns = namespace(next_marked=false) %}
+{% if doses %}
   <div class="card">
     <h2>Bugünkü program</h2>
-    <div class="sched">
-      {% for t, med in schedule %}
-        {% set is_past = t != '—' and t < now_hm %}
-        {% set is_next = not is_past and t != '—' and not ns.next_marked %}
-        {% if is_next %}{% set ns.next_marked = true %}{% endif %}
-        <span class="{{ 'past' if is_past }} {{ 'next' if is_next }}" {% if is_next %}title="Sıradaki"{% endif %}>
-          {{ t }} · {{ med.name }}{% if med.dose %} ({{ med.dose }}){% endif %}
-        </span>
+    <ul class="rows">
+      {% for d in doses %}
+        <li class="{{ 'done' if d.taken }}">
+          <form method="post" action="{{ url_for('health.med_take', med_id=d.med.id) }}" class="inline">
+            {{ ui.csrf() }}<input type="hidden" name="slot" value="{{ d.slot }}">
+            <button class="tick {{ 'on' if d.taken }}" title="{{ 'Geri al' if d.taken else 'Aldım' }}" aria-label="{{ 'Geri al' if d.taken else 'Aldım' }}"></button>
+          </form>
+          <div class="grow">
+            <div class="title">{{ d.med.name }}{% if d.med.dose %} <span class="muted small">· {{ d.med.dose }}</span>{% endif %}</div>
+          </div>
+          <span class="badge {{ 'good' if d.taken else ('soon' if d.past else '') }}">{{ '✓ ' if d.taken }}{{ d.slot }}</span>
+        </li>
       {% endfor %}
-    </div>
+    </ul>
   </div>
 {% endif %}
 
@@ -30,6 +33,8 @@
       {{ ui.field("Saatler", "times", placeholder="08:00, 20:00", attrs='maxlength="200" autocomplete="off"',
                   hint="Virgülle ayırın. 8, 8.30, 20:00 gibi yazımlar düzeltilir.") }}
       {{ ui.field("Not", "note", placeholder="İsteğe bağlı: tok karnına…", attrs='maxlength="500"') }}
+      {{ ui.checkbox("🔔 Doz saatlerinde Telegram'dan hatırlat", "notify", True) }}
+      {% if not telegram_ready %}<p class="muted small">Hatırlatma için <a href="{{ url_for('settings.index') }}#telegram">Telegram'ı bağla</a>.</p>{% endif %}
       <button class="btn primary block">Ekle</button>
     </form>
   </details>
@@ -48,6 +53,9 @@
               {% if m.times %}
                 <span class="times">{% for t in m.times.split(', ') %}<span class="badge">⏰ {{ t }}</span>{% endfor %}</span>
               {% else %}<span>Saat belirtilmemiş</span>{% endif %}
+              {% if m.notify %}<span title="Telegram hatırlatması">🔔</span>{% endif %}
+              {% set a = adherence.get(m.id) %}
+              {% if a %}<span title="Son 7 günde alınan / planlanan doz">Son 7 gün: {{ a[0] }}/{{ a[1] }}</span>{% endif %}
               {% if m.note %}<span>{{ m.note }}</span>{% endif %}
             </div>
           </div>

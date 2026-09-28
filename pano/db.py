@@ -271,6 +271,24 @@ MIGRATIONS = [
     ALTER TABLE list_items ADD COLUMN due_sent_at TEXT;        -- "zamanı geldi" mesajı gönderildi
     CREATE INDEX idx_list_items_due ON list_items(done, due_date);
     """,
+    # 4: tekrarlayan işler, fatura ve ilaç hatırlatmaları
+    """
+    ALTER TABLE list_items ADD COLUMN repeat TEXT;             -- NULL | daily | weekdays | weekly | monthly | yearly
+    ALTER TABLE list_items ADD COLUMN spawned_id INTEGER;      -- tamamlanınca oluşturulan sonraki tekrar
+    ALTER TABLE bills ADD COLUMN remind INTEGER NOT NULL DEFAULT 1;  -- Telegram'dan hatırlat
+    ALTER TABLE bills ADD COLUMN pre_sent_at TEXT;             -- "yarın son gün" gönderildi
+    ALTER TABLE bills ADD COLUMN due_sent_at TEXT;             -- "bugün son gün" gönderildi
+    ALTER TABLE medications ADD COLUMN notify INTEGER NOT NULL DEFAULT 0;  -- doz saatinde Telegram
+    CREATE TABLE med_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        med_id INTEGER NOT NULL REFERENCES medications(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        slot TEXT NOT NULL,          -- 'HH:MM'
+        sent_at TEXT,
+        taken_at TEXT,
+        UNIQUE (med_id, date, slot)
+    );
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

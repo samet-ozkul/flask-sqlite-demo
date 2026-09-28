@@ -13,7 +13,7 @@ import re
 from datetime import datetime, time, timedelta
 
 from .db import get_db
-from .utils import TZ, now_local
+from .utils import TZ, add_months, now_local, today
 
 REMIND_OPTIONS = [
     ("", "Hatırlatma yok"),
@@ -32,9 +32,21 @@ DEFAULT_DUE_TIME = os.environ.get("REMINDER_DEFAULT_TIME", "09:00")
 LATE_WINDOW = timedelta(hours=6)
 
 
+REPEAT_OPTIONS = [
+    ("", "Tekrar yok"),
+    ("daily", "Her gün"),
+    ("weekdays", "Hafta içi her gün"),
+    ("weekly", "Her hafta"),
+    ("monthly", "Her ay"),
+    ("yearly", "Her yıl"),
+]
+REPEAT_LABELS = dict(REPEAT_OPTIONS[1:])
+
+
 def done_buttons(item_id):
     """Hatırlatma mesajının butonları (webhook kuruluysa gönderilir)."""
-    return [[("✅ Tamamlandı", f"done:{item_id}")]]
+    return [[("✅ Tamamlandı", f"done:{item_id}")],
+            [("⏰ 1 saat ertele", f"snz:{item_id}:1h"), ("📅 Yarına", f"snz:{item_id}:1d")]]
 
 
 def undo_buttons(item_id):
@@ -51,6 +63,88 @@ def parse_time(value):
     if h > 23 or mnt > 59:
         return None
     return f"{h:02d}:{mnt:02d}"
+
+
+def parse_repeat(value):
+    return value if value in REPEAT_LABELS else None
+
+
+def repeat_label(value):
+    return REPEAT_LABELS.get(value, "")
+
+
+def _advance(d, repeat):
+    if repeat == "daily":
+        return d + timedelta(days=1)
+    if repeat == "weekdays":
+        d += timedelta(days=1)
+        while d.weekday() >= 5:  # Cumartesi, Pazar
+            d += timedelta(days=1)
+        return d
+    if repeat == "weekly":
+        return d + timedelta(days=7)
+    if repeat == "monthly":
+        return add_months(d, 1)
+    return add_months(d, 12)
+
+
+def next_repeat_date(due_date, repeat):
+    """Bir sonraki tekrar: son tarihten ileri, bugünden sonraki ilk gün (geç tamamlansa da geçmişe düşmez)."""
+    d = datetime.fromisoformat(due_date[:10]).date()
+    t = today()
+    d = _advance(d, repeat)
+    while d <= t:
+        d = _advance(d, repeat)
+    return d.isoformat()
+
+
+def set_done(item_id, done):
+    """Maddeyi tamamla / yeniden aç. Tekrarlayan maddede tamamlanınca sonrakini oluşturur,
+    geri alınınca (henüz dokunulmamışsa) o sonrakini siler. Web, pano ve Telegram aynı yolu kullanır."""
+    db = get_db()
+    item = db.execute("SELECT * FROM list_items WHERE id = ?", (item_id,)).fetchone()
+    if item is None or bool(item["done"]) == bool(done):
+        return item
+    if done:
+        spawned = None
+        if item["repeat"] and item["due_date"]:
+            spawned = db.execute(
+                "INSERT INTO list_items (list_id, text, qty, due_date, due_time, remind_before, repeat, created_by)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (item["list_id"], item["text"], item["qty"], next_repeat_date(item["due_date"], item["repeat"]),
+                 item["due_time"], item["remind_before"], item["repeat"], item["created_by"]),
+            ).lastrowid
+        db.execute("UPDATE list_items SET done = 1, done_at = CURRENT_TIMESTAMP, spawned_id = ? WHERE id = ?",
+                   (spawned, item_id))
+    else:
+        if item["spawned_id"]:
+            db.execute("DELETE FROM list_items WHERE id = ? AND done = 0", (item["spawned_id"],))
+        db.execute("UPDATE list_items SET done = 0, done_at = NULL, spawned_id = NULL WHERE id = ?", (item_id,))
+    db.commit()
+    return db.execute("SELECT * FROM list_items WHERE id = ?", (item_id,)).fetchone()
+
+
+def snooze(item_id, mode):
+    """'1h': şu andan 1 saat sonrasına; '1d': ertesi güne aynı saatte. Hatırlatma yeniden gönderilir.
+    Yeni zamanı ('YYYY-MM-DD', 'HH:MM') döner."""
+    db = get_db()
+    item = db.execute("SELECT * FROM list_items WHERE id = ?", (item_id,)).fetchone()
+    now = now_local().replace(second=0, microsecond=0)
+    if mode == "1h":
+        when = now + timedelta(hours=1)
+        # 1 saat sonrası için sadece "zamanı geldi" mesajı (önceden uyarı hemen tekrar gelmesin)
+        new_date, new_time, remind = when.date().isoformat(), when.strftime("%H:%M"), 0
+    else:
+        base = max(datetime.fromisoformat(item["due_date"][:10]).date(), now.date()) if item["due_date"] else now.date()
+        new_date, new_time = (base + timedelta(days=1)).isoformat(), item["due_time"]
+        remind = item["remind_before"] if item["remind_before"] is not None else 0
+    db.execute(
+        "UPDATE list_items SET due_date = ?, due_time = ?, remind_before = ?,"
+        " pre_sent_at = NULL, due_sent_at = NULL WHERE id = ?",
+        (new_date, new_time, remind, item_id),
+    )
+    db.commit()
+    return new_date, new_time or DEFAULT_DUE_TIME
 
 
 def parse_remind(value):

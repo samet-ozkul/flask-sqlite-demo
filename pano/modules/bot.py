@@ -8,12 +8,14 @@ Buton verisi (callback_data):
   done:<madde_id>  -> yapılacak işi tamamla, butonu "Geri al" yap
   undo:<madde_id>  -> yeniden aç, butonu "Tamamlandı" yap
 """
+import json
 import logging
 import secrets
 
 from flask import Blueprint, abort, jsonify, request
 
-from .. import bot_commands, telegram
+from .. import bot_commands, scheduled, telegram
+from .. import todo_reminders as todo
 from ..auth import csrf_exempt
 from ..db import execute, query, query_one
 from ..todo_reminders import done_buttons, undo_buttons
@@ -66,45 +68,109 @@ def _handle_callback(cq):
     msg = cq.get("message") or {}
     chat_id = str((msg.get("chat") or {}).get("id") or (cq.get("from") or {}).get("id", ""))
     action, _, raw_id = (cq.get("data") or "").partition(":")
-    if action not in ("done", "undo"):
+    handlers = {"done": _cb_todo, "undo": _cb_todo, "snz": _cb_snooze, "bill": _cb_bill, "billu": _cb_bill,
+                "med": _cb_med, "medu": _cb_med}
+    if action not in handlers:
         if not bot_commands.handle_callback(cq, chat_id, msg.get("message_id")):
             telegram.answer_callback(callback_id)
         return
-    if not raw_id.isdigit():
+    item_id = raw_id.split(":")[0]
+    if not item_id.isdigit():
         telegram.answer_callback(callback_id)
         return
-
     # Butona basan kişi: bu sohbete bağlı pano kullanıcıları
     user_ids = [r["id"] for r in query("SELECT id FROM users WHERE telegram_chat_id = ?", (chat_id,))]
     if not user_ids:
         telegram.answer_callback(callback_id, "Bu sohbet panoya bağlı değil.")
         return
-    marks = ",".join("?" * len(user_ids))
-    # Web'deki kuralın aynısı: kendi listesi ya da paylaşılan liste
-    item = query_one(
-        "SELECT i.* FROM list_items i JOIN lists l ON l.id = i.list_id"
-        f" WHERE i.id = ? AND (l.shared = 1 OR l.user_id IN ({marks}))",
-        (int(raw_id), *user_ids),
-    )
+    buttons = handlers[action](action, int(item_id), raw_id, user_ids, callback_id)
     message_id = msg.get("message_id")
-    if item is None:
-        telegram.answer_callback(callback_id, "Madde bulunamadı, silinmiş olabilir.")
-        if message_id:
-            telegram.edit_buttons(chat_id, message_id, [])
-        return
-
-    if action == "done":
-        if not item["done"]:
-            execute("UPDATE list_items SET done = 1, done_at = CURRENT_TIMESTAMP WHERE id = ?", (item["id"],))
-        telegram.answer_callback(callback_id, "✅ Tamamlandı")
-        buttons = undo_buttons(item["id"])
-    else:
-        if item["done"]:
-            execute("UPDATE list_items SET done = 0, done_at = NULL WHERE id = ?", (item["id"],))
-        telegram.answer_callback(callback_id, "↩️ Yeniden açıldı")
-        buttons = done_buttons(item["id"])
-    if message_id:
+    if message_id and buttons is not None:
         try:
             telegram.edit_buttons(chat_id, message_id, buttons)
         except telegram.TelegramError:
             pass  # ör. "message is not modified" — iş zaten yapıldı
+
+
+def _in(user_ids):
+    return ",".join("?" * len(user_ids))
+
+
+def _todo_item(item_id, user_ids):
+    # Web'deki kuralın aynısı: kendi listesi ya da paylaşılan liste
+    return query_one(
+        "SELECT i.* FROM list_items i JOIN lists l ON l.id = i.list_id"
+        f" WHERE i.id = ? AND (l.shared = 1 OR l.user_id IN ({_in(user_ids)}))",
+        (item_id, *user_ids),
+    )
+
+
+def _cb_todo(action, item_id, raw, user_ids, callback_id):
+    item = _todo_item(item_id, user_ids)
+    if item is None:
+        telegram.answer_callback(callback_id, "Madde bulunamadı, silinmiş olabilir.")
+        return []
+    todo.set_done(item_id, action == "done")
+    if action == "done":
+        note = " · sonraki eklendi 🔁" if item["repeat"] and item["due_date"] and not item["done"] else ""
+        telegram.answer_callback(callback_id, "✅ Tamamlandı" + note)
+        return undo_buttons(item_id)
+    telegram.answer_callback(callback_id, "↩️ Yeniden açıldı")
+    return done_buttons(item_id)
+
+
+def _cb_snooze(action, item_id, raw, user_ids, callback_id):
+    item = _todo_item(item_id, user_ids)
+    if item is None or item["done"]:
+        telegram.answer_callback(callback_id, "Madde bulunamadı ya da tamamlanmış.")
+        return []
+    mode = "1d" if raw.endswith(":1d") else "1h"
+    new_date, new_time = todo.snooze(item_id, mode)
+    label = ("yarın " if mode == "1d" else "") + new_time
+    telegram.answer_callback(callback_id, f"⏰ {label} için ertelendi")
+    return [[("✅ Tamamlandı", f"done:{item_id}")], [(f"⏰ Ertelendi: {label}", "noop")]]
+
+
+def _cb_bill(action, bill_id, raw, user_ids, callback_id):
+    from .bills import pay_bill
+    bill = query_one(f"SELECT * FROM bills WHERE id = ? AND user_id IN ({_in(user_ids)})", (bill_id, *user_ids))
+    if bill is None:
+        telegram.answer_callback(callback_id, "Fatura bulunamadı.")
+        return []
+    key = f"billpay:{bill_id}"
+    if action == "bill":
+        if bill["paid"]:
+            telegram.answer_callback(callback_id, "Bu fatura zaten ödenmiş.")
+            return scheduled.bill_undo_buttons(bill_id)
+        result = pay_bill(bill["user_id"], bill, add_expense=True)
+        # Yanlış dokunuşta "Geri al" oluşan harcamayı ve sonraki faturayı da silebilsin
+        execute("INSERT OR REPLACE INTO app_state (key, value) VALUES (?, ?)",
+                (key, json.dumps({"next_id": result["next_id"], "expense_id": result["expense_id"]})))
+        telegram.answer_callback(callback_id, "✅ " + " ".join(result["messages"])[:190])
+        return scheduled.bill_undo_buttons(bill_id)
+    created = query_one("SELECT value FROM app_state WHERE key = ?", (key,))
+    if created:
+        ids = json.loads(created["value"])
+        if ids.get("expense_id"):
+            execute("DELETE FROM expenses WHERE id = ? AND user_id = ?", (ids["expense_id"], bill["user_id"]))
+        if ids.get("next_id"):
+            execute("DELETE FROM bills WHERE id = ? AND user_id = ? AND paid = 0", (ids["next_id"], bill["user_id"]))
+        execute("DELETE FROM app_state WHERE key = ?", (key,))
+    execute("UPDATE bills SET paid = 0, paid_at = NULL WHERE id = ?", (bill_id,))
+    telegram.answer_callback(callback_id, "↩️ Ödeme geri alındı")
+    return scheduled.bill_buttons(bill_id)
+
+
+def _cb_med(action, log_id, raw, user_ids, callback_id):
+    log = query_one(
+        "SELECT l.*, m.name FROM med_logs l JOIN medications m ON m.id = l.med_id"
+        f" WHERE l.id = ? AND m.user_id IN ({_in(user_ids)})", (log_id, *user_ids))
+    if log is None:
+        telegram.answer_callback(callback_id, "Kayıt bulunamadı.")
+        return []
+    scheduled.set_med_taken(log_id, action == "med")
+    if action == "med":
+        telegram.answer_callback(callback_id, f"✅ {log['name']} alındı")
+        return scheduled.med_undo_buttons(log_id)
+    telegram.answer_callback(callback_id, "↩️ Geri alındı")
+    return scheduled.med_buttons(log_id)
