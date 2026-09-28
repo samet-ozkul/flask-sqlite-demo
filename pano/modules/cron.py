@@ -119,6 +119,11 @@ def daily(secret):
                 except telegram.TelegramError as e:
                     result["errors"].append(f"{user['username']} rapor: {e}")
 
+    # Varlık değer geçmişi (grafik için günde bir kayıt; kur alınamazsa o gün atlanır)
+    from .assets import record_snapshot
+    for row in query("SELECT DISTINCT user_id FROM assets"):
+        record_snapshot(row["user_id"])
+
     # Ufak bakım: eski önbellek ve giriş denemesi kayıtları
     external.purge_cache()
     db = get_db()

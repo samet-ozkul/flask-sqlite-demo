@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "splits/_bits.html" as sp with context %}
+{% block title %}Ortak Harcama{% endblock %}
+{% block head %}
+{{ sp.styles() }}
+<style>
+  .group-rows > li { padding: 0; }
+  .group-rows a.group-link { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 12px 0; color: var(--text); }
+  .group-rows a.group-link:hover { text-decoration: none; }
+  .group-rows a.group-link:hover .title { color: var(--primary); }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("👥 Ortak Harcama", "Ev, tatil, arkadaş grubu: kim ne ödedi, kim kime ne kadar ödemeli") }}
+
+{% if items %}
+  <div class="stats">
+    <div class="stat">
+      <div class="label">Alacağın</div>
+      <div class="value pos">{{ credit | money }}</div>
+      <div class="sub">tüm gruplarda</div>
+    </div>
+    <div class="stat">
+      <div class="label">Borcun</div>
+      <div class="value neg">{{ debt | money }}</div>
+      <div class="sub">tüm gruplarda</div>
+    </div>
+  </div>
+{% endif %}
+
+<div class="card">
+  <details class="add" {% if not items %}open{% endif %}>
+    <summary>＋ Yeni grup</summary>
+    <form method="post" action="{{ url_for('splits.create') }}">
+      {{ ui.csrf() }}
+      {{ ui.field("Grup adı", "name", required=True, placeholder="Ev, Tatil 2026...", attrs='maxlength="80" autocomplete="off"') }}
+      <button class="btn primary block">Oluştur</button>
+      <small class="muted">Sonra üyeleri eklersin: uygulamayı kullananlar ya da hesabı olmayan kişiler (ör. “Ali”).</small>
+    </form>
+  </details>
+</div>
+
+{% if items %}
+  <div class="card">
+    <ul class="rows group-rows">
+      {% for it in items %}
+        {% set grp = it.group %}
+        <li>
+          <a class="group-link" href="{{ url_for('splits.detail', group_id=grp.id) }}">
+            <span class="ico">👥</span>
+            <span class="grow">
+              <span class="title">{{ grp.name }}</span>
+              <span class="meta">
+                <span>{{ grp.member_count }} üye</span>
+                <span>{{ grp.expense_count }} harcama · {{ grp.total | money }}</span>
+                {% if grp.owner_id != g.user.id %}<span>👤 {{ grp.owner_display or grp.owner_username }}</span>{% endif %}
+              </span>
+            </span>
+            <span class="split-amount amount" title="Senin bakiyen">
+              {{ sp.net(it.net) }}
+              <span class="net-sub muted">{{ sp.net_label(it.net) }}</span>
+            </span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <p class="muted small"><span class="pos">+ alacaklısın</span> (diğerleri sana borçlu) · <span class="neg">− borçlusun</span></p>
+{% else %}
+  {{ ui.empty("Henüz grup yok. Ev arkadaşların ya da tatil ekibin için bir grup oluştur!", "👥") }}
+{% endif %}
+{% endblock %}

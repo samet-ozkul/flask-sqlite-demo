@@ -1,0 +1,40 @@
+{# Varlık ekleme / düzenleme formu. Kullanım: {% import "assets/_form.html" as af with context %} #}
+{% import "_macros.html" as ui %}
+
+{# Tür seçimine göre alanları gizleyen stil (JS yok; :has() desteklemeyen tarayıcıda tüm alanlar görünür) #}
+{% macro style() -%}
+<style>
+  @supports selector(:has(a)) {
+    .asset-form:not(:has(select[name=kind] option[value=fx]:checked)) .fx-only { display: none; }
+    .asset-form:has(select[name=kind] option[value=cash]:checked) .price-only { display: none; }
+  }
+</style>
+{%- endmacro %}
+
+{% macro form(action, asset=None, submit="Kaydet") -%}
+  <form method="post" action="{{ action }}" class="asset-form">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.field("Ad", "name", asset.name if asset else "", required=True,
+                  placeholder="ör. Vadeli hesap, Dolar birikimi, Bilezik", attrs='maxlength="100"') }}
+      {{ ui.select("Tür", "kind", kinds.items() | list, asset.kind if asset else "cash") }}
+    </div>
+    <div class="form-row three">
+      <div class="fx-only">
+        {{ ui.select("Döviz cinsi", "currency", fx_currencies.items() | list,
+                     asset.currency if asset and asset.kind == 'fx' else "USD") }}
+      </div>
+      {{ ui.field("Miktar", "quantity", plain(asset.quantity) if asset else "", required=True,
+                  placeholder="ör. 1.500 ya da 25,5", attrs='inputmode="decimal" autocomplete="off"',
+                  hint="Nakit: TL · Döviz: döviz tutarı · Altın: gram · Diğer: adet") }}
+      <div class="price-only">
+        {{ ui.field("Birim fiyat (₺, isteğe bağlı)", "unit_price",
+                    plain(asset.unit_price) if asset and asset.unit_price else "",
+                    placeholder="ör. 4.250", attrs='inputmode="decimal" autocomplete="off"',
+                    hint="Altın fiyatı otomatik gelmiyorsa ya da 'Diğer' için gram/adet fiyatı") }}
+      </div>
+    </div>
+    {{ ui.field("Not", "note", asset.note if asset else "", placeholder="İsteğe bağlı", attrs='maxlength="500"') }}
+    <button class="btn primary">{{ submit }}</button>
+  </form>
+{%- endmacro %}

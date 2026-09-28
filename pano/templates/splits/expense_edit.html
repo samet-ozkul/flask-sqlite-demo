@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "splits/_bits.html" as sp with context %}
+{% block title %}Harcamayı düzenle{% endblock %}
+{% block head %}{{ sp.styles() }}{% endblock %}
+{% block content %}
+{% call ui.page_header("Harcamayı düzenle", "👥 " ~ group.name, back=url_for('splits.detail', group_id=group.id)) %}
+  {{ ui.delete_button(url_for('splits.delete_expense', expense_id=expense.id), "Sil", "Bu harcama silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  {{ sp.expense_form(url_for('splits.edit_expense', expense_id=expense.id), members, member_options,
+                     payer_id=expense.payer_id, amount=expense.amount, date=expense.date, note=expense.note,
+                     selected=selected) }}
+</div>
+
+<p class="muted small">
+  {% if creator %}Ekleyen: {{ creator.display_name or creator.username }} · {% endif %}{{ expense.created_at | localdt }}
+</p>
+{% endblock %}

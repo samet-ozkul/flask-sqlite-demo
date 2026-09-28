@@ -347,6 +347,84 @@ MIGRATIONS = [
     """
     ALTER TABLE users ADD COLUMN ai_enabled INTEGER NOT NULL DEFAULT 0;
     """,
+    # 10: varlıklar, birikim hedefleri, ortak harcama
+    """
+    CREATE TABLE assets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('cash', 'fx', 'gold', 'other')),
+        currency TEXT NOT NULL DEFAULT 'TRY',     -- fx: USD/EUR/GBP; diğerleri TRY
+        quantity REAL NOT NULL,                   -- cash: TL; fx: döviz miktarı; gold: gram; other: adet
+        unit_price REAL,                          -- gold/other: elle girilen birim TL fiyatı (canlı fiyat yoksa)
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT
+    );
+    CREATE TABLE asset_snapshots (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        total_try REAL NOT NULL,
+        PRIMARY KEY (user_id, date)
+    );
+    CREATE TABLE goals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL DEFAULT '🏁',
+        target REAL NOT NULL,
+        deadline TEXT,
+        note TEXT NOT NULL DEFAULT '',
+        done_at TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE goal_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        goal_id INTEGER NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+        amount REAL NOT NULL,                     -- eksi değer: hedeften para çekildi
+        date TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE split_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE split_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL REFERENCES split_groups(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,   -- uygulama kullanıcısıysa
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE split_expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL REFERENCES split_groups(id) ON DELETE CASCADE,
+        payer_id INTEGER NOT NULL REFERENCES split_members(id) ON DELETE CASCADE,
+        amount REAL NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        date TEXT NOT NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE split_shares (
+        expense_id INTEGER NOT NULL REFERENCES split_expenses(id) ON DELETE CASCADE,
+        member_id INTEGER NOT NULL REFERENCES split_members(id) ON DELETE CASCADE,
+        share REAL NOT NULL,
+        PRIMARY KEY (expense_id, member_id)
+    );
+    CREATE TABLE split_settlements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL REFERENCES split_groups(id) ON DELETE CASCADE,
+        from_id INTEGER NOT NULL REFERENCES split_members(id) ON DELETE CASCADE,
+        to_id INTEGER NOT NULL REFERENCES split_members(id) ON DELETE CASCADE,
+        amount REAL NOT NULL,
+        date TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)
