@@ -4,7 +4,7 @@
 {% block head %}
 <style>
   .qr-box { display: flex; justify-content: center; margin: 10px 0; }
-  .qr-box svg { width: 220px; height: 220px; border-radius: 8px; }
+  .qr-box svg { width: min(260px, 100%); height: auto; aspect-ratio: 1; border-radius: 8px; display: block; }
   .secret { font-family: ui-monospace, Consolas, monospace; font-size: 1.05rem; letter-spacing: .05em; text-align: center;
             background: var(--surface-2); padding: 8px; border-radius: 8px; overflow-wrap: anywhere; }
 </style>
