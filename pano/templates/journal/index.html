@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Günlük{% endblock %}
+{% block head %}
+<style>
+  .mood-pick { display: flex; gap: 6px; justify-content: space-between; margin-bottom: 12px; }
+  .mood-pick label { flex: 1; text-align: center; cursor: pointer; }
+  .mood-pick input { display: none; }
+  .mood-pick span { display: block; font-size: 1.8rem; padding: 6px 0; border-radius: 12px; border: 2px solid transparent; }
+  .mood-pick input:checked + span { border-color: var(--primary); background: var(--primary-soft); }
+  .mood-pick small { display: block; font-size: .68rem; color: var(--muted); }
+  .jcal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; max-width: 460px; margin: 0 auto; }
+  .jcal .h { font-size: .72rem; text-align: center; color: var(--muted); }
+  .jcal .d { aspect-ratio: 1; min-width: 0; border-radius: 8px; background: var(--surface-2); display: flex; flex-direction: column;
+             align-items: center; justify-content: center; font-size: .72rem; color: var(--text); text-decoration: none; }
+  .jcal .d.empty { background: transparent; }
+  .jcal .d.today { outline: 2px solid var(--primary); }
+  .jcal .d .e { font-size: 1.05rem; line-height: 1; }
+  .jcal .m1 { background: #fdd; } .jcal .m2 { background: #fde8d0; } .jcal .m3 { background: #f3efcf; }
+  .jcal .m4 { background: #dff3dc; } .jcal .m5 { background: #c9ecd3; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme=light]) .jcal .m1 { background: #4a2626; } :root:not([data-theme=light]) .jcal .m2 { background: #4a3522; }
+    :root:not([data-theme=light]) .jcal .m3 { background: #423d22; } :root:not([data-theme=light]) .jcal .m4 { background: #22402a; }
+    :root:not([data-theme=light]) .jcal .m5 { background: #1d4a2e; }
+  }
+  :root[data-theme=dark] .jcal .m1 { background: #4a2626; } :root[data-theme=dark] .jcal .m2 { background: #4a3522; }
+  :root[data-theme=dark] .jcal .m3 { background: #423d22; } :root[data-theme=dark] .jcal .m4 { background: #22402a; }
+  :root[data-theme=dark] .jcal .m5 { background: #1d4a2e; }
+  .month-nav { display: flex; justify-content: space-between; align-items: center; margin: 0 auto 10px; max-width: 460px; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("📓 Günlük", "Her gün bir satır ve bir emoji") }}
+
+<div class="card">
+  <h2>{{ 'Bugün' if edit_day == today.isoformat() else (edit_day | date_tr(True)) }}</h2>
+  <form method="post">
+    {{ ui.csrf() }}
+    <input type="hidden" name="date" value="{{ edit_day }}">
+    <div class="mood-pick">
+      {% for n, (emoji, label) in moods.items() %}
+        <label><input type="radio" name="mood" value="{{ n }}" {% if edit_entry and edit_entry.mood == n %}checked{% endif %}><span>{{ emoji }}</span><small>{{ label }}</small></label>
+      {% endfor %}
+    </div>
+    {{ ui.textarea("Nasıl geçti?", "text", edit_entry.text if edit_entry else "", rows=4, placeholder="Bugün aklında kalan bir şey…") }}
+    <div class="row-flex">
+      <button class="btn primary">Kaydet</button>
+      {% if edit_entry %}{{ ui.delete_button(url_for('journal.delete', day=edit_day), "Sil", "Bu günün kaydı silinsin mi?") }}{% endif %}
+    </div>
+  </form>
+</div>
+
+{% if memories %}
+  <div class="card">
+    <h2>🕰️ Geçmişte bugün</h2>
+    <ul class="rows">
+      {% for label, m in memories %}
+        <li><span class="ico">{{ moods[m.mood][0] if m.mood else '📓' }}</span>
+          <div class="grow"><div class="title">{{ label }} <span class="muted small">{{ m.date | date_tr }}</span></div>
+            {% if m.text %}<div class="meta">{{ m.text }}</div>{% endif %}</div></li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<div class="card">
+  <div class="month-nav">
+    <a class="btn sm" href="{{ url_for('journal.index', ay='%04d-%02d' % (prev.year, prev.month)) }}">←</a>
+    <h2 style="margin: 0">{{ month_name }} {{ year }}</h2>
+    <a class="btn sm" href="{{ url_for('journal.index', ay='%04d-%02d' % (nxt.year, nxt.month)) }}">→</a>
+  </div>
+  <div class="jcal">
+    {% for w in weekdays %}<div class="h">{{ w }}</div>{% endfor %}
+    {% for week in weeks %}{% for d in week %}
+      {% if d is none %}<div class="d empty"></div>
+      {% else %}
+        {% set e = entries.get(d.isoformat()) %}
+        {% if d <= today %}
+          <a class="d {{ 'm%d' % e.mood if e and e.mood }} {{ 'today' if d == today }}" href="{{ url_for('journal.index', ay='%04d-%02d' % (year, month), gun=d.isoformat()) }}"
+             title="{{ d | date_tr }}{% if e and e.text %}: {{ e.text[:60] }}{% endif %}">
+            <span>{{ d.day }}</span>{% if e %}<span class="e">{{ moods[e.mood][0] if e.mood else '📝' }}</span>{% endif %}
+          </a>
+        {% else %}<div class="d" style="opacity: .4"><span>{{ d.day }}</span></div>{% endif %}
+      {% endif %}
+    {% endfor %}{% endfor %}
+  </div>
+  <p class="muted small" style="margin-top: 8px">{{ count }} gün yazıldı{% if avg %} · ortalama ruh hali {{ avg | num(1) }} / 5{% endif %}. Bir güne dokunarak düzenleyebilirsin.</p>
+</div>
+
+{% if has_weekday %}
+  <div class="card">
+    <h2>Haftanın günlerine göre <span class="muted small">son 6 ay</span></h2>
+    <div class="bars">
+      {% for day, v in weekday_avg %}
+        <div class="bar-row"><span class="bar-label">{{ day }}</span>
+          <span class="bar-track"><span class="bar-fill" style="width: {{ (v * 20) if v else 0 }}%"></span></span>
+          <span class="bar-value">{{ (v | num(1)) if v else '—' }}</span></div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+<div class="card">
+  <h2>🔔 Akşam hatırlatması</h2>
+  <form method="post" action="{{ url_for('journal.reminder') }}" class="row-flex">
+    {{ ui.csrf() }}
+    {{ ui.checkbox("Her akşam Telegram'dan sor", "on", reminder) }}
+    <input type="time" name="time" value="{{ reminder or '21:30' }}" style="max-width: 140px">
+    <button class="btn sm">Kaydet</button>
+  </form>
+  <p class="muted small">O gün günlüğe yazmadıysan belirlediğin saatte “Bugün nasıldı?” diye sorulur; emojiye dokunman yeterli.</p>
+</div>
+{% endblock %}

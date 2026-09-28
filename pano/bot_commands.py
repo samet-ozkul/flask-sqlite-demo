@@ -35,6 +35,7 @@ COMMANDS = [
     ("yap", "Yapılacak ekle: /yap fatura öde yarın 14:00"),
     ("liste", "Açık maddeleri göster: /liste market"),
     ("etkinlik", "Ortak etkinlik ekle: /etkinlik piknik pazar 11:00"),
+    ("gunluk", "Günlüğe yaz: /gunluk bugün çok yoğundu"),
     ("bugun", "Günün özeti"),
     ("rapor", "Geçen ayın raporu (/rapor bu ay)"),
     ("ara", "Her yerde ara: /ara matkap"),
@@ -53,6 +54,7 @@ HELP = """<b>Kişisel Pano komutları</b>
     <code>/yap çöpü at pazartesi 20:00 her hafta</code> — tekrarlayan
     <code>/yap bulaşıkları yıka yarın 21:00 @ayse</code> — birine ata
 👨‍👩‍👧 <code>/etkinlik annemlerde yemek cumartesi 19:00</code> — ortak takvime ekle
+📓 <code>/gunluk 🙂 bugün yürüyüşe çıktım</code> — günlüğe yaz (başa emoji koyarsan ruh hali olur)
 📋 <code>/liste</code> ya da <code>/liste market</code> — açık maddeler
 ☀️ <code>/bugun</code> — günün özeti
 📊 <code>/rapor</code> — geçen ayın raporu · <code>/rapor bu ay</code>
@@ -145,6 +147,7 @@ def handle_message(msg):
             "ekle": cmd_shop, "e": cmd_shop,
             "yap": cmd_todo, "y": cmd_todo,
             "etkinlik": cmd_event,
+            "gunluk": cmd_journal, "g": cmd_journal,
             "liste": cmd_list, "l": cmd_list,
             "bugun": cmd_today,
             "rapor": cmd_report,
@@ -166,7 +169,7 @@ def handle_callback(cq, chat_id, message_id):
     data = cq.get("data") or ""
     prefix = data.split(":", 1)[0]
     handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
-                "rc": cb_receipt, "ai": cb_ai}
+                "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -266,6 +269,57 @@ def cmd_note(user, chat_id, rest):
     execute("INSERT INTO notes (user_id, title, content, updated_at) VALUES (?, '', ?, CURRENT_TIMESTAMP)",
             (user["id"], rest[:20000]))
     telegram.send_message(chat_id, f'📝 Not kaydedildi. <a href="{esc(link("notes.index"))}">Notlar →</a>')
+
+
+# ---------- Günlük ----------
+def _mood_prefix(text):
+    """'😄 harika gün' -> (5, 'harika gün'); emoji yoksa (None, metin)."""
+    from .modules.journal import MOODS
+    for n, (emoji, _label) in MOODS.items():
+        for variant in (emoji, emoji.replace("\ufe0f", "")):
+            if variant and text.startswith(variant):
+                return n, text[len(variant):].strip()
+    return None, text
+
+
+def cmd_journal(user, chat_id, rest):
+    from .modules.journal import TEXT_MAX, entry_text, mood_buttons, save_entry
+    day = today_str()
+    mood, text = _mood_prefix(rest)
+    if mood or text:
+        save_entry(user["id"], day, mood=mood, text=text[:TEXT_MAX] if text else None, append=True)
+    row = query_one("SELECT * FROM journal WHERE user_id = ? AND date = ?", (user["id"], day))
+    if not (mood or text):
+        body = entry_text(day, row, esc) if row else "📓 Bugün henüz yazmadın. <code>/gunluk bugün şöyle geçti...</code>"
+    else:
+        body = "✔️ Günlüğe eklendi.\n" + entry_text(day, row, esc)
+    body += f'\n<a href="{esc(link("journal.index"))}">Günlük →</a>'
+    ask_mood = not (row and row["mood"])
+    telegram.send_message(chat_id, body + ("\n\nBugün nasıldı?" if ask_mood else ""),
+                          buttons=mood_buttons(day) if ask_mood else None)
+
+
+def cb_journal_mood(user, chat_id, message_id, callback_id, data):
+    from datetime import date, timedelta
+    from .modules.journal import MOODS, entry_text, save_entry
+    parts = data.split(":")
+    try:
+        day, mood = date.fromisoformat(parts[1]), int(parts[2])
+    except (IndexError, ValueError):
+        telegram.answer_callback(callback_id)
+        return
+    t = today()
+    if mood not in MOODS or day > t or day < t - timedelta(days=7):
+        telegram.answer_callback(callback_id, "Bu gün için artık kaydedilemiyor.")
+        return
+    save_entry(user["id"], day.isoformat(), mood=mood)
+    telegram.answer_callback(callback_id, f"{MOODS[mood][0]} kaydedildi")
+    row = query_one("SELECT * FROM journal WHERE user_id = ? AND date = ?", (user["id"], day.isoformat()))
+    try:
+        telegram.edit_message(chat_id, message_id, entry_text(day.isoformat(), row, esc) +
+                              "\nİstersen <code>/gunluk ...</code> ile birkaç satır ekle.")
+    except telegram.TelegramError:
+        pass
 
 
 # ---------- Listeler ----------
@@ -833,7 +887,7 @@ def _ask_buttons(user, chat_id, text):
     row = [("☑️ Yapılacak", "tx:todo")]
     if parse_expense(user["id"], text):
         row.append(("💸 Harcama", "tx:exp"))
-    buttons = [[("📝 Not", "tx:note"), ("🛒 Alışveriş", "tx:shop")], row, [("✖️ Vazgeç", "tx:x")]]
+    buttons = [[("📝 Not", "tx:note"), ("🛒 Alışveriş", "tx:shop")], row, [("📓 Günlük", "tx:jr"), ("✖️ Vazgeç", "tx:x")]]
     preview = text if len(text) <= 80 else text[:77] + "..."
     telegram.send_message(chat_id, f"Bunu ne yapayım?\n<i>{esc(preview)}</i>", buttons=buttons)
 
@@ -845,7 +899,7 @@ def cb_text(user, chat_id, message_id, callback_id, data):
     if choice == "x" or pending is None:
         telegram.edit_message(chat_id, message_id, "✖️ Vazgeçildi." if choice == "x" else "⌛ Süre doldu.")
         return
-    handler = {"note": cmd_note, "shop": cmd_shop, "todo": cmd_todo, "exp": cmd_expense}.get(choice)
+    handler = {"note": cmd_note, "shop": cmd_shop, "todo": cmd_todo, "exp": cmd_expense, "jr": cmd_journal}.get(choice)
     if handler is None:
         return
     telegram.edit_message(chat_id, message_id, f"✔️ <i>{esc(pending['text'][:80])}</i>")

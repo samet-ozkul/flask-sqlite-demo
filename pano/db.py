@@ -480,6 +480,19 @@ MIGRATIONS = [
     CREATE INDEX idx_watchlist_user ON watchlist(user_id, status);
     ALTER TABLE users ADD COLUMN weather_alerts INTEGER NOT NULL DEFAULT 1;
     """,
+    # 13: günlük ve ruh hali
+    """
+    CREATE TABLE journal (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        mood INTEGER CHECK (mood IS NULL OR mood BETWEEN 1 AND 5),
+        text TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, date)
+    );
+    ALTER TABLE users ADD COLUMN journal_reminder TEXT;
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

@@ -68,6 +68,8 @@ def index():
     )
 
     disk = usage() if g.user["is_admin"] else None
+    from .journal import MOODS
+    journal_today = query_one("SELECT * FROM journal WHERE user_id = ? AND date = ?", (uid, t.isoformat()))
 
     return render_template(
         "dashboard/index.html",
@@ -87,6 +89,8 @@ def index():
         month_name=MONTHS_TR[t.month - 1],
         pending=pending,
         disk=disk,
+        moods=MOODS,
+        journal_today=journal_today,
     )
 
 
