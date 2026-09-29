@@ -12,6 +12,7 @@
     {{ ui.checkbox("Beni hatırla (30 gün)", "remember", True) }}
     <button class="btn primary block">Giriş yap</button>
   </form>
+  <p class="muted center small" style="margin-top: 14px"><a href="{{ url_for('auth.forgot') }}">Şifremi unuttum</a></p>
   {% if registration_open() %}
     <p class="muted center">Hesabın yok mu? <a href="{{ url_for('auth.register') }}">Kayıt ol</a></p>
   {% endif %}

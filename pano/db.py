@@ -511,6 +511,15 @@ MIGRATIONS = [
     """
     ALTER TABLE users ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0;
     """,
+    # 16: şifremi unuttum (Telegram'a tek kullanımlık bağlantı; bağlantının özeti saklanır)
+    """
+    CREATE TABLE password_resets (
+        token_hash TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at REAL NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

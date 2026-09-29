@@ -29,6 +29,10 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 - Aynı IP'den 10 hatalı denemede o kullanıcı için, 30 denemede IP için 15 dk kilit.
 - **İki adımlı giriş (önerilir):** Ayarlar → 🔐 İki adımlı giriş → QR kodu Google Authenticator / Microsoft Authenticator ile okut. Girişte şifreden sonra 6 haneli kod istenir; aynı kod ikinci kez kullanılamaz, 5 hatalı kodda 15 dk kilit. Telefon kaybolursa diye 8 tek kullanımlık **yedek kod** verilir (Ayarlar'dan şifreyle yenilenir). Hem telefonunu hem yedek kodlarını kaybeden kullanıcının 2FA'sını yönetici Kullanıcılar sayfasından kapatabilir.
 - **Diğer cihazlardan çıkış:** Ayarlar → 📱 Oturumlar → *Diğer cihazlardan çıkış yap* telefonda, iş bilgisayarında açık kalan (“Beni hatırla” ile 30 günlük olanlar dahil) bütün oturumları kapatır; bu cihaz açık kalır. Şifre değişince, yönetici şifreyi sıfırlayınca ve iki adımlı giriş açılınca bu kendiliğinden yapılır.
+- **Şifremi unuttum:** Giriş sayfasındaki bağlantıdan kullanıcı adı girilir; hesap Telegram'a bağlıysa bota 15 dakika geçerli, tek kullanımlık bir sıfırlama bağlantısı gelir (saatte en fazla 3 istek). Şifre değişince diğer oturumlar kapanır ve Telegram'dan haber verilir; iki adımlı giriş açıksa girişte kod yine istenir. Telegram'ı bağlı olmayan kullanıcının şifresini yönetici **Yönetim → Kullanıcılar**'dan sıfırlar; yöneticinin kendisi için konsoldan:
+  ```bash
+  cd ~/flask-sqlite-demo && workon flask-demo && python -c "import sqlite3, getpass; from werkzeug.security import generate_password_hash as h; u = input('Kullanıcı adı: '); p = getpass.getpass('Yeni şifre: '); db = sqlite3.connect('app.db'); n = db.execute('UPDATE users SET password_hash = ? WHERE username = ?', (h(p), u)).rowcount; db.execute('DELETE FROM login_attempts'); db.commit(); print('Değişti' if n else 'Kullanıcı yok')"
+  ```
 - Her kayıt kullanıcıya ait; dosyalar sadece sahibine sunulur.
 - Şifre, kart bilgisi, kimlik fotoğrafı gibi hassas verileri burada saklamayın; bunun için şifre yöneticisi kullanın.
 

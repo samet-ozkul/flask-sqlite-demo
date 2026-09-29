@@ -4,7 +4,7 @@ import secrets
 import time
 from functools import wraps
 
-from flask import (Blueprint, abort, flash, g, redirect, render_template,
+from flask import (Blueprint, abort, flash, g, make_response, redirect, render_template,
                    request, session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -125,6 +125,16 @@ def _clear_failures(username):
     db.commit()
 
 
+def _clear_all_failures(username):
+    """Şifre sıfırlanınca bu kullanıcının bütün IP'lerdeki giriş kilitleri kalkar."""
+    suffix = ":" + username.lower()[:40]
+    db = get_db()
+    for row in db.execute("SELECT key FROM login_attempts WHERE key LIKE 'ipuser:%'").fetchall():
+        if row["key"].endswith(suffix):
+            db.execute("DELETE FROM login_attempts WHERE key = ?", (row["key"],))
+    db.commit()
+
+
 def _safe_next(url):
     return safe_path(url) or url_for("dashboard.index")
 
@@ -218,6 +228,62 @@ def verify_2fa():
         db.commit()
         flash("Kod hatalı ya da süresi geçmiş.", "error")
     return render_template("auth/verify_2fa.html")
+
+
+@bp.route("/sifremi-unuttum", methods=["GET", "POST"])
+def forgot():
+    from . import password_reset as pr, telegram
+    if g.user:
+        return redirect(url_for("settings.index"))
+    if request.method == "POST":
+        if pr.over_limit(f"reset-ip:{request.remote_addr}", pr.IP_LIMIT):
+            flash("Çok fazla istek. Bir saat sonra tekrar deneyin.", "error")
+            return render_template("auth/forgot.html", telegram_enabled=telegram.enabled()), 429
+        username = request.form.get("username", "").strip()[:40]
+        user = query_one("SELECT * FROM users WHERE username = ?", (username,))
+        # Kullanıcı var mı, Telegram bağlı mı: cevapta belli edilmez
+        if user and user["telegram_chat_id"] and telegram.enabled() \
+                and not pr.over_limit(f"reset-user:{user['id']}", pr.USER_LIMIT):
+            url = url_for("auth.reset_password", token=pr.create(user["id"]), _external=True)
+            try:
+                telegram.send_message(user["telegram_chat_id"], pr.request_message(user, url, telegram.escape))
+            except telegram.TelegramError:
+                pass
+        flash(f"Kullanıcı adı doğruysa ve hesap Telegram'a bağlıysa, sıfırlama bağlantısı Telegram'a gönderildi. "
+              f"Bağlantı {pr.TTL // 60} dakika geçerli.", "success")
+        return redirect(url_for("auth.login"))
+    return render_template("auth/forgot.html", telegram_enabled=telegram.enabled())
+
+
+@bp.route("/sifre-sifirla/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    from . import password_reset as pr, telegram
+    user = pr.lookup(token)
+    if user is None:
+        flash("Bağlantı geçersiz, kullanılmış ya da süresi dolmuş. Yeni bir bağlantı iste.", "error")
+        return redirect(url_for("auth.forgot"))
+    if request.method == "POST":
+        new = request.form.get("new", "")
+        if len(new) < 8:
+            flash("Yeni şifre en az 8 karakter olmalı.", "error")
+        elif new != request.form.get("confirm", ""):
+            flash("Şifreler eşleşmiyor.", "error")
+        elif pr.consume(token) is not None:
+            set_password(user["id"], new)  # diğer bütün oturumlar da kapanır
+            session.clear()
+            _clear_all_failures(user["username"])
+            if user["telegram_chat_id"]:
+                try:
+                    telegram.send_message(user["telegram_chat_id"], pr.changed_message(user, telegram.escape))
+                except telegram.TelegramError:
+                    pass
+            flash("Şifren değiştirildi. Yeni şifrenle giriş yapabilirsin.", "success")
+            return redirect(url_for("auth.login"))
+    resp = make_response(render_template("auth/reset.html", reset_user=user))
+    # Bağlantıdaki anahtar başka siteye (Referer) ya da tarayıcı önbelleğine sızmasın
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @bp.route("/cikis", methods=["POST"])
