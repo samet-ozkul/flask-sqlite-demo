@@ -132,6 +132,7 @@ def daily(secret):
     external.purge_cache()
     db = get_db()
     db.execute("DELETE FROM login_attempts WHERE first_at < ?", (time.time() - 86400,))
+    db.execute("DELETE FROM password_resets WHERE expires_at < ?", (time.time(),))
     db.commit()
     return jsonify(result)
 

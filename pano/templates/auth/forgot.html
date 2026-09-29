@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Şifremi unuttum{% endblock %}
+{% block content %}
+<div class="auth-card card">
+  <div class="auth-logo">🔑</div>
+  <h1>Şifremi unuttum</h1>
+  {% if telegram_enabled %}
+    <p class="muted small">Kullanıcı adını yaz. Hesabın Telegram'a bağlıysa bota 15 dakika geçerli, tek kullanımlık bir sıfırlama bağlantısı gelir.</p>
+    <form method="post">
+      {{ ui.csrf() }}
+      {{ ui.field("Kullanıcı adı", "username", required=True, attrs='autofocus autocomplete="username" autocapitalize="none" maxlength="40"') }}
+      <button class="btn primary block">Bağlantıyı gönder</button>
+    </form>
+    <p class="muted small" style="margin-top: 14px">Telegram'ı bağlamadıysan yöneticiden şifreni sıfırlamasını iste.</p>
+  {% else %}
+    <p class="muted">Bu sitede Telegram ayarlı olmadığı için şifre buradan sıfırlanamıyor. Yöneticiden şifreni sıfırlamasını iste.</p>
+  {% endif %}
+  <p class="muted center small"><a href="{{ url_for('auth.login') }}">← Girişe dön</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Yeni şifre{% endblock %}
+{% block content %}
+<div class="auth-card card">
+  <div class="auth-logo">🔑</div>
+  <h1>Yeni şifre</h1>
+  <p class="muted small center">Hesap: <b>{{ reset_user.username }}</b></p>
+  <form method="post">
+    {{ ui.csrf() }}
+    <input type="text" name="username" value="{{ reset_user.username }}" autocomplete="username" hidden>
+    {{ ui.field("Yeni şifre", "new", type="password", required=True, attrs='minlength="8" autofocus autocomplete="new-password"') }}
+    {{ ui.field("Yeni şifre (tekrar)", "confirm", type="password", required=True, attrs='minlength="8" autocomplete="new-password"') }}
+    <button class="btn primary block">Şifreyi değiştir</button>
+  </form>
+  <p class="muted small" style="margin-top: 14px">Kaydedince diğer cihazlardaki oturumlar kapanır. İki adımlı giriş açıksa girişte kod yine istenir.</p>
+</div>
+{% endblock %}
