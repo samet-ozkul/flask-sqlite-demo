@@ -12,9 +12,11 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 | 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) · **Belgeler** (pasaport, ehliyet, kimlik, ruhsat, poliçe bitiş tarihleri; 1 hafta–6 ay önceden Telegram hatırlatması) |
 | 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Günlük** (her gün bir satır ve ruh hali emojisi, ay takvimi, “1 yıl önce bugün”, akşam Telegram'dan “Bugün nasıldı?”) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) · **İzleme / Okuma** (film, dizi, kitap listesi; kapaklı arama, puan) · **Kişiler** (iletişim hatırlatıcı: “dedeni 3 haftadır aramadın”, tek dokunuşla 📞 Aradım, arama/WhatsApp bağlantısı, doğum günleri) |
 | ⚙️ Altyapı | Kullanıcı yönetimi, tek tıkla yedek al/geri yükle, disk kullanımı, Telegram günlük özeti, telefona uygulama olarak yükleme (PWA) · **Çöp kutusu** (silinen kayıt 30 gün saklanır, tek tıkla geri gelir) · **Tema** (otomatik / açık / koyu) · **Pano düzeni** (kartları seç ve sırala) |
-| 🧰 Araçlar | **Zaman Takibi** (başlat/durdur sayacı, elle kayıt, proje bazında haftalık/aylık rapor, saatlik ücretle kazanç, Excel/CSV; bottan `/baslat`, `/durdur`, `/zaman`) |
+| 🧰 Araçlar | **Zaman Takibi** (başlat/durdur sayacı, elle kayıt, proje bazında haftalık/aylık rapor, saatlik ücretle kazanç, Excel/CSV; bottan `/baslat`, `/durdur`, `/zaman`) · **Hesaplayıcılar** (kredi taksiti ve ödeme planı, mevduat getirisi, KDV, yüzde, tarih/iş günü/yaş, birim çevirici, döviz/altın, hesap bölüşme, yakıt maliyeti) |
 
 **Menü:** Bilgisayarda üst çubukta en çok kullandığın modüller (☆ ile seçilir, Ayarlar → 📌 Menü kısayolları'ndan sıralanır) ve **☰ Modüller** açılır menüsü (gruplu, aramalı) durur; telefonda alt çubukta ilk 3 kısayol. **Ctrl+K** ya da **/** ile hızlı geçiş: modül adını yaz, Enter (eşleşme yoksa her yerde arar).
+
+**Hesaplayıcılar** tamamen tarayıcıda çalışır, yazdıkça sonuç güncellenir; sunucuya veri gitmez ve veritabanına bir şey yazılmaz (son girilen değerler sadece o cihazda hatırlanır). Kredide “Vergi ekle” işaretlenirse KKDF %15 + BSMV %15 faize eklenir (ihtiyaç/taşıt kredisi; konut kredisinde yok). Döviz/altın hesabı Kurlar modülündeki güncel kuru kullanır; kur alınamazsa o kart “kur alınamadı” der. İş günü hesabında resmi tatiller düşülmez.
 
 ## 512 MB disk nasıl korunuyor?
 
