@@ -590,6 +590,36 @@ MIGRATIONS = [
     """
     ALTER TABLE users ADD COLUMN nav_pins TEXT;
     """,
+    # 21: kişiler ve görüşme kayıtları (iletişim hatırlatıcı; doğum günü '--MM-DD' ise yıl bilinmiyor)
+    """
+    CREATE TABLE contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        relation TEXT NOT NULL DEFAULT '',
+        phone TEXT NOT NULL DEFAULT '',
+        email TEXT NOT NULL DEFAULT '',
+        birthday TEXT,
+        address TEXT NOT NULL DEFAULT '',
+        note TEXT NOT NULL DEFAULT '',
+        contact_every INTEGER,
+        last_contact_at TEXT,
+        nudged_for TEXT,
+        snooze_until TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_contacts_user ON contacts(user_id);
+    CREATE TABLE contact_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'call' CHECK (kind IN ('call', 'message', 'visit', 'other')),
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_contact_logs ON contact_logs(contact_id, date);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

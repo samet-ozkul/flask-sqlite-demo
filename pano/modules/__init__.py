@@ -29,6 +29,7 @@ MODULES = [
     ("recipes", "recipes.index", "Tarifler", "🍲", "Kişisel"),
     ("watchlist", "watchlist.index", "İzleme / Okuma", "🎬", "Kişisel"),
     ("specialdays", "specialdays.index", "Önemli Günler", "🎂", "Kişisel"),
+    ("contacts", "contacts.index", "Kişiler", "📇", "Kişisel"),
 ]
 
 # Menüde gösterilmeyen altyapı modülleri

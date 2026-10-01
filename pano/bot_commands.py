@@ -172,7 +172,7 @@ def handle_callback(cq, chat_id, message_id):
     data = cq.get("data") or ""
     prefix = data.split(":", 1)[0]
     handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
-                "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood}
+                "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood, "ct": cb_contact, "ctz": cb_contact}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -322,6 +322,35 @@ def cb_journal_mood(user, chat_id, message_id, callback_id, data):
     try:
         telegram.edit_message(chat_id, message_id, entry_text(day.isoformat(), row, esc) +
                               "\nİstersen <code>/gunluk ...</code> ile birkaç satır ekle.")
+    except telegram.TelegramError:
+        pass
+
+
+# ---------- Kişiler ----------
+def cb_contact(user, chat_id, message_id, callback_id, data):
+    """Dürtme mesajı: ct:<id> -> bugün arandı olarak kaydet, ctz:<id> -> yarın yeniden hatırlat."""
+    from .modules.contacts import add_log, snooze, status
+    action, _, raw_id = data.partition(":")
+    contact = query_one("SELECT * FROM contacts WHERE id = ? AND user_id = ?",
+                        (int(raw_id) if raw_id.isdigit() else 0, user["id"]))
+    if contact is None:
+        telegram.answer_callback(callback_id, "Kişi bulunamadı, silinmiş olabilir.")
+        return
+    name = f"<b>{esc(contact['name'])}</b>"
+    if action == "ct":
+        add_log(contact, "call", today_str())
+        st = status(query_one("SELECT * FROM contacts WHERE id = ?", (contact["id"],)))
+        telegram.answer_callback(callback_id, "✅ Kaydedildi")
+        text = f"✅ {name} ile görüşme kaydedildi."
+        if st["due"]:
+            text += f" Sıradaki: {fmt_date(st['due'], True)}."
+    else:
+        snooze(contact["id"], (today() + timedelta(days=1)).isoformat())
+        telegram.answer_callback(callback_id, "⏰ Yarın hatırlatırım")
+        text = f"⏰ {name}: yarın yeniden hatırlatırım."
+    url = link("contacts.detail", contact_id=contact["id"])
+    try:
+        telegram.edit_message(chat_id, message_id, f'{text}\n<a href="{esc(url)}">Kişi sayfası →</a>')
     except telegram.TelegramError:
         pass
 

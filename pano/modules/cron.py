@@ -66,6 +66,13 @@ def build_daily_message(user, site_url):
             detail = f" · {esc(it['detail'])}" if it["detail"] else ""
             lines.append(f"{it['icon']} {esc(it['title'])} — <i>{rel_days(it['date'])}</i>{detail}")
 
+    from .contacts import overdue, since_text
+    late = overdue(user["id"], t)
+    if late:
+        names = ", ".join(f"{esc(c['name'])} ({since_text(st)})" for c, st in late[:5])
+        more = f" +{len(late) - 5}" if len(late) > 5 else ""
+        lines += ["", f"<b>📇 Aranacaklar:</b> {names}{more}"]
+
     meds = medications_today(user["id"])
     if meds:
         lines += ["", "<b>💊 Bugünkü ilaçlar</b>"]
@@ -230,6 +237,22 @@ def todo_reminders(secret):
                 result["documents_sent"] += 1
             except telegram.TelegramError as e:
                 result["errors"].append(f"belge {doc['id']}: {e}")
+
+    # Kişiler: görüşme vakti gelenlere dürtme (varsayılan saatten sonra, günde bir kontrol; her vade için bir kez)
+    from . import contacts
+    result["contacts_nudged"] = 0
+    nudge_day = now.date().isoformat()
+    if now.strftime("%H:%M") >= todo.DEFAULT_DUE_TIME and _state_get("contacts_nudge") != nudge_day:
+        for row, st in contacts.pending(now):
+            url = url_for("contacts.detail", contact_id=row["id"], _external=True)
+            try:
+                telegram.send_message(row["chat_id"], contacts.nudge_message(row, st, url, telegram.escape),
+                                      buttons=contacts.nudge_buttons(row["id"]) if with_buttons else None)
+                contacts.mark_nudged(row["id"], st["due"])
+                result["contacts_nudged"] += 1
+            except telegram.TelegramError as e:
+                result["errors"].append(f"kişi {row['id']}: {e}")
+        _state_set("contacts_nudge", nudge_day)
 
     # Hava uyarısı: akşam, yarın için yağmur / don / sıcak / fırtına (günde bir kez)
     result["weather_alerts"] = 0
