@@ -1,0 +1,43 @@
+{% import "_macros.html" as ui %}
+<h2>Kutudakiler <span class="muted small">{{ fmt_size(total) }} / {{ max_total_mb }} MB</span>
+  {% if items %}{{ ui.delete_button(url_for('transfer.clear'), "Boşalt", "Aktarma kutusundaki her şey silinsin mi?") }}{% endif %}</h2>
+{% if items %}
+  <ul class="rows">
+    {% for it in items %}
+      <li class="t-item" style="display: block">
+        <div class="head">
+          <span class="ico">{{ '📝' if it.kind == 'text' else '📎' }}</span>
+          <div class="grow">
+            <div class="name">{{ it.filename if it.kind == 'file' else (it.text.split('\n')[0] | truncate(80)) }}</div>
+            <div class="meta">
+              {% if it.device %}<span>{{ it.device }}</span>{% endif %}
+              <span>⏳ {{ it.left }} kaldı</span>
+              {% if it.kind == 'file' %}<span>{{ fmt_size(it.size) }}</span>{% endif %}
+              {% if it.once %}<span class="badge soon">tek seferlik</span>{% endif %}
+            </div>
+          </div>
+        </div>
+        {% if it.kind == 'text' %}
+          <div class="t-text" id="t-text-{{ it.id }}">{{ it.text }}</div>
+        {% elif it.preview %}
+          <img class="t-preview" src="{{ url_for('transfer.preview', item_id=it.id) }}" alt="" loading="lazy">
+        {% endif %}
+        <div class="row-flex" style="margin-top: 8px">
+          {% if it.kind == 'text' %}
+            <button class="btn sm primary" type="button" data-copy="t-text-{{ it.id }}">📋 Kopyala</button>
+            {% set url = it.text.strip() %}
+            {% if url.startswith(('http://', 'https://')) and ' ' not in url and '\n' not in url %}
+              <a class="btn sm" href="{{ url }}" target="_blank" rel="noopener noreferrer">🔗 Aç</a>
+            {% endif %}
+          {% else %}
+            <a class="btn sm primary" href="{{ url_for('transfer.download', item_id=it.id) }}">⬇️ İndir</a>
+          {% endif %}
+          {% if telegram_linked %}{{ ui.post_button(url_for('transfer.to_telegram', item_id=it.id), "📲 Telegram'a") }}{% endif %}
+          {{ ui.delete_button(url_for('transfer.delete', item_id=it.id), "Sil", "Silinsin mi?") }}
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  {{ ui.empty("Kutu boş. Bir cihazda metin ya da dosya gönder, öbür cihazda bu sayfayı aç.", "📤") }}
+{% endif %}

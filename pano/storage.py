@@ -192,7 +192,9 @@ def cleanup_orphans():
             known.add(row["thumb"])
     base = upload_dir()
     if os.path.isdir(base):
-        for root, _dirs, files in os.walk(base):
+        for root, dirs, files in os.walk(base):
+            if root == base:
+                dirs[:] = [d for d in dirs if d != "_aktarma"]  # süreli aktarma dosyaları kendi temizliğinde
             for name in files:
                 full = os.path.join(root, name)
                 rel = os.path.relpath(full, base).replace(os.sep, "/")

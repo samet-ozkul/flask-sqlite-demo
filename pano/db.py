@@ -568,6 +568,24 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_automation_log ON automation_log(automation_id, ran_at);
     """,
+    # 19: cihazlar arası aktarma (süreli metin ve dosya; dosyalar uploads/_aktarma/ altında)
+    """
+    CREATE TABLE transfers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('text', 'file')),
+        text TEXT NOT NULL DEFAULT '',
+        filename TEXT NOT NULL DEFAULT '',
+        stored_name TEXT NOT NULL DEFAULT '',
+        size INTEGER NOT NULL DEFAULT 0,
+        mime TEXT NOT NULL DEFAULT '',
+        once INTEGER NOT NULL DEFAULT 0,
+        device TEXT NOT NULL DEFAULT '',
+        expires_at REAL NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_transfers_user ON transfers(user_id, expires_at);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

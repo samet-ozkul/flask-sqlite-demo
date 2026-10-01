@@ -36,7 +36,9 @@ def make_backup_zip(include_files=True):
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         zf.write(db_copy, DB_NAME)
         if include_files and os.path.isdir(upload_dir):
-            for root, _dirs, files in os.walk(upload_dir):
+            for root, dirs, files in os.walk(upload_dir):
+                if root == upload_dir:
+                    dirs[:] = [d for d in dirs if d != "_aktarma"]  # süreli aktarma dosyaları yedeğe girmez
                 for name in files:
                     full = os.path.join(root, name)
                     arc = "uploads/" + os.path.relpath(full, upload_dir).replace(os.sep, "/")

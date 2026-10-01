@@ -6,6 +6,7 @@ MODULES = [
     ("agenda", "calendar.index", "Takvim", "📅", "Genel"),
     ("events", "events.index", "Etkinlikler", "👨‍👩‍👧", "Genel"),
     ("automations", "automations.index", "Otomasyon", "⚙️", "Genel"),
+    ("transfer", "transfer.index", "Aktar", "📤", "Genel"),
     ("notes", "notes.index", "Notlar", "📝", "Listeler ve notlar"),
     ("lists", "lists.index", "Listeler", "🛒", "Listeler ve notlar"),
     ("links", "links.index", "Sonra Bak", "🔖", "Listeler ve notlar"),
