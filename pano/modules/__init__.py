@@ -29,6 +29,7 @@ MODULES = [
     ("health", "health.index", "Sağlık", "🩺", "Kişisel"),
     ("recipes", "recipes.index", "Tarifler", "🍲", "Kişisel"),
     ("watchlist", "watchlist.index", "İzleme / Okuma", "🎬", "Kişisel"),
+    ("places", "places.index", "Harita", "🗺️", "Kişisel"),
     ("specialdays", "specialdays.index", "Önemli Günler", "🎂", "Kişisel"),
     ("contacts", "contacts.index", "Kişiler", "📇", "Kişisel"),
     ("timetrack", "timetrack.index", "Zaman Takibi", "⏱️", "Araçlar"),

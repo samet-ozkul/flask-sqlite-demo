@@ -12,6 +12,7 @@ Mesajı gönderen, bu sohbete bağlı pano kullanıcısıdır.
   /bugun                     -> günün özeti
   link                       -> Sonra Bak'a kaydedilir
   fotoğraf / PDF             -> garantiye ya da nota eklenir (sorulur)
+  konum                      -> park yeri ya da Harita'ya yer olarak kaydedilir (sorulur)
   düz yazı                   -> ne yapılacağı butonlarla sorulur
 """
 import io
@@ -70,6 +71,7 @@ HELP = """<b>Kişisel Pano komutları</b>
 
 🔖 Link gönder → Sonra Bak'a kaydedilir
 📷 Fotoğraf gönder → garantiye ya da nota eklenir
+📍 Konum gönder → park yeri ya da Harita'ya yer olarak kaydedilir
 ✍️ Düz yazı gönder → ne yapacağımı sorarım (yapay zekâ açıksa kendisi anlar: "yarın 3'te dişçiyi ara")
 🧾 Yapay zekâ açıksa fiş/fatura fotoğrafından tutar ve kategori okunur"""
 
@@ -142,6 +144,9 @@ def handle_message(msg):
     if msg.get("photo") or document or msg.get("video"):
         ask_attachment(user, chat_id, msg)
         return
+    if msg.get("location"):
+        ask_location(user, chat_id, msg)
+        return
     text = (msg.get("text") or "").strip()
     if not text:
         return
@@ -179,7 +184,7 @@ def handle_callback(cq, chat_id, message_id):
     prefix = data.split(":", 1)[0]
     handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
                 "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood, "ct": cb_contact, "ctz": cb_contact,
-                "tt": cb_timer}
+                "tt": cb_timer, "loc": cb_location}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -740,6 +745,46 @@ def cb_attachment(user, chat_id, message_id, callback_id, data):
         telegram.edit_message(chat_id, message_id, f"⚠️ Eklenemedi: {esc(e)}")
         return
     telegram.edit_message(chat_id, message_id, f'✅ Eklendi: {esc(label)}\n<a href="{esc(target)}">Aç →</a>')
+
+
+# ---------- Konum: park yeri ya da Harita'ya yer ----------
+def ask_location(user, chat_id, msg):
+    loc = msg["location"]
+    try:
+        lat, lon = round(float(loc["latitude"]), 6), round(float(loc["longitude"]), 6)
+    except (KeyError, TypeError, ValueError):
+        return
+    venue = msg.get("venue") or {}  # Telegram'da listeden seçilen mekân: adı ve adresi de gelir
+    _set_pending(chat_id, {"kind": "location", "lat": lat, "lon": lon,
+                           "title": (venue.get("title") or "")[:100], "address": (venue.get("address") or "")[:200]})
+    what = f"<b>{esc(venue['title'])}</b> konumunu" if venue.get("title") else "Bu konumu"
+    telegram.send_message(chat_id, f"📍 {what} ne yapayım?",
+                          buttons=[[("🅿️ Park yeri", "loc:park"), ("📍 Yer olarak kaydet", "loc:place")],
+                                   [("✖️ Vazgeç", "loc:x")]])
+
+
+def cb_location(user, chat_id, message_id, callback_id, data):
+    from .modules.places import add_location_place, directions_url, save_parking
+    choice = data.split(":", 1)[1]
+    pending = _pop_pending(chat_id, "location")
+    telegram.answer_callback(callback_id)
+    if choice == "x" or pending is None:
+        telegram.edit_message(chat_id, message_id, "✖️ Vazgeçildi." if choice == "x" else "⌛ Süre doldu, konumu tekrar gönder.")
+        return
+    lat, lon = pending["lat"], pending["lon"]
+    if choice == "park":
+        save_parking(user["id"], lat, lon)
+        telegram.edit_message(chat_id, message_id,
+                              "🅿️ Park yeri kaydedildi. Dönüşte bu mesajdan yol tarifi alabilirsin.\n"
+                              f'<a href="{esc(directions_url(lat, lon))}">🧭 Yol tarifi</a> · '
+                              f'<a href="{esc(link("places.index"))}">🗺️ Harita →</a>')
+    elif choice == "place":
+        place_id, name, city = add_location_place(user["id"], lat, lon, pending.get("title"), pending.get("address"))
+        where = f" ({esc(city['name'])})" if city else ""
+        telegram.edit_message(chat_id, message_id,
+                              f"📍 Yer olarak kaydedildi: <b>{esc(name)}</b>{where}\n"
+                              f'Adını, kategorisini ve notunu eklemek için '
+                              f'<a href="{esc(link("places.edit", place_id=place_id))}">düzenle →</a>')
 
 
 # ---------- Aktarma kutusu ----------

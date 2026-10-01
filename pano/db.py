@@ -724,6 +724,46 @@ MIGRATIONS = [
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     """,
+    # 26: harita — şehirler, yerler (şehre bağlı ya da bağımsız) ve park yeri (kullanıcı başına tek kayıt)
+    """
+    CREATE TABLE cities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        country TEXT NOT NULL DEFAULT '',
+        lat REAL,
+        lon REAL,
+        status TEXT NOT NULL DEFAULT 'visited' CHECK (status IN ('visited', 'wish')),
+        visited_on TEXT,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_cities_user ON cities(user_id);
+    CREATE TABLE places (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        city_id INTEGER REFERENCES cities(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'other'
+            CHECK (category IN ('food', 'cafe', 'sight', 'stay', 'shop', 'nature', 'other')),
+        status TEXT NOT NULL DEFAULT 'wish' CHECK (status IN ('visited', 'wish')),
+        rating INTEGER CHECK (rating IS NULL OR rating BETWEEN 1 AND 5),
+        lat REAL,
+        lon REAL,
+        address TEXT NOT NULL DEFAULT '',
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_places_user ON places(user_id, city_id);
+    CREATE INDEX idx_places_city ON places(city_id);
+    CREATE TABLE parking (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        lat REAL NOT NULL,
+        lon REAL NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        saved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

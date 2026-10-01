@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "places/_form.html" import place_fields, map_box with context %}
+{% block title %}{{ place.name if place else "Yeni yer" }}{% endblock %}
+{% block head %}{% include "places/_head.html" %}{% endblock %}
+{% block content %}
+{% set back = url_for('places.city', city_id=city_id) if city_id else url_for('places.index') %}
+{% if place %}
+  {% call ui.page_header(categories[place.category][1] ~ " " ~ place.name, ("🏙️ " ~ city.name) if city else none, back=back) %}
+    {{ ui.delete_button(url_for('places.delete', place_id=place.id), "Sil", "Yer silinsin mi? (Çöp kutusundan geri getirilebilir.)") }}
+  {% endcall %}
+  {% if place.lat is not none %}
+    <div class="row-flex" style="margin-bottom: 14px">
+      <a class="btn primary" href="{{ directions_url(place.lat, place.lon) }}" target="_blank" rel="noopener">🧭 Yol tarifi</a>
+      <a class="btn" href="{{ osm_url(place.lat, place.lon) }}" target="_blank" rel="noopener">🗺️ Haritada aç</a>
+    </div>
+  {% endif %}
+{% else %}
+  {{ ui.page_header("📍 Yeni yer", "Yemek yeri, kafe, gezilecek yer, otel…", back=back) }}
+{% endif %}
+
+<section class="card">
+  {{ map_box(data, pick="place-form", fallback="🗺️ Harita yüklenemedi; konumu “📍 Şu anki konumum” ya da harita linkiyle verebilirsin.") }}
+  <p class="map-note muted small">Haritaya dokunarak konumu seç; işaretçiyi sürükleyerek düzeltebilirsin.</p>
+</section>
+
+<section class="card">
+  <form method="post" id="place-form" data-place-form
+        action="{{ url_for('places.edit', place_id=place.id) if place else url_for('places.create') }}">
+    {{ ui.csrf() }}
+    {{ place_fields(place, city_id) }}
+    <button class="btn primary">{{ "Kaydet" if place else "Ekle" }}</button>
+  </form>
+</section>
+{% include "places/_scripts.html" %}
+{% endblock %}
