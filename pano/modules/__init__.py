@@ -35,6 +35,7 @@ MODULES = [
     ("calculators", "calculators.index", "Hesaplayıcılar", "🧮", "Araçlar"),
     ("kanban", "kanban.index", "Kanban", "🗂️", "Araçlar"),
     ("profile", "profile.edit", "Profil Sayfası", "🌐", "Araçlar"),
+    ("scanner", "scanner.index", "Belge Tara", "📄", "Araçlar"),
 ]
 
 # Menüde gösterilmeyen altyapı modülleri
