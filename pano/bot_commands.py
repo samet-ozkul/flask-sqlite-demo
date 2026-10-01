@@ -38,6 +38,7 @@ COMMANDS = [
     ("etkinlik", "Ortak etkinlik ekle: /etkinlik piknik pazar 11:00"),
     ("gunluk", "Günlüğe yaz: /gunluk bugün çok yoğundu"),
     ("aktar", "Aktarma kutusuna metin koy: /aktar metin"),
+    ("tara", "Belge tara: /tara yaz, sayfaların fotoğraflarını gönder, PDF yap"),
     ("baslat", "Zaman sayacını başlat: /baslat proje not"),
     ("durdur", "Zaman sayacını durdur"),
     ("zaman", "Çalışan sayaç ve bugünün toplamı"),
@@ -62,6 +63,7 @@ HELP = """<b>Kişisel Pano komutları</b>
 📓 <code>/gunluk 🙂 bugün yürüyüşe çıktım</code> — günlüğe yaz (başa emoji koyarsan ruh hali olur)
 📋 <code>/liste</code> ya da <code>/liste market</code> — açık maddeler
 📤 <code>/aktar metin</code> — bilgisayarda açmak için aktarma kutusuna koy (dosya gönderirsen “📤 Aktar”)
+📄 <code>/tara</code> — sayfaların fotoğraflarını gönder, bitince “📄 PDF yap” (tek fotoğrafta “📄 Taramaya ekle”)
 ⏱️ <code>/baslat web sitesi tasarım</code> — zaman sayacını başlat (baştaki kelimeler proje adıysa o projeye)
     <code>/durdur</code> — sayacı durdur · <code>/zaman</code> — çalışan sayaç ve bugünün toplamı
 ☀️ <code>/bugun</code> — günün özeti
@@ -141,6 +143,9 @@ def handle_message(msg):
         telegram.send_message(chat_id, "Bu sohbet panoya bağlı değil. Panoda <b>Ayarlar → Telegram'ı bağla</b>.")
         return
     document = msg.get("document") or {}
+    if _image_part(msg) and _scan_state(chat_id):
+        scan_add_message(user, chat_id, msg)
+        return
     if msg.get("photo") or document or msg.get("video"):
         ask_attachment(user, chat_id, msg)
         return
@@ -160,6 +165,7 @@ def handle_message(msg):
             "yap": cmd_todo, "y": cmd_todo,
             "etkinlik": cmd_event,
             "gunluk": cmd_journal, "g": cmd_journal,
+            "tara": cmd_scan,
             "aktar": cmd_transfer,
             "baslat": cmd_timer_start, "durdur": cmd_timer_stop, "zaman": cmd_timer_status,
             "liste": cmd_list, "l": cmd_list,
@@ -184,7 +190,7 @@ def handle_callback(cq, chat_id, message_id):
     prefix = data.split(":", 1)[0]
     handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
                 "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood, "ct": cb_contact, "ctz": cb_contact,
-                "tt": cb_timer, "loc": cb_location}
+                "tt": cb_timer, "loc": cb_location, "scn": cb_scan}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -676,6 +682,24 @@ def save_link(user, chat_id, url, text):
 
 
 # ---------- Fotoğraf / PDF ----------
+def _image_part(msg):
+    """Fotoğraf ya da resim belgesi ise (file_id, ad, tür); değilse None."""
+    if msg.get("photo"):
+        return msg["photo"][-1]["file_id"], "telegram.jpg", "image/jpeg"  # en büyük boyut
+    doc = msg.get("document") or {}
+    if (doc.get("mime_type") or "").startswith("image/"):
+        return doc["file_id"], doc.get("file_name") or "resim", doc["mime_type"]
+    return None
+
+
+def _peek_pending(chat_id, kind):
+    row = query_one("SELECT value FROM app_state WHERE key = ?", (f"tg_pending:{chat_id}",))
+    data = json.loads(row["value"]) if row else None
+    if not data or data.get("kind") != kind or time.time() - data.get("ts", 0) > PENDING_TTL:
+        return None
+    return data
+
+
 def ask_attachment(user, chat_id, msg):
     if msg.get("photo"):
         file_id, name, mime = msg["photo"][-1]["file_id"], "telegram.jpg", "image/jpeg"  # en büyük boyut
@@ -684,21 +708,54 @@ def ask_attachment(user, chat_id, msg):
         file_id, name = doc["file_id"], doc.get("file_name") or ("video.mp4" if msg.get("video") else "belge")
         mime = doc.get("mime_type") or "application/octet-stream"
     caption = " ".join((msg.get("caption") or "").split())[:150]
-    _set_pending(chat_id, {"kind": "file", "file_id": file_id, "name": name, "caption": caption, "mime": mime})
+    group = msg.get("media_group_id")
+    prev = _peek_pending(chat_id, "file") if group else None
+    if prev and prev.get("group") == group and len(prev.get("more", [])) < 30:
+        # Albümün devamı: yeni soru yerine ilk sorunun sayısı güncellenir, seçim hepsine uygulanır
+        prev.setdefault("more", []).append({"file_id": file_id, "name": name, "mime": mime})
+        prev["caption"] = prev["caption"] or caption
+        _set_pending(chat_id, prev)
+        if prev.get("msg") and prev.get("buttons"):
+            try:
+                telegram.edit_message(chat_id, prev["msg"], f"📷 {1 + len(prev['more'])} dosya geldi. Hepsini nereye ekleyeyim?",
+                                      prev["buttons"])
+            except telegram.TelegramError:
+                pass
+        return
+    pending = {"kind": "file", "file_id": file_id, "name": name, "caption": caption, "mime": mime, "group": group}
+    _set_pending(chat_id, pending)
     if not (mime.startswith("image/") or mime == "application/pdf"):
         # Garantiye/nota sadece fotoğraf ve PDF eklenir; diğer dosyalar aktarma kutusuna gidebilir
-        telegram.send_message(chat_id, f"📎 <b>{esc(name)}</b> dosyasını bilgisayarda açmak için aktarma kutusuna koyayım mı?",
-                              buttons=[[("📤 Aktar (1 saat)", "ph:tr")], [("✖️ Vazgeç", "ph:x")]])
+        buttons = [[("📤 Aktar (1 saat)", "ph:tr")], [("✖️ Vazgeç", "ph:x")]]
+        sent = telegram.send_message(chat_id, f"📎 <b>{esc(name)}</b> dosyasını bilgisayarda açmak için aktarma kutusuna koyayım mı?",
+                                     buttons=buttons)
+        _remember_prompt(chat_id, pending, sent, buttons)
         return
     warranties = query("SELECT id, product FROM warranties WHERE user_id = ? ORDER BY id DESC LIMIT 5", (user["id"],))
     buttons = [[(f"🛡️ {w['product'][:35]}", f"ph:w:{w['id']}")] for w in warranties]
     is_image = bool(msg.get("photo")) or (msg.get("document") or {}).get("mime_type", "").startswith("image/")
+    if is_image:
+        buttons.insert(0, [("📄 Taramaya ekle (PDF için)", "ph:sc")])
     if is_image and assistant.available(user):
         buttons.insert(0, [("🧾 Fişi oku (yapay zekâ)", "ph:ai")])
     buttons.append([("➕ Yeni garanti" + (f": {caption[:25]}" if caption else ""), "ph:new")])
     buttons.append([("📝 Nota ekle", "ph:note"), ("📤 Aktar", "ph:tr")])
     buttons.append([("✖️ Vazgeç", "ph:x")])
-    telegram.send_message(chat_id, "📷 Bunu nereye ekleyeyim?", buttons=buttons)
+    sent = telegram.send_message(chat_id, "📷 Bunu nereye ekleyeyim?", buttons=buttons)
+    _remember_prompt(chat_id, pending, sent, buttons)
+
+
+def _remember_prompt(chat_id, pending, sent, buttons):
+    """Albümün sonraki fotoğrafları bu soruyu güncelleyebilsin diye mesaj kimliği saklanır."""
+    if pending.get("group") and isinstance(sent, dict) and sent.get("message_id"):
+        pending.update(msg=sent["message_id"], buttons=buttons)
+        _set_pending(chat_id, pending)
+
+
+def _pending_files(pending):
+    """Bekleyen dosyalar: ilki ve (albümse) devamı."""
+    first = {"file_id": pending["file_id"], "name": pending["name"], "mime": pending.get("mime", "")}
+    return [first] + pending.get("more", [])
 
 
 def cb_attachment(user, chat_id, message_id, callback_id, data):
@@ -714,6 +771,9 @@ def cb_attachment(user, chat_id, message_id, callback_id, data):
         return
     if choice == "tr":
         _transfer_file(user, chat_id, message_id, callback_id, pending)
+        return
+    if choice == "sc":
+        _scan_files(user, chat_id, message_id, callback_id, pending)
         return
     telegram.answer_callback(callback_id, "Kaydediliyor...")
     uid, caption = user["id"], pending["caption"]
@@ -738,13 +798,20 @@ def cb_attachment(user, chat_id, message_id, callback_id, data):
             (uid, caption or "Fotoğraf", caption)).lastrowid
         entity, label = "note", f"📝 {caption or 'Fotoğraf'} (yeni not)"
         target = link("notes.edit", note_id=entity_id)
-    try:
-        data_bytes = telegram.download_file(pending["file_id"])
-        save_attachment(FileStorage(io.BytesIO(data_bytes), filename=pending["name"]), uid, entity, entity_id)
-    except (telegram.TelegramError, ValueError) as e:
-        telegram.edit_message(chat_id, message_id, f"⚠️ Eklenemedi: {esc(e)}")
+    saved, errors = 0, []
+    for f in _pending_files(pending):
+        try:
+            data_bytes = telegram.download_file(f["file_id"])
+            save_attachment(FileStorage(io.BytesIO(data_bytes), filename=f["name"]), uid, entity, entity_id)
+            saved += 1
+        except (telegram.TelegramError, ValueError) as e:
+            errors.append(str(e))
+    if not saved:
+        telegram.edit_message(chat_id, message_id, f"⚠️ Eklenemedi: {esc(errors[0] if errors else '')}")
         return
-    telegram.edit_message(chat_id, message_id, f'✅ Eklendi: {esc(label)}\n<a href="{esc(target)}">Aç →</a>')
+    count = f" ({saved} dosya)" if saved > 1 else ""
+    warn = f"\n⚠️ {len(errors)} dosya eklenemedi: {esc(errors[0])}" if errors else ""
+    telegram.edit_message(chat_id, message_id, f'✅ Eklendi{count}: {esc(label)}{warn}\n<a href="{esc(target)}">Aç →</a>')
 
 
 # ---------- Konum: park yeri ya da Harita'ya yer ----------
@@ -805,15 +872,169 @@ def cmd_transfer(user, chat_id, rest):
 def _transfer_file(user, chat_id, message_id, callback_id, pending):
     from .modules.transfer import DEFAULT_MINUTES, TransferError, add_file
     telegram.answer_callback(callback_id, "Aktarılıyor...")
-    try:
-        data = telegram.download_file(pending["file_id"])
-        add_file(user["id"], data, pending["name"], pending.get("mime", ""), DEFAULT_MINUTES, device="🤖 Telegram",
-                 size_hint=len(data))
-    except (telegram.TelegramError, TransferError) as e:
-        telegram.edit_message(chat_id, message_id, f"⚠️ Aktarılamadı: {esc(e)}")
+    files, done, errors = _pending_files(pending), 0, []
+    for f in files:
+        try:
+            data = telegram.download_file(f["file_id"])
+            add_file(user["id"], data, f["name"], f.get("mime", ""), DEFAULT_MINUTES, device="🤖 Telegram",
+                     size_hint=len(data))
+            done += 1
+        except (telegram.TelegramError, TransferError) as e:
+            errors.append(str(e))
+    if not done:
+        telegram.edit_message(chat_id, message_id, f"⚠️ Aktarılamadı: {esc(errors[0] if errors else '')}")
         return
-    telegram.edit_message(chat_id, message_id, f"📤 <b>{esc(pending['name'])}</b> aktarma kutusuna kondu, 1 saat duracak.\n"
+    what = f"<b>{esc(pending['name'])}</b>" if len(files) == 1 else f"<b>{done} dosya</b>"
+    warn = f"\n⚠️ {len(errors)} dosya aktarılamadı: {esc(errors[0])}" if errors else ""
+    telegram.edit_message(chat_id, message_id, f"📤 {what} aktarma kutusuna kondu, 1 saat duracak.{warn}\n"
                                                f'<a href="{esc(link("transfer.index"))}">Aktar →</a>')
+
+
+# ---------- Belge tarama: Telegram'dan sayfa ----------
+SCAN_MODE_TTL = 15 * 60  # /tara modu son sayfadan bu kadar sonra kendiliğinden kapanır
+SCAN_BUTTONS = [[("📄 PDF yap", "scn:pdf:doc"), ("🎨 Renkli PDF", "scn:pdf:color")], [("🗑️ Kutuyu boşalt", "scn:clr")]]
+
+
+def _scan_state(chat_id):
+    row = query_one("SELECT value FROM app_state WHERE key = ?", (f"scan_mode:{chat_id}",))
+    data = json.loads(row["value"]) if row else None
+    return data if data and data.get("until", 0) > time.time() else None
+
+
+def _scan_set(chat_id, msg_id=None):
+    db = get_db()
+    db.execute("INSERT OR REPLACE INTO app_state (key, value) VALUES (?, ?)",
+               (f"scan_mode:{chat_id}", json.dumps({"until": time.time() + SCAN_MODE_TTL, "msg": msg_id})))
+    db.commit()
+
+
+def _scan_end(chat_id):
+    execute("DELETE FROM app_state WHERE key = ?", (f"scan_mode:{chat_id}",))
+
+
+def _scan_text(count, mode_on, note=""):
+    lines = [f"📄 <b>Tarama kutusu: {count} sayfa</b>" + (" · tarama modu açık" if mode_on else "")]
+    if note:
+        lines.append(note)
+    if mode_on:
+        lines.append("Sayfaların fotoğraflarını sırayla gönder (albüm de olur); bitince <b>📄 PDF yap</b>.")
+    lines.append(f'Sırala/döndür ya da nota ekle: <a href="{esc(link("scanner.index"))}">Belge Tara →</a>')
+    return "\n".join(lines)
+
+
+def _scan_show(chat_id, count, note="", edit_id=None):
+    """Durum mesajını günceller (yoksa yenisini gönderir); mesaj kimliğini döner."""
+    state = _scan_state(chat_id)
+    text = _scan_text(count, state is not None, note)
+    target = edit_id or (state or {}).get("msg")
+    if target:
+        try:
+            telegram.edit_message(chat_id, target, text, SCAN_BUTTONS)
+            return target
+        except telegram.TelegramError:
+            pass  # silinmiş ya da çok eski mesaj: yenisini gönder
+    sent = telegram.send_message(chat_id, text, buttons=SCAN_BUTTONS)
+    return sent.get("message_id") if isinstance(sent, dict) else None
+
+
+def _add_scan_pages(user, files):
+    """Telegram dosyalarını kutuya koyar: (kutudaki sayı, hatalar)."""
+    from .modules.scanner import ScanError, inbox_add, inbox_count
+    errors = []
+    for f in files:
+        try:
+            inbox_add(user["id"], telegram.download_file(f["file_id"]), f["name"])
+        except (telegram.TelegramError, ScanError) as e:
+            errors.append(str(e))
+    return inbox_count(user["id"]), errors
+
+
+def scan_add_message(user, chat_id, msg):
+    """Tarama modunda gelen fotoğraf: sormadan kutuya, durum mesajı güncellenir (albümde tek mesaj)."""
+    file_id, name, mime = _image_part(msg)
+    count, errors = _add_scan_pages(user, [{"file_id": file_id, "name": name, "mime": mime}])
+    note = f"⚠️ {esc(errors[0])}" if errors else ""
+    _scan_set(chat_id, _scan_show(chat_id, count, note))  # süre son sayfadan itibaren yeniden başlar
+
+
+def _scan_files(user, chat_id, message_id, callback_id, pending):
+    """Fotoğraf sorusundaki "📄 Taramaya ekle": soru mesajı durum mesajına dönüşür."""
+    telegram.answer_callback(callback_id, "Taramaya ekleniyor...")
+    count, errors = _add_scan_pages(user, _pending_files(pending))
+    note = f"⚠️ {esc(errors[0])}" if errors else ""
+    if not count:
+        telegram.edit_message(chat_id, message_id, f"⚠️ Taramaya eklenemedi: {esc(errors[0] if errors else '')}")
+        return
+    _scan_show(chat_id, count, note, edit_id=message_id)
+
+
+def cmd_scan(user, chat_id, rest):
+    from .modules.scanner import inbox_count, inbox_remove
+    word = fold(rest)
+    if word in ("bitti", "bitir", "pdf", "tamam", "renkli", "gri"):
+        mode = {"renkli": "color", "gri": "gray"}.get(word, "doc")
+        scan_pdf(user, chat_id, mode)
+        return
+    if word in ("iptal", "bosalt", "temizle", "sil", "kapat"):
+        n = inbox_remove(user["id"])
+        _scan_end(chat_id)
+        telegram.send_message(chat_id, f"🗑️ Tarama kapatıldı, kutudaki {n} sayfa silindi." if n else "Tarama kapatıldı.")
+        return
+    _scan_set(chat_id)
+    _scan_set(chat_id, _scan_show(chat_id, inbox_count(user["id"]), "📷 Tarama modu açıldı."))
+
+
+def scan_pdf(user, chat_id, mode="doc", message_id=None):
+    """Kutudaki sayfalardan PDF yapar ve sohbete gönderir; başarılıysa kutu boşalır, mod kapanır."""
+    from .modules.scanner import (MODES, TELEGRAM_MAX_BYTES, ScanError, build_pdf, close_files, default_title,
+                                  inbox_files, inbox_items, inbox_remove, pdf_filename)
+    from .utils import fmt_size
+    rows = inbox_items(user["id"])
+    if not rows:
+        text = "📄 Tarama kutusu boş. <code>/tara</code> yazıp sayfaların fotoğraflarını gönder."
+        if message_id:
+            telegram.edit_message(chat_id, message_id, text)
+        else:
+            telegram.send_message(chat_id, text)
+        return
+    title = default_title()
+    files = inbox_files(rows)
+    try:
+        pdf = build_pdf(files, [0] * len(files), mode if mode in MODES else "doc", title)
+        if len(pdf) > TELEGRAM_MAX_BYTES:
+            raise ScanError("PDF Telegram için çok büyük (en fazla 50 MB); web'deki Belge Tara'dan indir.")
+        telegram.send_document(chat_id, pdf_filename(title), pdf, caption=f"📄 {title} · {len(rows)} sayfa",
+                               mime="application/pdf")
+    except (ScanError, telegram.TelegramError) as e:
+        _scan_show(chat_id, len(rows), f"⚠️ PDF yapılamadı: {esc(e)}", edit_id=message_id)
+        return
+    finally:
+        close_files(files)
+    inbox_remove(user["id"], {r["id"] for r in rows})
+    _scan_end(chat_id)
+    done = f"✅ PDF gönderildi: {len(rows)} sayfa, {fmt_size(len(pdf))}. Tarama kutusu boşaldı."
+    if message_id:
+        try:
+            telegram.edit_message(chat_id, message_id, done)
+            return
+        except telegram.TelegramError:
+            pass
+    telegram.send_message(chat_id, done)
+
+
+def cb_scan(user, chat_id, message_id, callback_id, data):
+    from .modules.scanner import inbox_remove
+    parts = data.split(":")
+    if parts[1:2] == ["pdf"]:
+        telegram.answer_callback(callback_id, "PDF hazırlanıyor...")
+        scan_pdf(user, chat_id, parts[2] if len(parts) > 2 else "doc", message_id)
+    elif parts[1:2] == ["clr"]:
+        n = inbox_remove(user["id"])
+        _scan_end(chat_id)
+        telegram.answer_callback(callback_id, "Boşaltıldı")
+        telegram.edit_message(chat_id, message_id, f"🗑️ Tarama kutusu boşaltıldı ({n} sayfa).")
+    else:
+        telegram.answer_callback(callback_id)
 
 
 # ---------- Zaman takibi ----------
