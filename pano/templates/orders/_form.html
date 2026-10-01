@@ -1,0 +1,65 @@
+{% import "_macros.html" as ui %}
+
+{# Sipariş ekleme/düzenleme alanları. o: orders satırı ya da None; expense: bağlı harcama (varsa).
+   "with context" ile içe aktarılır (stores, carriers, statuses, categories...). #}
+{% macro order_fields(o=None, expense=None) -%}
+  <div class="form-row">
+    {{ ui.field("Mağaza", "store", o.store if o else "", placeholder="ör. Trendyol",
+                attrs='list="order-stores" maxlength="60" autocomplete="off"') }}
+    {{ ui.field("Ürün", "item", o.item if o else "", required=True, placeholder="ör. Bluetooth kulaklık",
+                attrs='maxlength="200"') }}
+  </div>
+  <div class="form-row three">
+    {{ ui.money_field("Tutar (₺)", "amount", o.amount if o else None, placeholder="Boş bırakılabilir") }}
+    {{ ui.field("Sipariş tarihi", "ordered_on", o.ordered_on if o else today_str(), type="date") }}
+    {{ ui.field("Beklenen teslim", "expected_on", (o.expected_on or "") if o else "", type="date") }}
+  </div>
+  <div class="form-row three">
+    {{ ui.field("Kargo firması", "carrier", o.carrier if o else "", placeholder="ör. Yurtiçi",
+                attrs='list="order-carriers" maxlength="40" autocomplete="off"') }}
+    {{ ui.field("Takip no", "tracking_no", o.tracking_no if o else "", attrs='maxlength="60" autocomplete="off"') }}
+    {{ ui.field("İade süresi (gün)", "return_days", o.return_days if o else default_return_days, type="number",
+                attrs='min="0" max="365" inputmode="numeric"', hint="Cayma hakkı 14 gün; mağaza farklı verebilir. 0 = takip etme") }}
+  </div>
+  <div class="form-row">
+    {{ ui.field("Takip linki (isteğe bağlı)", "tracking_url", o.tracking_url if o else "", type="url",
+                placeholder="https://...", attrs='maxlength="2000"', hint="Boşsa takip no ile Google'da aranır") }}
+    {{ ui.field("Sipariş sayfası linki", "order_url", o.order_url if o else "", type="url",
+                placeholder="https://...", attrs='maxlength="2000"') }}
+  </div>
+  <div class="form-row">
+    <label class="field"><span>Durum</span>
+      <select name="status">
+        {% for k, (label, icon) in statuses.items() %}<option value="{{ k }}" {% if k == (o.status if o else 'ordered') %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <div data-show-for="status=delivered,returning,returned">
+      {{ ui.field("Teslim tarihi", "delivered_on", ((o.delivered_on or today_str()) if o else today_str()), type="date",
+                  hint="Değişince iade son günü yeniden hesaplanır") }}
+    </div>
+  </div>
+  {{ ui.textarea("Not", "note", o.note if o else "", rows=2, placeholder="Beden, renk, iade kodu...") }}
+  {% if expense %}
+    <p class="small">💸 Harcamalara eklendi:
+      <a href="{{ url_for('expenses.edit', expense_id=expense.id) }}">{{ expense.amount | money }} · {{ expense.category }}</a></p>
+  {% else %}
+    <div class="form-row">
+      {{ ui.checkbox("💸 Harcamalara da ekle", "add_expense") }}
+      <label class="field"><span>Harcama kategorisi</span>
+        <select name="expense_category">
+          {% for c in categories %}<option value="{{ c }}" {% if c == 'Diğer' %}selected{% endif %}>{{ category_icon(c) }} {{ c }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+  {% endif %}
+  <datalist id="order-stores">{% for s in stores %}<option value="{{ s }}">{% endfor %}</datalist>
+  <datalist id="order-carriers">{% for c in carriers %}<option value="{{ c }}">{% endfor %}</datalist>
+{%- endmacro %}
+
+{# İade süresi rozeti. left: kalan gün (orders.return_left) ya da None #}
+{% macro return_badge(left) -%}
+  {% if left is none %}
+  {% elif left > 0 %}<span class="badge {{ 'soon' if left <= 2 }}">iade için {{ left }} gün kaldı</span>
+  {% elif left == 0 %}<span class="badge soon">iade için bugün son gün</span>
+  {% else %}<span class="badge">iade süresi doldu</span>{% endif %}
+{%- endmacro %}

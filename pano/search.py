@@ -17,6 +17,12 @@ def _mood(n):
     return MOODS.get(n, ("", ""))[0]
 
 
+def _order_detail(r):
+    from .modules.orders import STATUSES
+    return " · ".join(x for x in (r["store"], STATUSES[r["status"]][0],
+                                  fmt_money(r["amount"]) if r["amount"] is not None else "") if x)
+
+
 def _sources(user_id):
     """(etiket, ikon, sorgu, parametreler, aranan alanlar, başlık, ayrıntı, adres)"""
     return [
@@ -60,6 +66,9 @@ def _sources(user_id):
          ("note", "category"), lambda r: r["note"] or r["category"],
          lambda r: fmt_date(r["date"]) + " · " + fmt_money(r["amount"]),
          lambda r: url_for("expenses.edit", expense_id=r["id"])),
+        ("Siparişler", "🚚", "SELECT * FROM orders WHERE user_id = ? ORDER BY ordered_on DESC, id DESC LIMIT ?",
+         (user_id,), ("store", "item", "tracking_no", "note"), lambda r: r["item"], _order_detail,
+         lambda r: url_for("orders.edit", order_id=r["id"])),
         ("Sağlık", "🩺", "SELECT * FROM appointments WHERE user_id = ? ORDER BY starts_at DESC LIMIT ?", (user_id,),
          ("title", "place", "note"), lambda r: r["title"], lambda r: fmt_date(r["starts_at"]) + " " + r["starts_at"][11:16],
          lambda r: url_for("health.appt_edit", appt_id=r["id"])),

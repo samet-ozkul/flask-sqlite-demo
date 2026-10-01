@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "orders/_form.html" import order_fields, return_badge with context %}
+{% block title %}Siparişler{% endblock %}
+{% block head %}
+<style>
+  .order-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .order-side { align-self: flex-start; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+</style>
+{% endblock %}
+{% block content %}
+{% set here = request.full_path.rstrip('?') %}
+{% if total %}
+  {{ ui.page_header("🚚 Siparişler", "Yolda " ~ summary.waiting ~ " sipariş · iade süresi devam eden " ~ summary.returnable
+                    ~ " · bu ay " ~ (summary.month_total | money)) }}
+{% else %}
+  {{ ui.page_header("🚚 Siparişler", "Kargo takibi, teslim günü ve iade süresi hatırlatması") }}
+{% endif %}
+
+<div class="card">
+  <details class="add" {% if not total %}open{% endif %}>
+    <summary>＋ Yeni sipariş</summary>
+    <form method="post" action="{{ url_for('orders.create') }}">
+      {{ ui.csrf() }}
+      {{ order_fields() }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+{% if total %}
+  <nav class="tabs">
+    {% for key, label in TABS.items() %}
+      <a href="{{ url_for('orders.index', sekme=key) }}" class="{{ 'active' if key == tab }}">{{ label }} <span class="pill-count">{{ counts[key] }}</span></a>
+    {% endfor %}
+  </nav>
+{% endif %}
+
+{% if items %}
+  <div class="card">
+    <ul class="rows">
+      {% for o in items %}
+        {% set status_label, status_icon = statuses[o.status] %}
+        {% set track = tracking_link(o) if o.status in ('ordered', 'shipped') else None %}
+        {% set quick = quick_actions(o, today) %}
+        <li>
+          <span class="ico" title="{{ status_label }}">{{ status_icon }}</span>
+          <div class="grow">
+            <div class="title">
+              <a href="{{ url_for('orders.edit', order_id=o.id) }}">{{ o.item }}</a>
+              {% if o.store %}<span class="muted small">· {{ o.store }}</span>{% endif %}
+            </div>
+            <div class="meta">
+              <span>{{ status_label }}{% if o.carrier %} · {{ o.carrier }}{% endif %}</span>
+              {% if o.status in ('ordered', 'shipped') and o.expected_on %}
+                <span>Beklenen {{ o.expected_on | date_tr }}</span>{{ ui.due_badge(o.expected_on, 1) }}
+              {% elif o.delivered_on and o.status != 'cancelled' %}<span>Teslim {{ o.delivered_on | date_tr }}</span>
+              {% else %}<span>Sipariş {{ o.ordered_on | date_tr }}</span>{% endif %}
+            </div>
+            {% if quick or track %}
+              <div class="order-actions">
+                {% for s, label in quick %}
+                  <form method="post" action="{{ url_for('orders.set_status', order_id=o.id) }}" class="inline">
+                    {{ ui.csrf() }}
+                    <input type="hidden" name="status" value="{{ s }}">
+                    <input type="hidden" name="next" value="{{ here }}">
+                    <button class="btn sm {{ 'ok' if s == 'delivered' }}">{{ label }}</button>
+                  </form>
+                {% endfor %}
+                {% if track %}<a class="btn sm" href="{{ track }}" target="_blank" rel="noopener noreferrer">📍 Kargo takip</a>{% endif %}
+              </div>
+            {% endif %}
+          </div>
+          <div class="order-side">
+            {% if o.amount is not none %}<span class="amount">{{ o.amount | money }}</span>{% endif %}
+            {{ return_badge(return_left(o, today)) }}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% elif total %}
+  {{ ui.empty({"bekleyen": "Yolda sipariş yok.", "teslim": "Teslim alınan sipariş yok.", "iade": "İade yok."}.get(tab, "Sipariş yok."), "📦") }}
+{% else %}
+  {{ ui.empty("Henüz sipariş yok. İnternetten bir şey aldığında ekle; kargosunu ve iade süresini birlikte takip edelim.", "🚚") }}
+{% endif %}
+{% endblock %}

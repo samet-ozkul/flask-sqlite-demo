@@ -91,6 +91,15 @@ def upcoming(user_id, days=7, long_days=30):
         add(DOC_KINDS[r["kind"]][1], f"{r['name']} bitiyor", r["expires_on"], "documents.edit", detail=r["holder"],
             doc_id=r["id"])
 
+    # Siparişler: beklenen teslim (gecikenler 30 gün görünür) ve iade son günü
+    for r in query("SELECT * FROM orders WHERE user_id = ? AND status IN ('ordered', 'shipped')"
+                   " AND expected_on BETWEEN ? AND ?", (user_id, (t - timedelta(days=30)).isoformat(), soon)):
+        add("🚚", f"{r['item']} bekleniyor", r["expected_on"], "orders.edit", detail=r["store"], order_id=r["id"])
+    for r in query("SELECT * FROM orders WHERE user_id = ? AND status = 'delivered' AND return_by BETWEEN ? AND ?",
+                   (user_id, ts, soon)):
+        add("↩️", f"{r['item']} iade son günü", r["return_by"], "orders.edit", detail=r["store"], overdue_ok=False,
+            order_id=r["id"])
+
     from .modules.events import visible_events
     for e in visible_events(user_id, " AND e.date BETWEEN ? AND ?", (ts, soon)):
         detail = " · ".join(x for x in (e["time"] or "", e["place"]) if x)

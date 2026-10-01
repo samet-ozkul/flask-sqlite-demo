@@ -254,6 +254,19 @@ def todo_reminders(secret):
                 result["errors"].append(f"kişi {row['id']}: {e}")
         _state_set("contacts_nudge", nudge_day)
 
+    # Siparişler: beklenen teslim günü, iade için son 2 gün ve son gün (varsayılan saatten sonra)
+    from .orders import mark_sent as mark_order, message as order_message, pending as pending_orders
+    result["orders_sent"] = 0
+    if now.strftime("%H:%M") >= todo.DEFAULT_DUE_TIME:
+        for kind, order, on in pending_orders(now):
+            try:
+                telegram.send_message(order["chat_id"], order_message(
+                    kind, order, url_for("orders.edit", order_id=order["id"], _external=True), telegram.escape))
+                mark_order(order, kind, on)
+                result["orders_sent"] += 1
+            except telegram.TelegramError as e:
+                result["errors"].append(f"sipariş {order['id']}: {e}")
+
     # Hava uyarısı: akşam, yarın için yağmur / don / sıcak / fırtına (günde bir kez)
     result["weather_alerts"] = 0
     for user, day, found in weather_alerts.pending(now):
