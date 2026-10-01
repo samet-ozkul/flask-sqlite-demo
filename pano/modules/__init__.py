@@ -34,6 +34,7 @@ MODULES = [
     ("timetrack", "timetrack.index", "Zaman Takibi", "⏱️", "Araçlar"),
     ("calculators", "calculators.index", "Hesaplayıcılar", "🧮", "Araçlar"),
     ("kanban", "kanban.index", "Kanban", "🗂️", "Araçlar"),
+    ("profile", "profile.edit", "Profil Sayfası", "🌐", "Araçlar"),
 ]
 
 # Menüde gösterilmeyen altyapı modülleri

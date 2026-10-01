@@ -1,0 +1,92 @@
+<!doctype html>
+{# Herkese açık profil: base.html kullanılmaz (menü, kullanıcı bilgisi, CSRF, betik yok). Sadece p'deki alanlar. #}
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ name }}</title>
+  {% if p.noindex %}<meta name="robots" content="noindex, nofollow">{% endif %}
+  {% if p.headline %}<meta name="description" content="{{ p.headline }}">{% endif %}
+  <meta property="og:type" content="profile">
+  <meta property="og:title" content="{{ name }}">
+  {% if p.headline %}<meta property="og:description" content="{{ p.headline }}">{% endif %}
+  <meta property="og:url" content="{{ url }}">
+  {% if p.has_photo %}<meta property="og:image" content="{{ url_for('profile.photo', slug=p.slug, v=p.updated_at, _external=True) }}">{% endif %}
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+  <style>
+    :root {
+      --bg: #f5f6fa; --card: #ffffff; --text: #1c1e26; --muted: #6b7080; --border: #e3e5ec;
+      --accent: {{ accent_light }}; --on-accent: #ffffff;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f1117; --card: #181b24; --text: #e8e9ee; --muted: #9095a5; --border: #2a2e3a;
+              --accent: {{ accent_dark }}; --on-accent: #0f1117; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+           padding: max(24px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+           font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    .owner { width: 100%; max-width: 440px; margin-bottom: 12px; padding: 8px 12px; border-radius: 10px; font-size: .88rem;
+             background: var(--card); border: 1px dashed var(--border); color: var(--muted); text-align: center; }
+    .owner a { color: var(--accent); }
+    main { width: 100%; max-width: 440px; background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+           padding: 28px 20px 22px; text-align: center; }
+    .avatar { width: 112px; height: 112px; border-radius: 50%; margin: 0 auto 14px; display: grid; place-items: center;
+              overflow: hidden; font-size: 3.4rem; line-height: 1; background: color-mix(in srgb, var(--accent) 14%, transparent);
+              color: var(--accent); font-weight: 700; }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    h1 { font-size: 1.45rem; margin: 0; line-height: 1.25; overflow-wrap: anywhere; }
+    .headline { color: var(--muted); margin: 4px 0 0; overflow-wrap: anywhere; }
+    .loc { color: var(--muted); font-size: .9rem; margin: 4px 0 0; }
+    .bio { white-space: pre-line; overflow-wrap: anywhere; margin: 14px 0 0; }
+    .contacts { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+    .contacts a { flex: 1 1 0; min-width: 96px; padding: 9px 10px; border-radius: 12px; border: 1px solid var(--accent);
+                  color: var(--accent); text-decoration: none; font-weight: 600; font-size: .92rem; white-space: nowrap; }
+    .links { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+    .links a { display: block; padding: 13px 16px; border-radius: 12px; background: var(--accent); color: var(--on-accent);
+               text-decoration: none; font-weight: 600; overflow-wrap: anywhere; }
+    .contacts a:hover, .links a:hover, .save:hover { filter: brightness(1.08); }
+    .save { display: inline-block; margin-top: 18px; padding: 8px 14px; border-radius: 99px; font-size: .9rem;
+            color: var(--text); background: color-mix(in srgb, var(--accent) 10%, transparent); text-decoration: none; }
+    footer { margin-top: 18px; font-size: .75rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  {% if owner %}
+    <div class="owner">{% if p.enabled %}Bu senin sayfan · 👁️ {{ p.views }} ziyaret{% else %}🔒 Sayfa kapalı: şu an sadece sen görüyorsun{% endif %}
+      · <a href="{{ url_for('profile.edit') }}">✏️ Düzenle</a></div>
+  {% endif %}
+  <main>
+    <div class="avatar">
+      {%- if p.has_photo %}<img src="{{ url_for('profile.photo', slug=p.slug, v=p.updated_at) }}" alt="{{ name }}">
+      {%- elif p.avatar_emoji %}{{ p.avatar_emoji }}
+      {%- else %}{{ name[:1] | upper }}{% endif -%}
+    </div>
+    <h1>{{ name }}</h1>
+    {% if p.headline %}<p class="headline">{{ p.headline }}</p>{% endif %}
+    {% if p.location %}<p class="loc">📍 {{ p.location }}</p>{% endif %}
+    {% if p.bio %}<p class="bio">{{ p.bio }}</p>{% endif %}
+
+    {% if contacts %}
+      <div class="contacts">
+        {% for icon, label, href, new_tab in contacts %}
+          <a href="{{ href }}"{% if new_tab %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ icon }} {{ label }}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if p.links %}
+      <nav class="links" aria-label="Linkler">
+        {% for l in p.links %}
+          <a href="{{ l.url }}" rel="noopener noreferrer"{% if l.url.lower().startswith(('http://', 'https://')) %} target="_blank"{% endif %}>{{ l.label }}</a>
+        {% endfor %}
+      </nav>
+    {% endif %}
+
+    <a class="save" href="{{ url_for('profile.vcard', slug=p.slug) }}">📇 Rehbere ekle</a>
+  </main>
+  <footer>Kişisel Pano</footer>
+</body>
+</html>
