@@ -263,7 +263,8 @@ def test_cron(app):
                     " FROM users WHERE username = 'admin'")
         r = c.get("/cron/gizli123/gunluk")
         assert r.status_code == 200 and r.json["sent"] >= 1, r.json
-        msg = [p for m, p, f in sent if m == "sendMessage"][-1]["text"]
+        # Ayın 1'inde özetin ardından aylık rapor da gider; özet "Günaydın" ile başlayan mesaj
+        msg = [p for m, p, f in sent if m == "sendMessage" and "Günaydın" in p["text"]][-1]["text"]
         assert "Elektrik &lt;b&gt;" in msg and "bugün" in msg, msg
         assert c.get("/cron/gizli123/gunluk").json["skipped"] >= 1  # aynı gün ikinci kez gönderilmez
         r = c.get("/cron/gizli123/yedek")

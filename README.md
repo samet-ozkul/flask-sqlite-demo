@@ -7,7 +7,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 |---|---|
 | 📅 Genel | **Takvim** (tüm tarihler tek takvimde, telefon takvimine abonelik) · **Etkinlikler** (aileyle paylaşılan ortak takvim, Telegram hatırlatması) · **Arama** (tek kutudan tüm modüller, bottan `/ara`) |
 | 🏠 Pano | Günün özeti: hava durumu, döviz kuru, yaklaşan ödemeler/tarihler, bugünkü alışkanlıklar ve ilaçlar, hızlı harcama ve hızlı not |
-| 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, paylaşılan listede işi birine atama, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) |
+| 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, paylaşılan listede işi birine atama, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) · **Şifreli Kasa** (hassas notlar tarayıcıda şifrelenir, sunucu okuyamaz) |
 | 💰 Para | **Harcamalar** (aylık özet, kategori grafiği, bütçe limiti, Excel/CSV) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) · **Varlıklar** (nakit, döviz, altın; güncel TL değeri ve 90 günlük grafik) · **Hedefler** (birikim hedefi, ayda ne kadar, tahmini bitiş) · **Ortak Harcama** (Splitwise benzeri: kim ne ödedi, kim kime borçlu) |
 | 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) · **Belgeler** (pasaport, ehliyet, kimlik, ruhsat, poliçe bitiş tarihleri; 1 hafta–6 ay önceden Telegram hatırlatması) |
 | 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Günlük** (her gün bir satır ve ruh hali emojisi, ay takvimi, “1 yıl önce bugün”, akşam Telegram'dan “Bugün nasıldı?”) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) · **İzleme / Okuma** (film, dizi, kitap listesi; kapaklı arama, puan) |
@@ -34,7 +34,8 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
   cd ~/flask-sqlite-demo && workon flask-demo && python -c "import sqlite3, getpass; from werkzeug.security import generate_password_hash as h; u = input('Kullanıcı adı: '); p = getpass.getpass('Yeni şifre: '); db = sqlite3.connect('app.db'); n = db.execute('UPDATE users SET password_hash = ? WHERE username = ?', (h(p), u)).rowcount; db.execute('DELETE FROM login_attempts'); db.commit(); print('Değişti' if n else 'Kullanıcı yok')"
   ```
 - Her kayıt kullanıcıya ait; dosyalar sadece sahibine sunulur.
-- Şifre, kart bilgisi, kimlik fotoğrafı gibi hassas verileri burada saklamayın; bunun için şifre yöneticisi kullanın.
+- **Şifreli Kasa:** Abone numarası, poliçe no, Wi-Fi şifresi gibi notlar kasa parolasıyla **tarayıcıda** şifrelenir (AES-256-GCM, anahtar PBKDF2-SHA256 600.000 turla türetilir). Kasa parolası sunucuya hiç gitmez; sunucuda ve yedeklerde sadece şifreli veri durur. Parola unutulursa kayıtlar kurtarılamaz (kasa hesap şifresiyle sıfırlanabilir). 5 dakika işlem yapılmazsa kilitlenir; aramada, yapay zekâda ve Telegram'da yer almaz.
+- Kart bilgisi ve kimlik fotoğrafı gibi verileri yine de burada saklamayın; banka ve önemli hesap şifreleri için gerçek bir şifre yöneticisi kullanın.
 
 ## Lokal çalıştırma
 
