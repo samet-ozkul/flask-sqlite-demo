@@ -29,16 +29,36 @@
   .chips input:checked + span { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); font-weight: 600; }
   .chips input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 1px; }
   .s-tips { margin: 0; padding-left: 1.2em; }
+  .s-src { position: absolute; bottom: 4px; left: 4px; padding: 0 6px; border-radius: 99px; font-size: .72rem;
+           background: var(--surface); box-shadow: var(--shadow); }
+  .s-inbox-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); margin: 10px 0; }
+  .s-inbox-grid img { width: 100%; aspect-ratio: 1; object-fit: contain; background: var(--surface-2);
+                      border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .s-js .s-inbox-grid { display: none; }
   .s-tips li { margin: 2px 0; }
 </style>
 {% endblock %}
 {% block content %}
 {{ ui.page_header("📄 Belge Tara", "Telefonla çektiğin sayfalardan tek PDF: indir, nota ekle, Aktar'a koy ya da Telegram'a gönder") }}
 
+{% if inbox %}
+  <section class="card" id="s-inbox-card">
+    <h2>📲 Telegram'dan gelen {{ inbox | length }} sayfa
+      {{ ui.delete_button(url_for('scanner.inbox_clear'), "Boşalt", "Telegram'dan gelen sayfalar silinsin mi?") }}</h2>
+    <div class="s-inbox-grid">
+      {% for p in inbox %}<img src="{{ p.url }}" alt="{{ loop.index }}. sayfa" loading="lazy">{% endfor %}
+    </div>
+    <p class="muted small">Aşağıdaki sayfa listesinin başına eklendiler; sıralayabilir, döndürebilir ya da çıkarabilirsin.
+      PDF yapılınca kutudan silinirler, yapılmazsa 24 saat sonra.</p>
+  </section>
+{% endif %}
+
 <form method="post" action="{{ url_for('scanner.make_pdf') }}" enctype="multipart/form-data" id="s-form"
       data-max-pages="{{ max_pages }}" data-max-mb="{{ max_mb }}">
   {{ ui.csrf() }}
   <input type="hidden" name="rotations" id="s-rotations">
+  <input type="hidden" name="order" id="s-order">
+  <script type="application/json" id="s-inbox">{{ inbox | tojson }}</script>
   <input type="hidden" name="dl" id="s-dl">
   <input type="file" multiple class="hidden" id="s-files">
 
@@ -87,7 +107,8 @@
     <li>Kâğıdı kadraja tam sığdır, telefonu kâğıda paralel tut.</li>
     <li>Yazılı sayfalarda “Belge” görünümü kâğıdı beyaz, yazıyı koyu yapar; fotoğraf ya da renkli belge için “Renkli” seç.</li>
   </ul>
-  <p class="muted small">🔒 İşleme sunucuda yapılır; fotoğraflar kaydedilmez, sadece seçtiğin hedefe PDF gider.</p>
+  {% if telegram_linked %}<p class="muted small">📲 Telegram'dan da tarayabilirsin: bota <code>/tara</code> yaz, sayfaların fotoğraflarını sırayla gönder, bitince “📄 PDF yap”a dokun. Sayfalar burada da görünür.</p>{% endif %}
+  <p class="muted small">🔒 İşleme sunucuda yapılır; fotoğraflar kaydedilmez, sadece seçtiğin hedefe PDF gider (Telegram'dan gelen sayfalar PDF yapılana kadar en fazla 24 saat bekler).</p>
 </section>
-<script src="{{ url_for('static', filename='scanner.js') }}?v=1" defer></script>
+<script src="{{ url_for('static', filename='scanner.js') }}?v=2" defer></script>
 {% endblock %}

@@ -130,7 +130,7 @@ def upload_files():
 # ---------- Testler ----------
 def test_page_and_access():
     page = text(ADMIN.get("/tara/"))
-    assert 'capture="environment"' in page and 'accept="image/*" multiple' in page and "scanner.js?v=1" in page
+    assert 'capture="environment"' in page and 'accept="image/*" multiple' in page and "scanner.js?v=2" in page
     assert 'value="Tarama 01.10.2026 14-35"' in page
     assert "fotoğraflar kaydedilmez, sadece seçtiğin hedefe PDF gider" in page
     assert 'value="telegram"' not in page  # Telegram bağlı değil

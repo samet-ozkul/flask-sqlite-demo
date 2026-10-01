@@ -20,13 +20,14 @@
   const maxPages = Number(form.dataset.maxPages);
   const maxBytes = Number(form.dataset.maxMb) * 1024 * 1024;
   const IMAGE_NAME = /\.(jpe?g|png|webp|gif|bmp|tiff?|heic|heif|avif)$/i;
-  const pages = []; // {file, rot, url, el, img, no}
+  const pages = []; // {file | inbox (Telegram kutusu id), size, rot, url, el, img, no}
   const size = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
 
   camera.removeAttribute("name");
   gallery.removeAttribute("name");
   combined.name = "files";
   form.classList.add("s-ready");
+  document.documentElement.classList.add("s-js");  // kutudaki sayfalar listede; karttaki küçük resimler gizlenir
 
   // ---------- Seçimi hatırla (görünüm, hedef) ----------
   const KEY = "tara-secim";
@@ -71,6 +72,13 @@
     const no = document.createElement("span");
     no.className = "s-no";
     box.append(img, no, button("✕", "Sayfayı kaldır", "del", "btn sm danger s-del"));
+    if (p.inbox) {
+      const src = document.createElement("span");
+      src.className = "s-src";
+      src.textContent = "📲";
+      src.title = "Telegram'dan";
+      box.append(src);
+    }
     const bar = document.createElement("div");
     bar.className = "s-bar";
     bar.append(button("←", "Öne al", "left"), button("⟳", "90° döndür", "rot"), button("→", "Geriye al", "right"));
@@ -90,7 +98,7 @@
       p.el.querySelector("[data-act=left]").disabled = i === 0;
       p.el.querySelector("[data-act=right]").disabled = i === pages.length - 1;
     });
-    const total = pages.reduce((s, p) => s + p.file.size, 0);
+    const total = pages.reduce((s, p) => s + p.size, 0);
     const full = pages.length >= maxPages;
     const tooBig = total > maxBytes;
     count.textContent = pages.length
@@ -108,7 +116,7 @@
     for (const file of files) {
       if (!(file.type.startsWith("image/") || IMAGE_NAME.test(file.name))) { skipped++; continue; }
       if (pages.length >= maxPages) { over++; continue; }
-      const p = { file, rot: 0, url: URL.createObjectURL(file) };
+      const p = { file, size: file.size, rot: 0, url: URL.createObjectURL(file) };
       makeItem(p);
       pages.push(p);
     }
@@ -138,7 +146,7 @@
       return;
     }
     if (btn.dataset.act === "del") {
-      URL.revokeObjectURL(p.url);
+      if (p.file) URL.revokeObjectURL(p.url);  // Telegram sayfası sadece bu PDF'ten çıkar, kutuda kalır
       pages.splice(i, 1);
     } else {
       const j = btn.dataset.act === "left" ? i - 1 : i + 1;
@@ -150,7 +158,7 @@
   });
 
   clearBtn.addEventListener("click", () => {
-    pages.splice(0).forEach((p) => URL.revokeObjectURL(p.url));
+    pages.splice(0).forEach((p) => { if (p.file) URL.revokeObjectURL(p.url); });
     render();
     say("");
   });
@@ -164,7 +172,7 @@
   }
 
   form.addEventListener("submit", (e) => {
-    const total = pages.reduce((s, p) => s + p.file.size, 0);
+    const total = pages.filter((p) => p.file).reduce((s, p) => s + p.size, 0);  // yüklenecek kısım
     if (!pages.length || total > maxBytes) {
       e.preventDefault();
       say(pages.length ? `Toplam boyut ${form.dataset.maxMb} MB'ı aşıyor; birkaç sayfayı kaldır.` : "Önce en az bir sayfa ekle.", true);
@@ -172,7 +180,7 @@
     }
     try {
       const dt = new DataTransfer();
-      pages.forEach((p) => dt.items.add(p.file));
+      pages.forEach((p) => { if (p.file) dt.items.add(p.file); });
       combined.files = dt.files;
     } catch (err) {
       e.preventDefault();
@@ -180,6 +188,8 @@
       return;
     }
     $("s-rotations").value = pages.map((p) => p.rot).join(",");
+    // Sıra: "i12" Telegram kutusundaki sayfa, "f" yüklenen bir sonraki dosya
+    $("s-order").value = pages.map((p) => (p.inbox ? "i" + p.inbox : "f")).join(",");
     busy(true);
     say(`${pages.length} sayfa yükleniyor ve işleniyor…`);
     if (form.elements.target.value === "download") {
@@ -203,6 +213,17 @@
 
   // Geri tuşuyla dönülünce (sayfa önbellekten gelir) buton takılı kalmasın
   window.addEventListener("pageshow", (e) => { if (e.persisted) busy(false); });
+
+  // Telegram'dan gelen sayfalar listenin başında
+  try {
+    for (const it of JSON.parse($("s-inbox").textContent || "[]")) {
+      const p = { inbox: it.id, size: it.size, rot: 0, url: it.url };
+      makeItem(p);
+      pages.push(p);
+    }
+  } catch (e) {
+    /* liste yoksa yalnızca yüklenen sayfalar */
+  }
 
   render();
   say("");

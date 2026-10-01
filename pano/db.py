@@ -764,6 +764,20 @@ MIGRATIONS = [
         saved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     """,
+    # 27: tarama kutusu (Telegram'dan gelen sayfalar PDF yapılana kadar; dosyalar uploads/_tarama/ altında, 24 saat)
+    """
+    CREATE TABLE scan_inbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL DEFAULT '',
+        stored_name TEXT NOT NULL,
+        mime TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        expires_at REAL NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_scan_inbox_user ON scan_inbox(user_id, id);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

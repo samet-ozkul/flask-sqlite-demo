@@ -168,6 +168,7 @@ Webhook kuruluyken bota yazarak panoyu açmadan giriş yapabilirsin (`/yardim` h
 | `/rapor` · `/rapor bu ay` | Aylık rapor |
 | `/ara matkap` | Her yerde arama |
 | `/aktar metin` · dosya gönder → **📤 Aktar** | Aktarma kutusuna koyar; bilgisayarda Aktar sayfasından açılır (1 saat) |
+| `/tara` → fotoğrafları gönder → **📄 PDF yap** | Belge tarama: sayfalar sormadan tarama kutusuna girer, PDF sohbete gelir (`/tara bitti`, `/tara iptal`); tek fotoğrafta **📄 Taramaya ekle** |
 | `/baslat web sitesi ana sayfa` | Zaman sayacını başlatır; baştaki kelimeler bir projenin adıysa o projeye, kalanı not olur (çalışan sayaç durur). Mesajdaki **⏹️ Durdur** ile durdurulur |
 | `/durdur` | Sayacı durdurur, süreyi ve bugünün toplamını yazar |
 | `/zaman` | Çalışan sayaç ve bugünün toplamı (proje bazında) |
@@ -225,7 +226,7 @@ Metinlerde `{tarih}`, `{ay}`, `{tutar}`, `{fatura}`, `{liste}`, `{adet}`, `{is}`
 
 **Excel/CSV:** Harcamalar sayfasındaki **⬇️ Excel** o ayı indirir (`?ay=tumu` ile hepsi). Dosya Türkçe Excel'de doğrudan açılır (UTF-8, `;` ayırıcı, virgüllü ondalık).
 
-**Belge Tara:** Telefonda **📷 Fotoğraf çek** ile sayfa sayfa (ya da **🖼️ Galeriden seç** ile topluca) eklenir; sayfalar sıralanır, 90° döndürülür. Görünüm *Renkli*, *Gri* ya da *Belge* (kâğıt beyaz, yazı koyu) olur; her sayfa en fazla A4 150 dpi'a küçültülür. PDF indirilir, yeni nota eklenir (not eki 3 MB'ı aşarsa bir kez daha küçültülür), Aktar'a konur (1 saat) ya da Telegram'a gönderilir. En fazla 20 sayfa / 60 MB; işleme sunucuda yapılır, fotoğraflar kaydedilmez.
+**Belge Tara:** Telefonda **📷 Fotoğraf çek** ile sayfa sayfa (ya da **🖼️ Galeriden seç** ile topluca) eklenir; sayfalar sıralanır, 90° döndürülür. Görünüm *Renkli*, *Gri* ya da *Belge* (kâğıt beyaz, yazı koyu) olur; her sayfa en fazla A4 150 dpi'a küçültülür. PDF indirilir, yeni nota eklenir (not eki 3 MB'ı aşarsa bir kez daha küçültülür), Aktar'a konur (1 saat) ya da Telegram'a gönderilir. En fazla 20 sayfa / 60 MB; işleme sunucuda yapılır, fotoğraflar kaydedilmez. **Telegram'dan:** bota `/tara` yazıp sayfaların fotoğraflarını sırayla (ya da albüm olarak) gönder; tek bir durum mesajı sayıyı gösterir, **📄 PDF yap** ya da **🎨 Renkli PDF** ile PDF sohbete gelir. Tarama modu dışında fotoğraf sorusundaki **📄 Taramaya ekle** de aynı kutuya koyar. Kutudaki sayfalar web'deki Belge Tara sayfasında listenin başında görünür (sıralanır, döndürülür, nota eklenir); PDF yapılınca silinir, yapılmazsa 24 saat sonra (yedeğe girmez). Albüm olarak gönderilen fotoğraflar artık tek soruda toplanır ve seçim hepsine uygulanır.
 
 **Kur alarmı:** Kurlar sayfasında “Dolar 50 ₺ üstüne çıkınca” gibi alarm kurulur; tetiklenince mesaj gelir ve alarm kapanır. Kaynak Avrupa Merkez Bankası referans kuru olduğundan günde bir kez (iş günleri) güncellenir.
 

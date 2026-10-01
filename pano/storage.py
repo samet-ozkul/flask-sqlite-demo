@@ -194,7 +194,7 @@ def cleanup_orphans():
     if os.path.isdir(base):
         for root, dirs, files in os.walk(base):
             if root == base:
-                dirs[:] = [d for d in dirs if d != "_aktarma"]  # süreli aktarma dosyaları kendi temizliğinde
+                dirs[:] = [d for d in dirs if d not in ("_aktarma", "_tarama")]  # süreli dosyalar kendi temizliğinde
             for name in files:
                 full = os.path.join(root, name)
                 rel = os.path.relpath(full, base).replace(os.sep, "/")

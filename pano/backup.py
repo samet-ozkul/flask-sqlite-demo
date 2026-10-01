@@ -38,7 +38,7 @@ def make_backup_zip(include_files=True):
         if include_files and os.path.isdir(upload_dir):
             for root, dirs, files in os.walk(upload_dir):
                 if root == upload_dir:
-                    dirs[:] = [d for d in dirs if d != "_aktarma"]  # süreli aktarma dosyaları yedeğe girmez
+                    dirs[:] = [d for d in dirs if d not in ("_aktarma", "_tarama")]  # süreli dosyalar yedeğe girmez
                 for name in files:
                     full = os.path.join(root, name)
                     arc = "uploads/" + os.path.relpath(full, upload_dir).replace(os.sep, "/")

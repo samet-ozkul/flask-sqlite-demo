@@ -308,6 +308,8 @@ def todo_reminders(secret):
     # Aktarma kutusu: süresi dolan metin ve dosyalar
     from .transfer import purge_expired
     result["transfers_purged"] = purge_expired()
+    from .scanner import purge_inbox
+    result["scan_pages_purged"] = purge_inbox()
 
     # Otomasyon: zamanı gelen kurallar (her dönemde bir kez)
     from .. import automation
