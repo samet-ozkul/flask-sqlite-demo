@@ -1,0 +1,23 @@
+{# Kart renk etiketleri: açık temada koyu, koyu temada açık tonlar (style.css'teki tema kalıbı) #}
+<style>
+  :root {
+    --k-red: #dc2626; --k-orange: #ea580c; --k-yellow: #ca8a04;
+    --k-green: #16a34a; --k-blue: #2563eb; --k-purple: #9333ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --k-red: #f87171; --k-orange: #fb923c; --k-yellow: #facc15;
+      --k-green: #4ade80; --k-blue: #60a5fa; --k-purple: #c084fc;
+    }
+  }
+  :root[data-theme="dark"] {
+    --k-red: #f87171; --k-orange: #fb923c; --k-yellow: #facc15;
+    --k-green: #4ade80; --k-blue: #60a5fa; --k-purple: #c084fc;
+  }
+  .c-red { --k: var(--k-red); }
+  .c-orange { --k: var(--k-orange); }
+  .c-yellow { --k: var(--k-yellow); }
+  .c-green { --k: var(--k-green); }
+  .c-blue { --k: var(--k-blue); }
+  .c-purple { --k: var(--k-purple); }
+</style>

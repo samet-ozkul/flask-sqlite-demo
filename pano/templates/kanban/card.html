@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ card.title }}{% endblock %}
+{% block head %}
+{% include "kanban/_colors.html" %}
+<style>
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; padding: 0; border: 0; }
+  .swatches legend { font-size: .85rem; font-weight: 500; margin-bottom: 4px; padding: 0; }
+  .swatches label { position: relative; }
+  .swatches input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .swatches span {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 12px; border-radius: 99px;
+    border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-size: .9rem; user-select: none;
+  }
+  .swatches span::before {
+    content: ""; width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+    background: var(--k, transparent); border: 1px solid var(--k, var(--muted));
+  }
+  .swatches input:checked + span { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 2px var(--primary); font-weight: 600; }
+  .swatches input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🗂️ " ~ card.title, card.board_name ~ " · " ~ card.column_name ~ (" ✓" if card.done else ""),
+                       back=url_for('kanban.board', board_id=card.board_id, _anchor='kart-' ~ card.id)) %}
+  {{ ui.delete_button(url_for('kanban.delete_card', card_id=card.id), "Sil", "Kart silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    {{ ui.field("Başlık", "title", card.title, required=True, attrs='maxlength="200"') }}
+    {{ ui.textarea("Not", "note", card.note, rows=6, placeholder="Ayrıntılar, bağlantılar, alt adımlar...") }}
+    <div class="form-row">
+      {{ ui.field("Son tarih", "due_date", card.due_date, type="date",
+                  hint="Bitti sütununda değilse yaklaşanlarda ve takvimde görünür") }}
+      {{ ui.select("Sütun", "column_id", column_options, card.column_id) }}
+    </div>
+    <fieldset class="swatches">
+      <legend>Renk</legend>
+      <label><input type="radio" name="color" value="" {% if not card.color %}checked{% endif %}><span>Yok</span></label>
+      {% for key, label in colors.items() %}
+        <label class="c-{{ key }}"><input type="radio" name="color" value="{{ key }}" {% if card.color == key %}checked{% endif %}><span>{{ label }}</span></label>
+      {% endfor %}
+    </fieldset>
+    <button class="btn primary">Kaydet</button>
+  </form>
+  <p class="muted small">
+    {% if creator %}Ekleyen: {{ creator.display_name or creator.username }} · {% endif %}Eklendi {{ card.created_at | localdt }}
+    {% if card.updated_at != card.created_at %} · Son değişiklik {{ card.updated_at | localdt }}{% endif %}
+  </p>
+</div>
+{% endblock %}

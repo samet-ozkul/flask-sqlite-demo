@@ -85,6 +85,11 @@ def upcoming(user_id, days=7, long_days=30):
         detail = r["list_name"] + (f" · {r['due_time']}" if r["due_time"] else "")
         add("☑️", r["text"], r["due_date"], "lists.detail", detail=detail, list_id=r["lid"])
 
+    from .modules.kanban import open_cards
+    for r in open_cards(user_id, " AND c.due_date <= ?", (soon,)):
+        add("🗂️", r["title"], r["due_date"], "kanban.board", detail=f"{r['board_name']} · {r['column_name']}",
+            board_id=r["board_id"], _anchor=f"kart-{r['id']}")
+
     from .modules.documents import KINDS as DOC_KINDS
     for r in query("SELECT * FROM documents WHERE user_id = ? AND expires_on BETWEEN ? AND ?",
                    (user_id, (t - timedelta(days=30)).isoformat(), later)):
