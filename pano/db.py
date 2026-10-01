@@ -540,6 +540,34 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_vault_items_user ON vault_items(user_id);
     """,
+    # 18: otomasyon kuralları ve çalışma kayıtları
+    """
+    CREATE TABLE automations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        trigger_type TEXT NOT NULL,
+        trigger_config TEXT NOT NULL DEFAULT '{}',
+        action_type TEXT NOT NULL,
+        action_config TEXT NOT NULL DEFAULT '{}',
+        last_period TEXT,
+        last_run_at TEXT,
+        run_count INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_automations_trigger ON automations(trigger_type, enabled);
+    CREATE TABLE automation_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        automation_id INTEGER NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        ran_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        ok INTEGER NOT NULL,
+        detail TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX idx_automation_log ON automation_log(automation_id, ran_at);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

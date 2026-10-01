@@ -98,9 +98,10 @@ def next_repeat_date(due_date, repeat):
     return d.isoformat()
 
 
-def set_done(item_id, done):
+def set_done(item_id, done, actor_id=None):
     """Maddeyi tamamla / yeniden aç. Tekrarlayan maddede tamamlanınca sonrakini oluşturur,
-    geri alınınca (henüz dokunulmamışsa) o sonrakini siler. Web, pano ve Telegram aynı yolu kullanır."""
+    geri alınınca (henüz dokunulmamışsa) o sonrakini siler. Web, pano ve Telegram aynı yolu kullanır.
+    actor_id: işaretleyen kullanıcı (otomasyondaki {kim} için)."""
     db = get_db()
     item = db.execute("SELECT * FROM list_items WHERE id = ?", (item_id,)).fetchone()
     if item is None or bool(item["done"]) == bool(done):
@@ -116,6 +117,14 @@ def set_done(item_id, done):
             ).lastrowid
         db.execute("UPDATE list_items SET done = 1, done_at = CURRENT_TIMESTAMP, spawned_id = ? WHERE id = ?",
                    (spawned, item_id))
+        db.commit()
+        from . import automation
+        actor = db.execute("SELECT username, display_name FROM users WHERE id = ?", (actor_id,)).fetchone() \
+            if actor_id else None
+        lst = db.execute("SELECT name FROM lists WHERE id = ?", (item["list_id"],)).fetchone()
+        automation.fire("todo_done", list_id=item["list_id"], liste=lst["name"] if lst else "",
+                        kim=(actor["display_name"] or actor["username"]) if actor else "",
+                        **{"is": item["text"]})
     else:
         if item["spawned_id"]:
             db.execute("DELETE FROM list_items WHERE id = ? AND done = 0", (item["spawned_id"],))

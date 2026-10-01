@@ -129,6 +129,8 @@ def daily(secret):
     # Ufak bakım: 30 günü dolan çöp, eski önbellek ve giriş denemesi kayıtları
     from .. import trash
     result["trash_purged"] = trash.purge()
+    from .. import automation
+    automation.purge_log()
     external.purge_cache()
     db = get_db()
     db.execute("DELETE FROM login_attempts WHERE first_at < ?", (time.time() - 86400,))
@@ -253,6 +255,10 @@ def todo_reminders(secret):
             result["journal_asked"] += 1
         except telegram.TelegramError as e:
             result["errors"].append(f"günlük {user['username']}: {e}")
+
+    # Otomasyon: zamanı gelen kurallar (her dönemde bir kez)
+    from .. import automation
+    result["automations"] = automation.run_scheduled(now)
 
     # Bütçe uyarıları (%80 ve %100, her ay bir kez)
     result["budget_alerts"] = 0
