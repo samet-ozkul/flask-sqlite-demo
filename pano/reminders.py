@@ -101,6 +101,13 @@ def upcoming(user_id, days=7, long_days=30):
     for r, nxt, _days, ordinal in upcoming_rows(user_id, within_days=long_days):
         add(KINDS[r["kind"]][1], r["name"], nxt.isoformat(), "specialdays.index", detail=ordinal, overdue_ok=False)
 
+    from .modules.contacts import birthday_title, next_birthday
+    for r in query("SELECT * FROM contacts WHERE user_id = ? AND birthday IS NOT NULL", (user_id,)):
+        nxt = next_birthday(r, t)
+        if nxt and (nxt - t).days <= long_days:
+            add("🎂", birthday_title(r, nxt), nxt.isoformat(), "contacts.detail", detail=r["relation"],
+                overdue_ok=False, contact_id=r["id"])
+
     items.sort(key=lambda x: (x["date"], x["title"]))
     return items
 

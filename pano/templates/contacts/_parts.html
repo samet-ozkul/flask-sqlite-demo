@@ -1,0 +1,67 @@
+{# Kişiler sayfalarının ortak parçaları. {% import "contacts/_parts.html" as cp %} #}
+{% import "_macros.html" as ui %}
+
+{% macro style() -%}
+<style>
+  .contact-rows > li { display: block; }
+  .contact-top { display: flex; align-items: center; gap: 10px; }
+  .contact-top a.grow { color: var(--text); }
+  .contact-top a.grow:hover { text-decoration: none; }
+  .contact-top a.grow:hover .title { color: var(--primary); }
+  .contact-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0 38px; }
+  .contact-bar form { display: inline; }
+  .contact-bar .btn { min-height: 34px; }
+  .contact-bar .sep { flex-basis: 100%; height: 0; }
+  @media (max-width: 480px) { .contact-bar { margin-left: 0; } }
+  @media (min-width: 560px) { .contact-bar .sep { flex-basis: auto; width: 1px; height: auto; background: var(--border); margin: 0 4px; } }
+  .contact-info { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
+  .contact-info li { display: flex; gap: 8px; align-items: baseline; overflow-wrap: anywhere; }
+  .contact-info li > span:first-child { width: 22px; flex-shrink: 0; text-align: center; }
+  .contact-note { white-space: pre-line; overflow-wrap: anywhere; }
+</style>
+{%- endmacro %}
+
+{# Ekleme ve düzenleme formunun alanları; c: kişi satırı ya da none #}
+{% macro fields(c, relations, every_options, shown_birthday="", no_year=False) -%}
+  <div class="form-row">
+    {{ ui.field("Ad", "name", c.name if c else "", required=True, placeholder="ör. Dede, Ayşe teyze", attrs='maxlength="100"') }}
+    {{ ui.field("İlişki", "relation", c.relation if c else "", placeholder="Aile, Arkadaş, İş…",
+                attrs='list="contact-relations" autocomplete="off" maxlength="40"') }}
+  </div>
+  <datalist id="contact-relations">{% for r in relations %}<option value="{{ r }}">{% endfor %}</datalist>
+  <div class="form-row">
+    {{ ui.field("Telefon", "phone", c.phone if c else "", type="tel", placeholder="0532 123 45 67", attrs='maxlength="30" autocomplete="off"') }}
+    {{ ui.field("E-posta", "email", c.email if c else "", type="email", attrs='maxlength="120" autocomplete="off"') }}
+  </div>
+  <div class="form-row">
+    <label class="field"><span>Ne sıklıkla görüşmek istersin?</span>
+      <select name="contact_every">
+        <option value="">Hatırlatma yok</option>
+        {% for v, label in every_options %}<option value="{{ v }}" {% if c and c.contact_every == v %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <small class="muted">Süre dolunca listede öne çıkar, Telegram'dan hatırlatılır</small>
+    </label>
+    {{ ui.field("Doğum günü", "birthday", shown_birthday, type="date") }}
+  </div>
+  {{ ui.checkbox("Doğum yılını bilmiyorum (yaş hesaplanmaz)", "no_year", no_year) }}
+  {{ ui.field("Adres", "address", c.address if c else "", attrs='maxlength="300"') }}
+  {{ ui.textarea("Not", "note", c.note if c else "", rows=2, placeholder="ör. Çocuklarının adı, en son ne konuştunuz…") }}
+{%- endmacro %}
+
+{# Hızlı kayıt butonları + arama / WhatsApp / e-posta bağlantıları #}
+{% macro actions(c, quick, tel, wa, next_url) -%}
+  <div class="contact-bar">
+    {% for kind, label in quick %}
+      <form method="post" action="{{ url_for('contacts.add_entry', contact_id=c.id) }}">
+        {{ ui.csrf() }}
+        <input type="hidden" name="kind" value="{{ kind }}">
+        <input type="hidden" name="next" value="{{ next_url }}">
+        <button class="btn sm">{{ label }}</button>
+      </form>
+    {% endfor %}
+    {% if tel or wa or c.email %}<span class="sep" aria-hidden="true"></span>{% endif %}
+    {% if tel %}<a class="btn sm" href="tel:{{ tel }}">📱 Ara</a>{% endif %}
+    {% if wa %}<a class="btn sm" href="https://wa.me/{{ wa }}" target="_blank" rel="noopener noreferrer">🟢 WhatsApp</a>{% endif %}
+    {% if c.email %}<a class="btn sm" href="mailto:{{ c.email }}">✉️ E-posta</a>{% endif %}
+  </div>
+{%- endmacro %}

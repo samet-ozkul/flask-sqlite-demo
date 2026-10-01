@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "contacts/_parts.html" as cp %}
+{% block title %}{{ c.name }}{% endblock %}
+{% block head %}{{ cp.style() }}{% endblock %}
+{% block content %}
+{% call ui.page_header(relation_icon(c.relation) ~ " " ~ c.name, c.relation or None, back=url_for('contacts.index')) %}
+  {{ ui.delete_button(url_for('contacts.delete', contact_id=c.id), "Sil", "Kişi ve görüşme geçmişi silinsin mi?") }}
+{% endcall %}
+
+<div class="card">
+  <div class="row-flex" style="justify-content: space-between; margin-bottom: 10px">
+    <span class="badge {{ st.cls }}">{{ st.text }}</span>
+    {% if c.contact_every %}<span class="muted small">🔁 {{ every_label(c.contact_every) }}{% if st.due and st.left > 0 %} · sıradaki {{ st.due | date_tr(True) }}{% endif %}</span>{% endif %}
+  </div>
+  <ul class="contact-info">
+    <li><span>🕒</span><span>Son görüşme: {{ (c.last_contact_at | date_tr(True)) if c.last_contact_at else "—" }}</span></li>
+    {% if snoozed %}<li><span>⏰</span><span>{{ snoozed | date_tr(True) }} günü yeniden hatırlatılacak</span></li>{% endif %}
+    {% if c.phone %}<li><span>📱</span><span>{{ c.phone }}</span></li>{% endif %}
+    {% if c.email %}<li><span>✉️</span><span>{{ c.email }}</span></li>{% endif %}
+    {% if birthday %}
+      <li><span>🎂</span><span>{{ birthday }}
+        {% if next_bday %}<span class="muted small">· {{ 'bugün 🎉' if bday_days == 0 else ('yarın' if bday_days == 1 else bday_days ~ ' gün sonra') }}{% if bday_age %} ({{ bday_age }}. yaş){% endif %}</span>{% endif %}
+      </span></li>
+    {% endif %}
+    {% if c.address %}<li><span>📍</span><span>{{ c.address }}</span></li>{% endif %}
+    {% if c.note %}<li><span>📝</span><span class="contact-note">{{ c.note }}</span></li>{% endif %}
+  </ul>
+  {{ cp.actions(c, quick, tel, whatsapp, url_for('contacts.detail', contact_id=c.id)) }}
+</div>
+
+<div class="card">
+  <details class="add">
+    <summary>＋ Geçmişe dönük kayıt</summary>
+    <form method="post" action="{{ url_for('contacts.add_entry', contact_id=c.id) }}">
+      {{ ui.csrf() }}
+      <div class="form-row three">
+        <label class="field"><span>Ne yaptınız?</span>
+          <select name="kind">{% for k, (icon, label) in kinds.items() %}<option value="{{ k }}">{{ icon }} {{ label }}</option>{% endfor %}</select>
+        </label>
+        {{ ui.field("Tarih", "date", today, type="date", required=True, attrs='max="' ~ today ~ '"') }}
+        {{ ui.field("Not", "note", placeholder="ör. Bayramı kutladık", attrs='maxlength="300"') }}
+      </div>
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+<div class="card">
+  <h2>Geçmiş <span class="pill-count">{{ logs | length }}</span></h2>
+  {% if logs %}
+    <ul class="rows">
+      {% for l in logs %}
+        <li>
+          <span class="ico" aria-hidden="true">{{ kinds[l.kind][0] }}</span>
+          <div class="grow">
+            <div class="title">{{ kinds[l.kind][1] }}{% if l.note %} <span class="muted small">· {{ l.note }}</span>{% endif %}</div>
+            {% set ago = -(l.date | days_until) %}
+            <div class="meta"><span>{{ l.date | date_tr(True) }}</span><span>{{ 'bugün' if ago == 0 else ('dün' if ago == 1 else ago ~ ' gün önce') }}</span></div>
+          </div>
+          <span class="actions">{{ ui.delete_button(url_for('contacts.delete_entry', contact_id=c.id, log_id=l.id), "Sil", "Bu kayıt silinsin mi?") }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ ui.empty("Henüz görüşme kaydı yok. Yukarıdaki 📞 Aradım ile başla.", "🕒") }}
+  {% endif %}
+</div>
+
+<div class="card">
+  <details class="add">
+    <summary>✏️ Düzenle</summary>
+    <form method="post" action="{{ url_for('contacts.detail', contact_id=c.id) }}">
+      {{ ui.csrf() }}
+      {{ cp.fields(c, relations, every_options, shown_birthday, no_year) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+<p class="muted small">Eklenme: {{ c.created_at | localdt("%d.%m.%Y") }}</p>
+{% endblock %}

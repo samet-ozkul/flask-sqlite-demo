@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% import "contacts/_parts.html" as cp %}
+{% block title %}Kişiler{% endblock %}
+{% block head %}{{ cp.style() }}{% endblock %}
+{% block content %}
+{{ ui.page_header("📇 Kişiler", "Kimi ne zamandır aramadın? Görüşme sıklığı, doğum günü ve hatırlatma") }}
+
+<div class="card">
+  <details class="add" {% if not total %}open{% endif %}>
+    <summary>＋ Yeni kişi</summary>
+    <form method="post" action="{{ url_for('contacts.create') }}">
+      {{ ui.csrf() }}
+      {{ cp.fields(none, relations, every_options) }}
+      {{ ui.field("Son görüşme", "last_contact_at", type="date", attrs='max="' ~ today ~ '"',
+                  hint="Biliyorsan: hatırlatma bu tarihten sayılır") }}
+      <button class="btn primary">Ekle</button>
+    </form>
+  </details>
+</div>
+
+{% if tabs %}
+  <nav class="tabs" aria-label="İlişkiye göre">
+    <a href="{{ url_for('contacts.index') }}" class="{{ 'active' if not selected }}">Tümü <span class="pill-count">{{ total }}</span></a>
+    {% for key, (label, count) in tabs %}
+      <a href="{{ url_for('contacts.index', iliski=label) }}" class="{{ 'active' if key == selected }}">{{ relation_icon(label) }} {{ label }} <span class="pill-count">{{ count }}</span></a>
+    {% endfor %}
+  </nav>
+{% endif %}
+
+{% if contacts %}
+  {% if late and not selected %}<p class="muted small">📞 {{ late }} kişiyle görüşme vakti geldi.</p>{% endif %}
+  <div class="card">
+    <ul class="rows contact-rows">
+      {% for c, st in contacts %}
+        <li>
+          <div class="contact-top">
+            <span class="ico" aria-hidden="true">{{ relation_icon(c.relation) }}</span>
+            <a class="grow" href="{{ url_for('contacts.detail', contact_id=c.id) }}">
+              <div class="title">{{ c.name }}</div>
+              <div class="meta">
+                {% if c.relation %}<span>{{ c.relation }}</span>{% endif %}
+                {% if c.contact_every %}<span>🔁 {{ every_label(c.contact_every) | lower }}</span>{% endif %}
+                {% if c.birthday %}<span>🎂 {{ birthday_text(c) }}</span>{% endif %}
+                {% if c.snooze_until and c.snooze_until > today %}<span>⏰ {{ c.snooze_until | date_tr }} hatırlatılacak</span>{% endif %}
+              </div>
+            </a>
+            <span class="badge {{ st.cls }}" {% if c.last_contact_at %}title="Son görüşme: {{ c.last_contact_at | date_tr(True) }}"{% endif %}>{{ st.text }}</span>
+          </div>
+          {{ cp.actions(c, quick, tel(c.phone), whatsapp(c.phone), request.full_path) }}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% elif total %}
+  {{ ui.empty("Bu ilişkide kimse yok.", "🔍") }}
+{% else %}
+  {{ ui.empty("Henüz kişi yok. Dedeni, en yakın arkadaşını ekle; ne sıklıkla görüşmek istediğini seç, unutunca hatırlatayım.", "📇") }}
+{% endif %}
+{% endblock %}

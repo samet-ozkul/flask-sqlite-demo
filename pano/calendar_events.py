@@ -1,7 +1,8 @@
 """Tüm tarihli kayıtlar tek listede: takvim sayfası ve telefon takvimi aboneliği (ICS) kullanır.
 
 Kaynaklar: faturalar, abonelik yenilemeleri, borç/alacak vadeleri, araç tarihleri, garanti bitişleri,
-randevular, yapılacaklar (açık), önemli günler. Abonelik ve önemli günler aralık içinde çoğaltılır.
+randevular, yapılacaklar (açık), önemli günler, kişilerin doğum günleri. Abonelik, önemli günler ve
+doğum günleri aralık içinde çoğaltılır.
 """
 from datetime import date, timedelta
 
@@ -97,6 +98,14 @@ def events_between(user_id, start, end, external=False):
             if start <= on <= end:
                 add("day", r["id"], on, r["name"], KINDS[r["kind"]][1], "specialdays.edit",
                     detail=ordinal_text(r, on), day_id=r["id"])
+
+    from .modules.contacts import birthday_on, birthday_title
+    for r in query("SELECT * FROM contacts WHERE user_id = ? AND birthday IS NOT NULL", (user_id,)):
+        for year in range(start.year, end.year + 1):
+            on = birthday_on(r, year)
+            if on and start <= on <= end:
+                add("contact-bday", r["id"], on, birthday_title(r, on), "🎂", "contacts.detail",
+                    detail=r["relation"], contact_id=r["id"])
 
     out.sort(key=lambda x: (x["date"], x["time"] or "99:99", x["title"]))
     return out

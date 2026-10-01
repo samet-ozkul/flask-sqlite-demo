@@ -84,6 +84,13 @@ def _sources(user_id):
         ("Önemli Günler", "🎂", "SELECT * FROM special_days WHERE user_id = ? LIMIT ?", (user_id,),
          ("name", "note"), lambda r: r["name"], lambda r: f"{r['day']:02d}.{r['month']:02d}",
          lambda r: url_for("specialdays.edit", day_id=r["id"])),
+        # Telefon boşluksuz da aranabilsin ("05321234567" ~ "0532 123 45 67")
+        ("Kişiler", "📇",
+         "SELECT *, replace(replace(replace(replace(phone, ' ', ''), '-', ''), '(', ''), ')', '') AS phone_digits"
+         " FROM contacts WHERE user_id = ? ORDER BY name LIMIT ?", (user_id,),
+         ("name", "relation", "phone", "phone_digits", "email", "note"), lambda r: r["name"],
+         lambda r: " · ".join(x for x in (r["relation"], r["phone"], r["email"]) if x),
+         lambda r: url_for("contacts.detail", contact_id=r["id"])),
     ]
 
 
