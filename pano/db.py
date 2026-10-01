@@ -646,6 +646,29 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_orders_user ON orders(user_id, status);
     """,
+    # 23: zaman takibi (projeler ve kayıtlar; zamanlar UTC 'YYYY-MM-DD HH:MM:SS')
+    """
+    CREATE TABLE time_projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT '',            -- hazır renk anahtarı (timetrack.COLORS)
+        hourly_rate REAL,                          -- saatlik ücret (₺); boşsa kazanç hesaplanmaz
+        archived INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE time_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES time_projects(id) ON DELETE CASCADE,   -- NULL = projesiz
+        note TEXT NOT NULL DEFAULT '',
+        started_at TEXT NOT NULL,
+        ended_at TEXT,                             -- NULL = sayaç çalışıyor
+        long_warned INTEGER NOT NULL DEFAULT 0,    -- "10 saattir çalışıyor" uyarısı gönderildi
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_time_entries_user ON time_entries(user_id, started_at);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

@@ -12,6 +12,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 | 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) · **Belgeler** (pasaport, ehliyet, kimlik, ruhsat, poliçe bitiş tarihleri; 1 hafta–6 ay önceden Telegram hatırlatması) |
 | 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Günlük** (her gün bir satır ve ruh hali emojisi, ay takvimi, “1 yıl önce bugün”, akşam Telegram'dan “Bugün nasıldı?”) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) · **İzleme / Okuma** (film, dizi, kitap listesi; kapaklı arama, puan) · **Kişiler** (iletişim hatırlatıcı: “dedeni 3 haftadır aramadın”, tek dokunuşla 📞 Aradım, arama/WhatsApp bağlantısı, doğum günleri) |
 | ⚙️ Altyapı | Kullanıcı yönetimi, tek tıkla yedek al/geri yükle, disk kullanımı, Telegram günlük özeti, telefona uygulama olarak yükleme (PWA) · **Çöp kutusu** (silinen kayıt 30 gün saklanır, tek tıkla geri gelir) · **Tema** (otomatik / açık / koyu) · **Pano düzeni** (kartları seç ve sırala) |
+| 🧰 Araçlar | **Zaman Takibi** (başlat/durdur sayacı, elle kayıt, proje bazında haftalık/aylık rapor, saatlik ücretle kazanç, Excel/CSV; bottan `/baslat`, `/durdur`, `/zaman`) |
 
 **Menü:** Bilgisayarda üst çubukta en çok kullandığın modüller (☆ ile seçilir, Ayarlar → 📌 Menü kısayolları'ndan sıralanır) ve **☰ Modüller** açılır menüsü (gruplu, aramalı) durur; telefonda alt çubukta ilk 3 kısayol. **Ctrl+K** ya da **/** ile hızlı geçiş: modül adını yaz, Enter (eşleşme yoksa her yerde arar).
 
@@ -163,6 +164,9 @@ Webhook kuruluyken bota yazarak panoyu açmadan giriş yapabilirsin (`/yardim` h
 | `/rapor` · `/rapor bu ay` | Aylık rapor |
 | `/ara matkap` | Her yerde arama |
 | `/aktar metin` · dosya gönder → **📤 Aktar** | Aktarma kutusuna koyar; bilgisayarda Aktar sayfasından açılır (1 saat) |
+| `/baslat web sitesi ana sayfa` | Zaman sayacını başlatır; baştaki kelimeler bir projenin adıysa o projeye, kalanı not olur (çalışan sayaç durur). Mesajdaki **⏹️ Durdur** ile durdurulur |
+| `/durdur` | Sayacı durdurur, süreyi ve bugünün toplamını yazar |
+| `/zaman` | Çalışan sayaç ve bugünün toplamı (proje bazında) |
 | Link | Sonra Bak'a kaydedilir |
 | Fotoğraf / PDF | Hangi garantiye ya da nota ekleneceği sorulur (açıklama yazarsan yeni garantinin adı olur) |
 | Düz yazı | Not / alışveriş / yapılacak / harcama / günlük olarak ne yapılacağı sorulur |
@@ -201,6 +205,8 @@ Metinlerde `{tarih}`, `{ay}`, `{tutar}`, `{fatura}`, `{liste}`, `{adet}`, `{is}`
 **Hava uyarısı:** Ayarlarda şehri olan kullanıcılara, yarın yağmur (≥%60), kar, gök gürültülü sağanak, don (≤0°), aşırı sıcak (≥35°) ya da kuvvetli rüzgâr (≥50 km/s) bekleniyorsa akşam 20:00'den sonra bir kez mesaj gelir; bugünün uyarıları günlük özette de yazar. Ayarlar'dan kapatılabilir.
 
 **Günlük:** Günlük sayfasında akşam hatırlatması açılırsa, o gün yazılmadıysa seçilen saatte “📓 Bugün nasıldı?” diye sorulur; emojiye dokunmak ruh halini kaydeder (webhook kuruluysa). Panodaki “Bugün” kartından da tek dokunuşla girilebilir.
+
+**Zaman takibi:** Zaman Takibi sayfasında proje ve not seçip **▶️ Başlat**; sayaç sayfa kapansa da sunucuda çalışmaya devam eder (aynı anda tek sayaç, yenisi başlayınca önceki durur). Elle kayıt için başlangıç–bitiş (gece yarısını geçebilir) ya da sadece süre (`1:30`, `90 dk`, `2 saat`) yazılır. Kayıt başladığı güne yazılır. **📊 Rapor** bu hafta / bu ay / geçen ay / özel aralık için proje bazında süre ve (saatlik ücreti olan projelerde) kazancı, haftalık görünümde gün gün toplamı gösterir; **⬇️ Excel** aynı aralığı indirir. 10 saatten uzun çalışan sayaç için bir kez “⏱️ Sayaç 10 saattir çalışıyor — unuttun mu?” mesajı ve **⏹️ Durdur** butonu gelir.
 
 **Önemli günler:** Seçilen gün sayısı kadar önce ve o gün 09:00'da mesaj gelir (“🎂 7 gün sonra: Annemin doğum günü (60. yaş)”); panoda 30 gün önceden görünür.
 

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Projeler · Zaman Takibi{% endblock %}
+{% block content %}
+{{ ui.page_header("📁 Projeler", "Renk ve saatlik ücret; arşivdeki proje sayaçta seçilmez ama raporda kalır", back=url_for('timetrack.index')) }}
+
+{% macro color_select(value="") -%}
+  <label class="field"><span>Renk</span>
+    <select name="color">
+      <option value="">{{ color_icon('') }} Renksiz</option>
+      {% for k, (label, icon) in colors.items() %}<option value="{{ k }}" {% if k == value %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}
+    </select>
+  </label>
+{%- endmacro %}
+
+<div class="card">
+  <details class="add" {% if not active and not archived %}open{% endif %}>
+    <summary>＋ Yeni proje</summary>
+    <form method="post" action="{{ url_for('timetrack.create_project') }}">
+      {{ ui.csrf() }}
+      <div class="form-row three">
+        {{ ui.field("Ad", "name", required=True, placeholder="ör. Web sitesi", attrs='maxlength="60" autocomplete="off"') }}
+        {{ color_select() }}
+        {{ ui.money_field("Saatlik ücret (₺)", "hourly_rate", placeholder="Boşsa kazanç yok") }}
+      </div>
+      <button class="btn primary">Ekle</button>
+    </form>
+  </details>
+</div>
+
+{% macro project_rows(items) -%}
+  <ul class="rows">
+    {% for p in items %}
+      {% set t = totals.get(p.id) %}
+      <li>
+        <span class="ico">{{ color_icon(p.color) }}</span>
+        <a class="grow" href="{{ url_for('timetrack.edit_project', project_id=p.id) }}">
+          <div class="title">{{ p.name }}</div>
+          <div class="meta">
+            {% if p.hourly_rate is not none %}<span>{{ p.hourly_rate | money }} / saat</span>{% endif %}
+            <span>Bu ay {{ duration(t.month if t else 0) }}</span>
+            <span>Toplam {{ duration(t.total if t else 0) }}</span>
+          </div>
+        </a>
+        <span class="actions">
+          <form method="post" action="{{ url_for('timetrack.archive_project', project_id=p.id) }}" class="inline">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('timetrack.projects') }}">
+            <button class="btn sm">{{ "Arşivden çıkar" if p.archived else "Arşivle" }}</button>
+          </form>
+        </span>
+      </li>
+    {% endfor %}
+  </ul>
+{%- endmacro %}
+
+{% if active %}
+  <div class="card">{{ project_rows(active) }}</div>
+{% else %}
+  {{ ui.empty("Henüz aktif proje yok. Projesiz de sayaç tutabilirsin; proje eklersen raporda ayrı görünür.", "📁") }}
+{% endif %}
+
+{% if archived %}
+  <details class="card">
+    <summary><b>🗄️ Arşiv</b> <span class="pill-count">{{ archived | length }}</span></summary>
+    {{ project_rows(archived) }}
+  </details>
+{% endif %}
+
+<p class="muted small center">Kazanç, projenin güncel saatlik ücretiyle hesaplanır. Proje silinirse kayıtları da çöp kutusuna gider.</p>
+{% endblock %}
