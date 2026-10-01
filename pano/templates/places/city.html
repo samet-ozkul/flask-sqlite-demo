@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "places/_form.html" import place_fields, place_row, map_box with context %}
+{% block title %}{{ city.name }}{% endblock %}
+{% block head %}{% include "places/_head.html" %}{% endblock %}
+{% block content %}
+{% set sub = [city.country, statuses[city.status][1] ~ ' ' ~ statuses[city.status][0], visit_label(city.visited_on)] | select | join(' · ') %}
+{% call ui.page_header("🏙️ " ~ city.name, sub, back=url_for('places.index')) %}
+  <a class="btn sm primary" href="#yer-ekle">＋ Yer ekle</a>
+  {{ ui.delete_button(url_for('places.city_delete', city_id=city.id), "Sil",
+                      "Şehir" ~ ((" ve içindeki " ~ (places | length) ~ " yer") if places else "") ~ " silinsin mi? (Çöp kutusundan geri getirilebilir.)") }}
+{% endcall %}
+
+{% if city.note %}
+  <section class="card">
+    <h2>📝 Şehir notu</h2>
+    <div class="md">{{ city.note | md }}</div>
+  </section>
+{% endif %}
+
+<section class="card">
+  {{ map_box(data, pick="place-form", fallback="🗺️ Harita yüklenemedi; yerler aşağıda listeleniyor.") }}
+  <p class="map-note muted small">Haritaya dokunursan o nokta aşağıdaki yeni yer formuna konum olarak yazılır.</p>
+</section>
+
+{% for key, meta, items in groups %}
+  <section class="card">
+    <h2>{{ meta[1] }} {{ meta[2] }} <span class="pill-count">{{ items | length }}</span></h2>
+    <ul class="rows">{% for p in items %}{{ place_row(p, request.path) }}{% endfor %}</ul>
+  </section>
+{% else %}
+  {{ ui.empty("Bu şehirde henüz yer yok. Yemek yerlerini, gezilecek yerleri, kalacağın oteli ekle.", "📍") }}
+{% endfor %}
+
+<section class="card" id="yer-ekle">
+  <h2>＋ {{ city.name }} için yer ekle</h2>
+  <form method="post" action="{{ url_for('places.create') }}" id="place-form" data-place-form>
+    {{ ui.csrf() }}
+    {{ place_fields(none, city.id) }}
+    <button class="btn primary">Ekle</button>
+  </form>
+</section>
+
+<details class="card">
+  <summary><b>✏️ Şehri düzenle</b></summary>
+  <form method="post" action="{{ url_for('places.city_edit', city_id=city.id) }}" style="margin-top: 12px">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.field("Ad", "name", city.name, required=True, attrs='maxlength="100"') }}
+      {{ ui.field("Ülke", "country", city.country, attrs='maxlength="60"') }}
+    </div>
+    <div class="form-row">
+      <label class="field"><span>Durum</span>
+        <select name="status">{% for s, (label, icon) in statuses.items() %}<option value="{{ s }}" {% if s == city.status %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}</select>
+      </label>
+      {{ ui.field("Ne zaman?", "visited_on", city.visited_on or "", placeholder="ör. 2024-07 ya da 15.07.2024", attrs='maxlength="20" autocomplete="off"') }}
+    </div>
+    {{ ui.textarea("Şehir notu", "note", city.note, rows=5, placeholder="Nerede kaldın, ne yedin, bir dahaki sefere ne yapacaksın…") }}
+    {{ ui.field("Konumu düzelt (isteğe bağlı)", "maplink", attrs='maxlength="2000" autocomplete="off"',
+                placeholder="harita linki ya da 37.8746, 32.4932", hint="Boş bırakırsan konum değişmez." if city.lat is not none else "Şehrin konumu yok; link ya da koordinat verirsen haritada görünür.") }}
+    <button class="btn primary">Kaydet</button>
+  </form>
+</details>
+{% include "places/_scripts.html" %}
+{% endblock %}

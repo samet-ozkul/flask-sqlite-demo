@@ -1,0 +1,76 @@
+{# Harita parçaları. Kullanım: {% from "places/_form.html" import place_fields, place_row, map_box with context %} #}
+{% import "_macros.html" as ui %}
+
+{# Harita kutusu: veri <script type="application/json"> ile gömülür, çizim static/places.js'te.
+   pick = yer formunun id'si (haritaya dokununca konum o forma yazılır). JS/Leaflet yoksa yedek metin kalır. #}
+{% macro map_box(data, pick=None, fallback="🗺️ Harita yüklenemedi; kayıtlar aşağıda listeleniyor.") -%}
+  <div class="map off" data-map {% if pick %}data-pick="{{ pick }}"{% endif %}>{{ fallback }}</div>
+  <script type="application/json" id="map-data">{{ data | tojson }}</script>
+{%- endmacro %}
+
+{# Yer satırı (şehir sayfası ve şehre bağlı olmayan yerler) #}
+{% macro place_row(p, next_url) -%}
+  <li class="{{ 'wish' if p.status == 'wish' }}">
+    <span class="ico" title="{{ categories[p.category][0] }}">{{ categories[p.category][1] }}</span>
+    <a class="grow" href="{{ url_for('places.edit', place_id=p.id) }}">
+      <div class="title">{{ p.name }}</div>
+      <div class="meta">
+        <span>{{ statuses[p.status][1] }} {{ statuses[p.status][0] }}</span>
+        {% if p.rating %}<span class="stars" title="{{ p.rating }}/5">{{ '★' * p.rating }}{{ '☆' * (5 - p.rating) }}</span>{% endif %}
+        {% if p.address %}<span>{{ p.address }}</span>{% endif %}
+        {% if p.lat is none %}<span>konumsuz</span>{% endif %}
+      </div>
+      {% if p.note %}<div class="meta">{{ p.note | truncate(90) }}</div>{% endif %}
+    </a>
+    <span class="actions">
+      {% if p.lat is not none %}<a class="btn sm icon" href="{{ directions_url(p.lat, p.lon) }}" target="_blank" rel="noopener" title="Yol tarifi" aria-label="Yol tarifi">🧭</a>{% endif %}
+      {% if p.status == 'wish' %}
+        <form method="post" action="{{ url_for('places.toggle_status', place_id=p.id) }}" class="inline">
+          {{ ui.csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+          <button class="btn sm icon ok" title="Gezdim olarak işaretle" aria-label="Gezdim">✅</button>
+        </form>
+      {% endif %}
+    </span>
+  </li>
+{%- endmacro %}
+
+{# Yer formu alanları (yeni / düzenle / şehir sayfasında ekle) #}
+{% macro place_fields(p, city_id) -%}
+  {{ ui.field("Ad", "name", p.name if p else "", required=True, attrs='maxlength="100"', placeholder="ör. Kadayıfçı Ali Usta") }}
+  <div class="form-row three">
+    <label class="field"><span>Kategori</span>
+      <select name="category">{% for k, (label, icon, _t) in categories.items() %}<option value="{{ k }}" {% if (p.category if p else 'food') == k %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}</select>
+    </label>
+    <label class="field"><span>Durum</span>
+      <select name="status">{% for s, (label, icon) in statuses.items() %}<option value="{{ s }}" {% if (p.status if p else 'wish') == s %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}</select>
+    </label>
+    <label class="field"><span>Puan</span>
+      <select name="rating"><option value="">—</option>{% for n in range(1, 6) %}<option value="{{ n }}" {% if p and p.rating == n %}selected{% endif %}>{{ '★' * n }}</option>{% endfor %}</select>
+    </label>
+  </div>
+  <div class="form-row">
+    <label class="field"><span>Şehir</span>
+      <select name="city_id">
+        <option value="">— Şehre bağlı değil —</option>
+        {% for c in cities %}<option value="{{ c.id }}" {% if c.id == city_id %}selected{% endif %}>{{ c.name }}{% if c.country %}, {{ c.country }}{% endif %}</option>{% endfor %}
+      </select>
+    </label>
+    {{ ui.field("Adres", "address", p.address if p else "", attrs='maxlength="200"', placeholder="ör. Alaaddin Cad. No 12") }}
+  </div>
+  {{ ui.textarea("Not", "note", p.note if p else "", rows=3, placeholder="ör. Künefesi meşhur, pazartesi kapalı") }}
+  <fieldset class="loc">
+    <legend>📍 Konum</legend>
+    <input type="hidden" name="lat" value="{{ p.lat if p and p.lat is not none else '' }}">
+    <input type="hidden" name="lon" value="{{ p.lon if p and p.lon is not none else '' }}">
+    <p class="muted small loc-status" data-loc-status role="status">
+      {%- if p and p.lat is not none %}📍 {{ '%.5f' | format(p.lat) }}, {{ '%.5f' | format(p.lon) }}{% else %}Konum yok: haritaya dokun, konumunu kullan ya da link yapıştır. Konumsuz yer listede görünür.{% endif -%}
+    </p>
+    <div class="row-flex" style="margin-bottom: 12px">
+      <button type="button" class="btn sm hidden" data-locate>📍 Şu anki konumum</button>
+      <button type="button" class="btn sm hidden" data-clear-loc>✖️ Konumu kaldır</button>
+    </div>
+    {{ ui.field("…ya da harita linki / koordinat", "maplink", attrs='maxlength="2000" autocomplete="off"',
+                placeholder="https://maps.google.com/… ya da 37.8746, 32.4932",
+                hint="Google Maps, Apple Haritalar, OpenStreetMap ve Yandex linkleri çözülür. maps.app.goo.gl gibi kısa linkler çözülemez: linki tarayıcıda açıp adres çubuğundaki uzun linki yapıştır ya da Google Maps'te noktaya basılı tutup koordinatı kopyala.") }}
+  </fieldset>
+{%- endmacro %}

@@ -74,6 +74,25 @@ def geocode(name):
     return {"name": label, "lat": r["latitude"], "lon": r["longitude"]}
 
 
+def geocode_many(name, count=5):
+    """Şehir adı -> en fazla `count` aday [{'name', 'admin', 'country', 'lat', 'lon'}] (Harita'da şehir seçmek için).
+    Bulunamazsa [], servise ulaşılamazsa None. Aynı arama 7 gün önbellekte durur."""
+    name = " ".join((name or "").split())[:100]
+    if len(name) < 2:
+        return []
+
+    def fetch():
+        q = urllib.parse.urlencode({"name": name, "count": count, "language": "tr", "format": "json"})
+        data = _fetch_json(f"https://geocoding-api.open-meteo.com/v1/search?{q}")
+        return [{
+            "name": r["name"], "admin": r.get("admin1") or "", "country": r.get("country") or "",
+            "lat": round(r["latitude"], 5), "lon": round(r["longitude"], 5),
+        } for r in data.get("results") or []
+            if r.get("name") and r.get("latitude") is not None and r.get("longitude") is not None]
+
+    return cached(f"geocode:{name.lower()}:{count}", 7 * 86400, fetch)
+
+
 def weather(lat, lon):
     if lat is None or lon is None:
         return None

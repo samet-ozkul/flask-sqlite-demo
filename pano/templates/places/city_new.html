@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Şehir ekle{% endblock %}
+{% block head %}{% include "places/_head.html" %}{% endblock %}
+{% block content %}
+{{ ui.page_header("🏙️ Şehir ekle", "Gezdiğin ya da gitmek istediğin bir şehir", back=url_for('places.index')) }}
+
+<form method="get" class="search">
+  <input type="search" name="q" value="{{ q }}" placeholder="Şehir adı: Roma, Batum, Ürgüp…" required {% if not q %}autofocus{% endif %}>
+  <button class="btn primary">Ara</button>
+</form>
+{% if error %}<div class="flash warning">{{ error }}</div>{% endif %}
+
+{% if q %}
+  <div class="card">
+    <form method="post">
+      {{ ui.csrf() }}
+      <input type="hidden" name="q" value="{{ q }}">
+      <div class="field"><span>{{ 'Hangisi?' if candidates else 'Bulunamadı' }}</span></div>
+      <ul class="rows picks">
+        {% for c in candidates %}
+          {% set i = loop.index0 %}
+          <li>
+            <label class="check">
+              <input type="radio" name="pick" value="{{ i }}" {% if loop.first %}checked{% endif %}>
+              <span><b>{{ c.name }}</b> <span class="muted small">{{ [c.admin if c.admin != c.name else '', c.country] | select | join(', ') }}</span></span>
+            </label>
+            <input type="hidden" name="name_{{ i }}" value="{{ c.name }}">
+            <input type="hidden" name="country_{{ i }}" value="{{ c.country }}">
+            <input type="hidden" name="lat_{{ i }}" value="{{ c.lat }}">
+            <input type="hidden" name="lon_{{ i }}" value="{{ c.lon }}">
+          </li>
+        {% endfor %}
+        <li>
+          <label class="check">
+            <input type="radio" name="pick" value="manual" {% if not candidates %}checked{% endif %}>
+            <span>✍️ “{{ q }}” adıyla ekle <span class="muted small">(haritada görünmez; sonra harita linkiyle konum verebilirsin)</span></span>
+          </label>
+        </li>
+      </ul>
+      <div data-show-for="pick=manual" style="margin-top: 12px">{{ ui.field("Ülke", "country", attrs='maxlength="60"') }}</div>
+      <div class="form-row" style="margin-top: 12px">
+        <label class="field"><span>Durum</span>
+          <select name="status">{% for s, (label, icon) in statuses.items() %}<option value="{{ s }}">{{ icon }} {{ label }}</option>{% endfor %}</select>
+        </label>
+        {{ ui.field("Ne zaman?", "visited_on", placeholder="ör. 2024-07 ya da 15.07.2024", attrs='maxlength="20" autocomplete="off"', hint="Ay yeterli; boş bırakılabilir") }}
+      </div>
+      {{ ui.textarea("Şehir notu", "note", rows=4, placeholder="ör. Kalenin arkasındaki sokakta akşam pazarı kuruluyor…") }}
+      <button class="btn primary">Ekle</button>
+    </form>
+  </div>
+{% else %}
+  <p class="muted small">Adı yaz, çıkan adaylardan doğru olanı seç; şehir haritaya kendi konumuyla eklenir.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,41 @@
+{# Harita sayfalarının ortak başlığı: Leaflet CSS (cdnjs, bütünlük kontrollü) ve sayfa stilleri #}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+      integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw=="
+      crossorigin="anonymous" referrerpolicy="no-referrer">
+<style>
+  /* z-index: 0 haritanın kendi katmanlarını üst çubuğun altında tutar */
+  .map { position: relative; z-index: 0; height: 320px; border-radius: var(--radius-sm); overflow: hidden;
+         border: 1px solid var(--border); background: var(--surface-2); font: inherit; }
+  @media (min-width: 700px) { .map { height: 420px; } }
+  .map.off { height: auto; padding: 14px; color: var(--muted); font-size: .88rem; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .map .leaflet-tile-pane { filter: brightness(.82) saturate(.9); } }
+  :root[data-theme="dark"] .map .leaflet-tile-pane { filter: brightness(.82) saturate(.9); }
+  .map-note { margin: 8px 0 0; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 11px; border-radius: 99px; white-space: nowrap;
+          border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: .88rem; }
+  .chip:hover { text-decoration: none; border-color: var(--primary); }
+  .chip.on { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+  .place-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pin-wrap { background: none; border: 0; }
+  .pin { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; line-height: 1; font-size: 15px;
+         background: var(--surface); border: 2px solid var(--ok); box-shadow: 0 1px 4px rgba(0, 0, 0, .35); }
+  .pin.wish { border-style: dashed; border-color: var(--warn); opacity: .72; }
+  .pin.city { background: var(--primary); border: 3px solid var(--surface); font-size: 18px; }
+  .pin.city.wish { background: var(--surface); border: 3px dashed var(--primary); opacity: .8; }
+  .pin.park { background: var(--primary); border-color: var(--surface); font-size: 18px; }
+  .pin.pick { border-color: var(--danger); font-size: 17px; }
+  .pin.sample { display: inline-grid; width: 22px; height: 22px; font-size: 11px; vertical-align: middle; box-shadow: none; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--text); }
+  .leaflet-popup-content { margin: 10px 14px; font-size: .9rem; line-height: 1.45; }
+  .leaflet-popup-content a { color: var(--primary); }
+  .pop-title { font-weight: 600; display: block; overflow-wrap: anywhere; }
+  .pop-links { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+  .stars { color: var(--warn); letter-spacing: 1px; }
+  .rows li.wish .ico { opacity: .7; }
+  .loc { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px 0; margin: 0 0 12px; min-width: 0; }
+  .loc legend { font-weight: 600; font-size: .85rem; padding: 0 6px; }
+  .loc-status { min-height: 1.4em; margin-top: 0; }
+  .picks .check { flex: 1; margin: 0; align-items: flex-start; }
+  .picks .check input { margin-top: 3px; flex-shrink: 0; }
+</style>

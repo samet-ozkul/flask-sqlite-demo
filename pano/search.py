@@ -23,6 +23,19 @@ def _order_detail(r):
                                   fmt_money(r["amount"]) if r["amount"] is not None else "") if x)
 
 
+def _map_title(r):
+    from .modules.places import CATEGORIES
+    if r["kind"] == "city":
+        return "🏙️ " + r["name"] + (f", {r['extra']}" if r["extra"] else "")
+    return f"{CATEGORIES[r['category']][1]} {r['name']}"
+
+
+def _map_url(r):
+    if r["kind"] == "city":
+        return url_for("places.city", city_id=r["id"])
+    return url_for("places.edit", place_id=r["id"])
+
+
 def _sources(user_id):
     """(etiket, ikon, sorgu, parametreler, aranan alanlar, başlık, ayrıntı, adres)"""
     from .modules.kanban import CARD_SELECT
@@ -88,6 +101,15 @@ def _sources(user_id):
          ("title", "creator", "note", "year"), lambda r: r["title"] + (" ✓" if r["status"] == "done" else ""),
          lambda r: " · ".join(x for x in (r["year"], r["creator"]) if x),
          lambda r: url_for("watchlist.edit", item_id=r["id"])),
+        # Şehirler (ad, ülke, not) ve yerler (ad, adres, not, bağlı olduğu şehir) tek grupta
+        ("Harita", "🗺️",
+         "SELECT 'city' AS kind, id, name, country AS extra, note, '' AS city_name, '' AS category FROM cities"
+         " WHERE user_id = ? UNION ALL"
+         " SELECT 'place', p.id, p.name, p.address, p.note, COALESCE(c.name, ''), p.category FROM places p"
+         " LEFT JOIN cities c ON c.id = p.city_id WHERE p.user_id = ? ORDER BY 1, 2 DESC LIMIT ?", (user_id, user_id),
+         ("name", "extra", "note", "city_name"), _map_title,
+         lambda r: " · ".join(x for x in (r["city_name"], r["extra"] if r["kind"] == "place" else "", r["note"]) if x),
+         _map_url),
         ("Günlük", "📓", "SELECT * FROM journal WHERE user_id = ? ORDER BY date DESC LIMIT ?", (user_id,),
          ("text",), lambda r: fmt_date(r["date"], True) + (" " + _mood(r["mood"]) if r["mood"] else ""),
          lambda r: r["text"], lambda r: url_for("journal.index", ay=r["date"][:7], gun=r["date"])),

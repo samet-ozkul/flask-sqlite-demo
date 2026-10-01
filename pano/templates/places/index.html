@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "places/_form.html" import place_row, map_box with context %}
+{% block title %}Harita{% endblock %}
+{% block head %}{% include "places/_head.html" %}{% endblock %}
+{% block content %}
+{% call ui.page_header("🗺️ Harita", "Gezdiğim ve gitmek istediğim şehirler, yerler ve park yeri") %}
+  <a class="btn sm primary" href="{{ url_for('places.create') }}">＋ Yer</a>
+  <a class="btn sm" href="{{ url_for('places.city_new') }}">🏙️ Şehir ekle</a>
+{% endcall %}
+
+{% macro park_form(button="🅿️ Park ettim") -%}
+  <form method="post" action="{{ url_for('places.park') }}" data-park-form>
+    {{ ui.csrf() }}
+    <input type="hidden" name="lat"><input type="hidden" name="lon">
+    <div class="quick">
+      <input type="text" name="note" maxlength="100" placeholder="Not: B2 kat, 14 numara" aria-label="Park notu (isteğe bağlı)">
+      <button class="btn primary">{{ button }}</button>
+    </div>
+    <p class="muted small" data-park-status role="status">Telefonun şu anki konumu kaydedilir. Bota konum göndererek de kaydedebilirsin.</p>
+  </form>
+{%- endmacro %}
+
+<section class="card" id="park">
+  {% if parking %}
+    <h2>🚗 Arabam nerede?</h2>
+    <p>🅿️ {{ parking.saved_at | localdt }} <span class="muted">({{ parked_ago }})</span>{% if parking.note %} · <b>{{ parking.note }}</b>{% endif %}</p>
+    <div class="row-flex">
+      <a class="btn sm primary" href="{{ directions_url(parking.lat, parking.lon) }}" target="_blank" rel="noopener">🧭 Yol tarifi</a>
+      <a class="btn sm" href="{{ osm_url(parking.lat, parking.lon) }}" target="_blank" rel="noopener" data-focus-parking>🗺️ Haritada göster</a>
+      {{ ui.post_button(url_for('places.unpark'), "✅ Arabayı aldım", "ok") }}
+    </div>
+    <details style="margin-top: 12px">
+      <summary class="muted small">Başka bir yere park ettim</summary>
+      <div style="margin-top: 10px">{{ park_form("🅿️ Buraya park ettim") }}</div>
+    </details>
+  {% else %}
+    <h2>🅿️ Park yeri</h2>
+    {{ park_form() }}
+  {% endif %}
+</section>
+
+<div class="stats place-stats">
+  <div class="stat"><div class="label">🏙️ Şehir</div><div class="value">{{ stats.cities }}</div>
+    <div class="sub">{{ ('+' ~ stats.wish_cities ~ ' gidilecek') if stats.wish_cities else 'gezildi' }}</div></div>
+  <div class="stat"><div class="label">🌍 Ülke</div><div class="value">{{ stats.countries }}</div><div class="sub">gezildi</div></div>
+  <div class="stat"><div class="label">📍 Yer</div><div class="value">{{ stats.places }}</div><div class="sub">{{ stats.visited_places }} gezildi</div></div>
+</div>
+
+<div class="chips" aria-label="Durum">
+  <a class="chip {{ 'on' if not status }}" href="{{ url_for('places.index', kategori=category or None) }}">Hepsi</a>
+  {% for s, (label, icon) in statuses.items() %}
+    <a class="chip {{ 'on' if status == s }}" href="{{ url_for('places.index', durum=s, kategori=category or None) }}">{{ icon }} {{ label }}</a>
+  {% endfor %}
+</div>
+<div class="chips" aria-label="Kategori">
+  <a class="chip {{ 'on' if not category }}" href="{{ url_for('places.index', durum=status or None) }}">Tüm yerler</a>
+  {% for k, (label, icon, _t) in categories.items() %}
+    <a class="chip {{ 'on' if category == k }}" href="{{ url_for('places.index', kategori=k, durum=status or None) }}">{{ icon }} {{ label }}</a>
+  {% endfor %}
+</div>
+
+<section class="card">
+  {{ map_box(data) }}
+  <p class="map-note muted small">
+    <span><span class="pin city sample">🏙️</span> gezilen şehir</span>
+    <span><span class="pin city wish sample">🏙️</span> gidilecek şehir</span>
+    <span><span class="pin sample">🍽️</span> gezilen yer</span>
+    <span><span class="pin wish sample">🍽️</span> gidilecek yer</span>
+  </p>
+</section>
+
+{% if has_any %}
+  <section class="card">
+    <h2>🏙️ Şehirler <span class="pill-count">{{ cities | length }}</span></h2>
+    <form method="get" action="{{ url_for('places.city_new') }}" class="quick" style="margin-bottom: 8px">
+      <input type="search" name="q" placeholder="Şehir ekle: Roma, Batum, Ürgüp…" required aria-label="Şehir adı">
+      <button class="btn">Ara</button>
+    </form>
+    {% if cities %}
+      <ul class="rows">
+        {% for c in cities %}
+          <li>
+            <span class="ico" title="{{ statuses[c.status][0] }}">{{ statuses[c.status][1] }}</span>
+            <a class="grow" href="{{ url_for('places.city', city_id=c.id) }}">
+              <div class="title">{{ c.name }}{% if c.country %} <span class="muted small">· {{ c.country }}</span>{% endif %}</div>
+              <div class="meta">
+                {% if c.visited_on %}<span>{{ visit_label(c.visited_on) }}</span>{% endif %}
+                {% if c.note %}<span>📝 not var</span>{% endif %}
+                {% if c.lat is none %}<span>konumsuz</span>{% endif %}
+              </div>
+            </a>
+            <span class="pill-count">{{ counts.get(c.id, 0) }} yer</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted small">Bu filtrede şehir yok.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>📍 Şehre bağlı olmayan yerler <span class="pill-count">{{ loose | length }}</span></h2>
+    {% if loose %}
+      <ul class="rows">{% for p in loose %}{{ place_row(p, request.full_path) }}{% endfor %}</ul>
+    {% else %}
+      <p class="muted small">Yok. Bir şehre bağlı olmayan yerler (ör. yol üstündeki bir dinlenme tesisi) burada listelenir.</p>
+    {% endif %}
+  </section>
+{% else %}
+  <section class="card">
+    {{ ui.empty("Haritan boş. Gezdiğin bir şehri ya da gitmek istediğin bir yeri ekle.", "🗺️") }}
+    <form method="get" action="{{ url_for('places.city_new') }}" class="quick">
+      <input type="search" name="q" placeholder="Şehir adı: Roma, Batum, Ürgüp…" required aria-label="Şehir adı">
+      <button class="btn primary">Şehir ara</button>
+    </form>
+  </section>
+{% endif %}
+{% include "places/_scripts.html" %}
+{% endblock %}
