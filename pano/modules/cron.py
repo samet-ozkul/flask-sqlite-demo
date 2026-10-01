@@ -256,6 +256,10 @@ def todo_reminders(secret):
         except telegram.TelegramError as e:
             result["errors"].append(f"günlük {user['username']}: {e}")
 
+    # Aktarma kutusu: süresi dolan metin ve dosyalar
+    from .transfer import purge_expired
+    result["transfers_purged"] = purge_expired()
+
     # Otomasyon: zamanı gelen kurallar (her dönemde bir kez)
     from .. import automation
     result["automations"] = automation.run_scheduled(now)

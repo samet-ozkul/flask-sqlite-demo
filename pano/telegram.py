@@ -131,9 +131,9 @@ def edit_buttons(chat_id, message_id, buttons):
                                             "reply_markup": keyboard(buttons or [])})
 
 
-def send_document(chat_id, filename, data, caption=""):
+def send_document(chat_id, filename, data, caption="", mime="application/zip"):
     return _call("sendDocument", {"chat_id": chat_id, "caption": caption},
-                 files={"document": (filename, data, "application/zip")})
+                 files={"document": (filename, data, mime)})
 
 
 def bot_username():

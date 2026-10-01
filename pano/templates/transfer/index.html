@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Aktar{% endblock %}
+{% block head %}
+<style>
+  .t-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; background: var(--surface-2);
+            border-radius: var(--radius-sm); padding: 8px 10px; margin-top: 8px; font-size: .92rem; }
+  .t-item .head { display: flex; gap: 10px; align-items: center; }
+  .t-item .name { font-weight: 600; overflow-wrap: anywhere; }
+  .t-preview { max-width: 100%; max-height: 180px; border-radius: var(--radius-sm); margin-top: 8px; display: block; }
+  .t-drop { border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 14px; text-align: center; }
+  .t-drop.over { border-color: var(--primary); background: var(--primary-soft); }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("📤 Aktar", "Telefon ile bilgisayar arasında metin ve dosya: bir cihazda gönder, öbüründe aç. Her şey süreli.") }}
+
+<section class="card">
+  <form method="post" action="{{ url_for('transfer.create') }}" enctype="multipart/form-data" id="t-form">
+    {{ ui.csrf() }}
+    {{ ui.textarea("Metin ya da link", "text", rows=3, placeholder="Yapıştır… (ör. bir adres, kod, uzun bir mesaj)") }}
+    <label class="field t-drop" id="t-drop"><span>📎 Dosyalar <span class="muted small">(her biri en fazla {{ max_file_mb }} MB, bir seferde 10 dosya)</span></span>
+      <input type="file" name="files" multiple data-max-mb="{{ max_file_mb }}">
+    </label>
+    <p class="muted small" id="t-files-info"></p>
+    <div class="form-row">
+      <label class="field"><span>Ne kadar dursun?</span>
+        <select name="minutes">{% for m, label in durations %}<option value="{{ m }}" {% if m == default_minutes %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      </label>
+      <div class="field" style="align-self: end">{{ ui.checkbox("Tek seferlik: dosya ilk indirmede silinsin", "once") }}</div>
+    </div>
+    <button class="btn primary" id="t-send">📤 Gönder</button>
+  </form>
+</section>
+
+<section class="card" id="t-list" data-url="{{ url_for('transfer.list_fragment') }}">
+  {% include "transfer/_list.html" %}
+</section>
+
+<p class="muted small center">Liste birkaç saniyede bir kendiliğinden yenilenir; diğer cihazda gönderdiğin hemen burada görünür.
+  {% if telegram_linked %}Telegram'da bota attığın metin ya da dosyayı “📤 Aktar” ile buraya koyabilirsin.{% endif %}
+  Dosyalar yedeğe girmez ve süresi dolunca sunucudan silinir.</p>
+<script src="{{ url_for('static', filename='transfer.js') }}?v=1" defer></script>
+{% endblock %}

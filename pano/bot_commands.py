@@ -36,6 +36,7 @@ COMMANDS = [
     ("liste", "Açık maddeleri göster: /liste market"),
     ("etkinlik", "Ortak etkinlik ekle: /etkinlik piknik pazar 11:00"),
     ("gunluk", "Günlüğe yaz: /gunluk bugün çok yoğundu"),
+    ("aktar", "Aktarma kutusuna metin koy: /aktar metin"),
     ("bugun", "Günün özeti"),
     ("rapor", "Geçen ayın raporu (/rapor bu ay)"),
     ("ara", "Her yerde ara: /ara matkap"),
@@ -56,6 +57,7 @@ HELP = """<b>Kişisel Pano komutları</b>
 👨‍👩‍👧 <code>/etkinlik annemlerde yemek cumartesi 19:00</code> — ortak takvime ekle
 📓 <code>/gunluk 🙂 bugün yürüyüşe çıktım</code> — günlüğe yaz (başa emoji koyarsan ruh hali olur)
 📋 <code>/liste</code> ya da <code>/liste market</code> — açık maddeler
+📤 <code>/aktar metin</code> — bilgisayarda açmak için aktarma kutusuna koy (dosya gönderirsen “📤 Aktar”)
 ☀️ <code>/bugun</code> — günün özeti
 📊 <code>/rapor</code> — geçen ayın raporu · <code>/rapor bu ay</code>
 🔍 <code>/ara matkap</code> — notlar, envanter, garantiler... her yerde ara
@@ -132,7 +134,7 @@ def handle_message(msg):
         telegram.send_message(chat_id, "Bu sohbet panoya bağlı değil. Panoda <b>Ayarlar → Telegram'ı bağla</b>.")
         return
     document = msg.get("document") or {}
-    if msg.get("photo") or (document.get("mime_type") or "").startswith(("image/", "application/pdf")):
+    if msg.get("photo") or document or msg.get("video"):
         ask_attachment(user, chat_id, msg)
         return
     text = (msg.get("text") or "").strip()
@@ -148,6 +150,7 @@ def handle_message(msg):
             "yap": cmd_todo, "y": cmd_todo,
             "etkinlik": cmd_event,
             "gunluk": cmd_journal, "g": cmd_journal,
+            "aktar": cmd_transfer,
             "liste": cmd_list, "l": cmd_list,
             "bugun": cmd_today,
             "rapor": cmd_report,
@@ -634,19 +637,26 @@ def save_link(user, chat_id, url, text):
 # ---------- Fotoğraf / PDF ----------
 def ask_attachment(user, chat_id, msg):
     if msg.get("photo"):
-        file_id, name = msg["photo"][-1]["file_id"], "telegram.jpg"  # en büyük boyut
+        file_id, name, mime = msg["photo"][-1]["file_id"], "telegram.jpg", "image/jpeg"  # en büyük boyut
     else:
-        doc = msg["document"]
-        file_id, name = doc["file_id"], doc.get("file_name") or "belge"
+        doc = msg.get("document") or msg.get("video")
+        file_id, name = doc["file_id"], doc.get("file_name") or ("video.mp4" if msg.get("video") else "belge")
+        mime = doc.get("mime_type") or "application/octet-stream"
     caption = " ".join((msg.get("caption") or "").split())[:150]
-    _set_pending(chat_id, {"kind": "file", "file_id": file_id, "name": name, "caption": caption})
+    _set_pending(chat_id, {"kind": "file", "file_id": file_id, "name": name, "caption": caption, "mime": mime})
+    if not (mime.startswith("image/") or mime == "application/pdf"):
+        # Garantiye/nota sadece fotoğraf ve PDF eklenir; diğer dosyalar aktarma kutusuna gidebilir
+        telegram.send_message(chat_id, f"📎 <b>{esc(name)}</b> dosyasını bilgisayarda açmak için aktarma kutusuna koyayım mı?",
+                              buttons=[[("📤 Aktar (1 saat)", "ph:tr")], [("✖️ Vazgeç", "ph:x")]])
+        return
     warranties = query("SELECT id, product FROM warranties WHERE user_id = ? ORDER BY id DESC LIMIT 5", (user["id"],))
     buttons = [[(f"🛡️ {w['product'][:35]}", f"ph:w:{w['id']}")] for w in warranties]
     is_image = bool(msg.get("photo")) or (msg.get("document") or {}).get("mime_type", "").startswith("image/")
     if is_image and assistant.available(user):
         buttons.insert(0, [("🧾 Fişi oku (yapay zekâ)", "ph:ai")])
     buttons.append([("➕ Yeni garanti" + (f": {caption[:25]}" if caption else ""), "ph:new")])
-    buttons.append([("📝 Nota ekle", "ph:note"), ("✖️ Vazgeç", "ph:x")])
+    buttons.append([("📝 Nota ekle", "ph:note"), ("📤 Aktar", "ph:tr")])
+    buttons.append([("✖️ Vazgeç", "ph:x")])
     telegram.send_message(chat_id, "📷 Bunu nereye ekleyeyim?", buttons=buttons)
 
 
@@ -660,6 +670,9 @@ def cb_attachment(user, chat_id, message_id, callback_id, data):
         return
     if choice == "ai":
         _read_receipt(user, chat_id, message_id, callback_id, pending)
+        return
+    if choice == "tr":
+        _transfer_file(user, chat_id, message_id, callback_id, pending)
         return
     telegram.answer_callback(callback_id, "Kaydediliyor...")
     uid, caption = user["id"], pending["caption"]
@@ -691,6 +704,35 @@ def cb_attachment(user, chat_id, message_id, callback_id, data):
         telegram.edit_message(chat_id, message_id, f"⚠️ Eklenemedi: {esc(e)}")
         return
     telegram.edit_message(chat_id, message_id, f'✅ Eklendi: {esc(label)}\n<a href="{esc(target)}">Aç →</a>')
+
+
+# ---------- Aktarma kutusu ----------
+def cmd_transfer(user, chat_id, rest):
+    from .modules.transfer import DEFAULT_MINUTES, TransferError, add_text
+    if not rest:
+        telegram.send_message(chat_id, "Örnek: <code>/aktar bilgisayarda açılacak link ya da metin</code>\n"
+                                       "Dosya ya da fotoğraf gönderirsen “📤 Aktar”ı seç.")
+        return
+    try:
+        add_text(user["id"], rest, DEFAULT_MINUTES, "🤖 Telegram")
+    except TransferError as e:
+        telegram.send_message(chat_id, f"⚠️ {esc(e)}")
+        return
+    telegram.send_message(chat_id, f'📤 Aktarma kutusuna kondu, 1 saat duracak. <a href="{esc(link("transfer.index"))}">Aktar →</a>')
+
+
+def _transfer_file(user, chat_id, message_id, callback_id, pending):
+    from .modules.transfer import DEFAULT_MINUTES, TransferError, add_file
+    telegram.answer_callback(callback_id, "Aktarılıyor...")
+    try:
+        data = telegram.download_file(pending["file_id"])
+        add_file(user["id"], data, pending["name"], pending.get("mime", ""), DEFAULT_MINUTES, device="🤖 Telegram",
+                 size_hint=len(data))
+    except (telegram.TelegramError, TransferError) as e:
+        telegram.edit_message(chat_id, message_id, f"⚠️ Aktarılamadı: {esc(e)}")
+        return
+    telegram.edit_message(chat_id, message_id, f"📤 <b>{esc(pending['name'])}</b> aktarma kutusuna kondu, 1 saat duracak.\n"
+                                               f'<a href="{esc(link("transfer.index"))}">Aktar →</a>')
 
 
 # ---------- Yapay zekâ: fiş okuma ----------
@@ -890,7 +932,8 @@ def _ask_buttons(user, chat_id, text):
     row = [("☑️ Yapılacak", "tx:todo")]
     if parse_expense(user["id"], text):
         row.append(("💸 Harcama", "tx:exp"))
-    buttons = [[("📝 Not", "tx:note"), ("🛒 Alışveriş", "tx:shop")], row, [("📓 Günlük", "tx:jr"), ("✖️ Vazgeç", "tx:x")]]
+    buttons = [[("📝 Not", "tx:note"), ("🛒 Alışveriş", "tx:shop")], row, [("📓 Günlük", "tx:jr"), ("📤 Aktar", "tx:tr")],
+               [("✖️ Vazgeç", "tx:x")]]
     preview = text if len(text) <= 80 else text[:77] + "..."
     telegram.send_message(chat_id, f"Bunu ne yapayım?\n<i>{esc(preview)}</i>", buttons=buttons)
 
@@ -902,7 +945,8 @@ def cb_text(user, chat_id, message_id, callback_id, data):
     if choice == "x" or pending is None:
         telegram.edit_message(chat_id, message_id, "✖️ Vazgeçildi." if choice == "x" else "⌛ Süre doldu.")
         return
-    handler = {"note": cmd_note, "shop": cmd_shop, "todo": cmd_todo, "exp": cmd_expense, "jr": cmd_journal}.get(choice)
+    handler = {"note": cmd_note, "shop": cmd_shop, "todo": cmd_todo, "exp": cmd_expense, "jr": cmd_journal,
+               "tr": cmd_transfer}.get(choice)
     if handler is None:
         return
     telegram.edit_message(chat_id, message_id, f"✔️ <i>{esc(pending['text'][:80])}</i>")

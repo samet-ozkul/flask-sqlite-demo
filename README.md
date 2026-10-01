@@ -5,7 +5,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 
 | Grup | Modüller |
 |---|---|
-| 📅 Genel | **Takvim** (tüm tarihler tek takvimde, telefon takvimine abonelik) · **Etkinlikler** (aileyle paylaşılan ortak takvim, Telegram hatırlatması) · **Otomasyon** (“eğer şu olursa bunu yap” kuralları) · **Arama** (tek kutudan tüm modüller, bottan `/ara`) |
+| 📅 Genel | **Takvim** (tüm tarihler tek takvimde, telefon takvimine abonelik) · **Etkinlikler** (aileyle paylaşılan ortak takvim, Telegram hatırlatması) · **Otomasyon** (“eğer şu olursa bunu yap” kuralları) · **Arama** (tek kutudan tüm modüller, bottan `/ara`) · **Aktar** (telefon ile bilgisayar arasında süreli metin ve dosya) |
 | 🏠 Pano | Günün özeti: hava durumu, döviz kuru, yaklaşan ödemeler/tarihler, bugünkü alışkanlıklar ve ilaçlar, hızlı harcama ve hızlı not |
 | 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, paylaşılan listede işi birine atama, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) · **Şifreli Kasa** (hassas notlar tarayıcıda şifrelenir, sunucu okuyamaz) |
 | 💰 Para | **Harcamalar** (aylık özet, kategori grafiği, bütçe limiti, Excel/CSV) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) · **Varlıklar** (nakit, döviz, altın; güncel TL değeri ve 90 günlük grafik) · **Hedefler** (birikim hedefi, ayda ne kadar, tahmini bitiş) · **Ortak Harcama** (Splitwise benzeri: kim ne ödedi, kim kime borçlu) |
@@ -18,6 +18,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 - Fotoğraflar en fazla 1600 px'e küçültülüp JPEG olarak kaydedilir (tipik fatura fotoğrafı 3-5 MB → ~250 KB), konum (EXIF/GPS) bilgisi silinir. Listelerde ~30 KB'lık küçük önizleme gösterilir.
 - PDF en fazla 3 MB. Veritabanı + dosyalar toplamı `STORAGE_QUOTA_MB`'yi (varsayılan 350) aşınca yükleme reddedilir.
 - Yedekler sunucuda **saklanmaz**: indirilir ya da Telegram'a gönderilir.
+- **Aktar** dosyaları süreli durur (10 dk – 24 saat, varsayılan 1 saat), 5 dakikalık cron'da silinir, yedeğe girmez; dosya başına 25 MB, kişi başına toplam 100 MB.
 - Silinen kayıtların ek dosyaları çöp kutusunda 30 gün durur, sonra günlük cron ile kalıcı silinir; acele varsa **Çöp kutusu → Boşalt**.
 - Yönetim → **Temizlik**: sahipsiz dosyaları siler (çöp kutusundakilere dokunmaz), veritabanını sıkıştırır (VACUUM).
 - Yönetim sayfası tüm ev klasörünü ölçebilir; pip önbelleği şişerse `rm -rf ~/.cache/pip`.
@@ -122,6 +123,7 @@ Sonra 3. adımdaki **Static files** ayarını ekle, WSGI dosyasına yeni değiş
 | `CRON_SECRET` | – | `/cron/<CRON_SECRET>/...` adreslerini açar |
 | `GOLDAPI_KEY` | – | Panoda gram altın fiyatı (goldapi.io ücretsiz plan, 8 saatte bir sorgulanır) |
 | `TMDB_API_KEY` | – | İzleme listesinde film/dizi araması (themoviedb.org ücretsiz; v3 anahtarı ya da v4 okuma belirteci). Kitap araması anahtarsız çalışır |
+| `TRANSFER_MAX_MB`, `TRANSFER_TOTAL_MB` | – | Aktar: dosya başına üst sınır (varsayılan 25) ve kişi başına aynı anda toplam (varsayılan 100) |
 | `STORAGE_QUOTA_MB` | – | Veritabanı + dosyalar için üst sınır (varsayılan 350) |
 | `ALLOW_REGISTRATION` | – | `1` ise herkes kayıt olabilir (varsayılan kapalı) |
 | `APP_TZ` | – | Saat dilimi (varsayılan `Europe/Istanbul`) |
@@ -158,6 +160,7 @@ Webhook kuruluyken bota yazarak panoyu açmadan giriş yapabilirsin (`/yardim` h
 | `/bugun` | Günün özeti |
 | `/rapor` · `/rapor bu ay` | Aylık rapor |
 | `/ara matkap` | Her yerde arama |
+| `/aktar metin` · dosya gönder → **📤 Aktar** | Aktarma kutusuna koyar; bilgisayarda Aktar sayfasından açılır (1 saat) |
 | Link | Sonra Bak'a kaydedilir |
 | Fotoğraf / PDF | Hangi garantiye ya da nota ekleneceği sorulur (açıklama yazarsan yeni garantinin adı olur) |
 | Düz yazı | Not / alışveriş / yapılacak / harcama / günlük olarak ne yapılacağı sorulur |
