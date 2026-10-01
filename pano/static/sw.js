@@ -2,11 +2,11 @@
 // - Sayfalar her zaman ağdan gelir (kişisel veriler önbelleğe alınmaz)
 // - Ağ yoksa çevrimdışı sayfası gösterilir
 // - CSS/JS/ikonlar önbellekten hızlı yüklenir
-const VERSION = "pano-v3";
+const VERSION = "pano-v4";
 const PRECACHE = [
   "/cevrimdisi",
   "/static/style.css?v=3",
-  "/static/app.js?v=3",
+  "/static/app.js?v=4",
   "/static/icons/icon-192.png",
 ];
 

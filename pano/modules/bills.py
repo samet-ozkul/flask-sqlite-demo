@@ -3,6 +3,7 @@ from flask import Blueprint, flash, g, redirect, render_template, request, url_f
 
 from .. import trash
 from ..auth import login_required
+from .. import automation
 from ..db import execute, get_db, owned_or_404, query, query_one
 from ..reminders import next_bill_date
 from ..utils import (fmt_date, form_bool, form_date, form_str, month_bounds, redirect_back,
@@ -140,6 +141,7 @@ def pay_bill(user_id, bill, add_expense=True):
         ).lastrowid
         result["messages"].append("Harcamalara eklendi.")
     db.commit()
+    automation.fire("bill_paid", user_id, fatura=bill["name"], tutar=bill["amount"])
     return result
 
 

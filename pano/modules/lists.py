@@ -14,7 +14,7 @@ import re
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
-from .. import telegram
+from .. import automation, telegram
 from .. import todo_reminders as todo
 from .. import trash
 from ..auth import login_required
@@ -81,6 +81,10 @@ def add_items(list_id, texts, user_id, qty="", due_date=None, due_time=None, rem
             (list_id, text, qty, due_date, due_time, remind_before, repeat, user_id, assignee_id),
         )
     db.commit()
+    if texts:
+        lst = db.execute("SELECT name, (SELECT COUNT(*) FROM list_items WHERE list_id = lists.id AND done = 0) AS n"
+                         " FROM lists WHERE id = ?", (list_id,)).fetchone()
+        automation.fire("list_count", list_id=list_id, liste=lst["name"], adet=lst["n"], onceki=lst["n"] - len(texts))
     return len(texts)
 
 
@@ -238,7 +242,7 @@ def add_item(list_id):
 @login_required
 def toggle_item(item_id):
     item = _item_or_404(item_id, g.user["id"])
-    todo.set_done(item_id, not item["done"])  # tekrarlayan maddede sonrakini de oluşturur
+    todo.set_done(item_id, not item["done"], actor_id=g.user["id"])  # tekrarlayan maddede sonrakini de oluşturur
     # Liste sayfasında her dokunuşta mesaj göstermeyelim; başka sayfadan (pano) gelindiyse bildir
     if request.form.get("next") or request.args.get("next"):
         flash(f"“{item['text']}” " + ("tamamlandı." if not item["done"] else "yeniden açıldı."), "success")

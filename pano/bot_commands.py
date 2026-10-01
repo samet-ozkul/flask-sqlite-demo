@@ -23,7 +23,7 @@ from datetime import timedelta
 from flask import request, url_for
 from werkzeug.datastructures import FileStorage
 
-from . import ai, assistant, telegram
+from . import ai, assistant, automation, telegram
 from . import todo_reminders as todo
 from .db import execute, get_db, query, query_one
 from .utils import fmt_date, fmt_money, fold, now_local, parse_number, today, today_str
@@ -225,6 +225,7 @@ def cmd_expense(user, chat_id, rest):
     amount, category, note = parsed
     expense_id = execute("INSERT INTO expenses (user_id, amount, category, note, date) VALUES (?, ?, ?, ?, ?)",
                          (user["id"], amount, category, note, today_str())).lastrowid
+    automation.fire("expense_added", user["id"], **{"tutar": amount, "kategori": category, "not": note})
     text = f"💸 <b>{fmt_money(amount)}</b> · {esc(category)}" + (f" · {esc(note)}" if note else "")
     text += f"\nBu ay toplam: {fmt_money(_month_total(user['id']))}"
     from . import budgets
@@ -549,7 +550,7 @@ def cb_list_item(user, chat_id, message_id, callback_id, data):
     if item is None:
         telegram.answer_callback(callback_id, "Madde bulunamadı.")
         return
-    todo.set_done(item["id"], not item["done"])
+    todo.set_done(item["id"], not item["done"], actor_id=user["id"])
     telegram.answer_callback(callback_id, ("↩️ " if item["done"] else "✅ ") + item["text"][:40])
     lst = query_one("SELECT * FROM lists WHERE id = ?", (item["list_id"],))
     try:
@@ -755,6 +756,7 @@ def cb_receipt(user, chat_id, message_id, callback_id, data):
         return
     expense_id = execute("INSERT INTO expenses (user_id, amount, category, note, date) VALUES (?, ?, ?, ?, ?)",
                          (uid, amount, r["category"], (r["merchant"] + note_extra).strip()[:200], r["date"])).lastrowid
+    automation.fire("expense_added", uid, **{"tutar": amount, "kategori": r["category"], "not": r["merchant"]})
     telegram.edit_message(chat_id, message_id,
                           f"✅ Harcama kaydedildi: <b>{fmt_money(amount)}</b> · {esc(r['category'])}"
                           + (f" · {esc(r['merchant'])}" if r["merchant"] else "")
@@ -828,6 +830,7 @@ def _save_intent(user, a):
     if a["action"] == "expense":
         expense_id = execute("INSERT INTO expenses (user_id, amount, category, note, date) VALUES (?, ?, ?, ?, ?)",
                              (uid, a["amount"], a["category"], a["text"][:200], a["date"] or today_str())).lastrowid
+        automation.fire("expense_added", uid, **{"tutar": a["amount"], "kategori": a["category"], "not": a["text"][:200]})
         return (f"✅ Harcama kaydedildi: <b>{fmt_money(a['amount'])}</b> · {esc(a['category'])}"
                 f"\nBu ay toplam: {fmt_money(_month_total(uid))}", [[("↩️ Geri al", f"exu:{expense_id}")]])
     if a["action"] == "todo":

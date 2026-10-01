@@ -5,7 +5,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 
 | Grup | Modüller |
 |---|---|
-| 📅 Genel | **Takvim** (tüm tarihler tek takvimde, telefon takvimine abonelik) · **Etkinlikler** (aileyle paylaşılan ortak takvim, Telegram hatırlatması) · **Arama** (tek kutudan tüm modüller, bottan `/ara`) |
+| 📅 Genel | **Takvim** (tüm tarihler tek takvimde, telefon takvimine abonelik) · **Etkinlikler** (aileyle paylaşılan ortak takvim, Telegram hatırlatması) · **Otomasyon** (“eğer şu olursa bunu yap” kuralları) · **Arama** (tek kutudan tüm modüller, bottan `/ara`) |
 | 🏠 Pano | Günün özeti: hava durumu, döviz kuru, yaklaşan ödemeler/tarihler, bugünkü alışkanlıklar ve ilaçlar, hızlı harcama ve hızlı not |
 | 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, paylaşılan listede işi birine atama, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) · **Şifreli Kasa** (hassas notlar tarayıcıda şifrelenir, sunucu okuyamaz) |
 | 💰 Para | **Harcamalar** (aylık özet, kategori grafiği, bütçe limiti, Excel/CSV) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) · **Varlıklar** (nakit, döviz, altın; güncel TL değeri ve 90 günlük grafik) · **Hedefler** (birikim hedefi, ayda ne kadar, tahmini bitiş) · **Ortak Harcama** (Splitwise benzeri: kim ne ödedi, kim kime borçlu) |
@@ -169,7 +169,7 @@ PythonAnywhere ücretsiz planında zamanlanmış görev yok. Bunun yerine [cron-
 | Görev | Adres | Önerilen zaman |
 |---|---|---|
 | Günlük özet (hava, yaklaşan ödemeler, randevular, ilaçlar) + 30 günü dolan çöpü temizleme | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/gunluk` | Her gün 08:00 (`0 8 * * *`) |
-| Yapılacak, fatura, belge, ilaç, günlük hatırlatmaları ve akşam hava uyarısı | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
+| Yapılacak, fatura, belge, ilaç, günlük hatırlatmaları, akşam hava uyarısı ve zamanlı otomasyonlar | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
 | Veritabanı yedeğini yöneticilere Telegram'dan gönder | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/yedek` | Haftada bir, Pazar 03:00 (`0 3 * * 0`) |
 
 Günlük özet aynı gün ikinci kez çağrılsa da tekrar gönderilmez. `CRON_SECRET`'ı kimseyle paylaşma.
@@ -180,6 +180,14 @@ cron-job.org'da saat dilimini **Europe/Istanbul** yapmayı unutma.
 **Tekrarlayan işler:** Yapılacağa *her gün / hafta içi / her hafta / her ay / her yıl* tekrarı verilebilir (bottan: `/yap çöpü at pazartesi 20:00 her hafta`). Tamamlanınca bir sonraki tarihle yenisi eklenir; geri alınırsa o yenisi silinir.
 
 **Fatura hatırlatmaları:** “Telegram'dan hatırlat” işaretli ödenmemiş faturalar için son günden bir gün önce ve son gün 09:00'da mesaj gelir. **✅ Ödendi** butonu faturayı öder, tekrarlıysa sonraki ayı ekler ve harcamalara yazar; **↩️ Geri al** bunların hepsini geri alır.
+
+**Otomasyon:** Otomasyon sayfasından “eğer şu olursa bunu yap” kuralları kurulur (hazır örnekler: her ay kira harcaması, market listesi kalabalıklaşınca haber, fatura ödenince eşe mesaj).
+
+| Ne zaman | Ne yapılsın |
+|---|---|
+| Her gün / her hafta / her ay belirli saatte · harcama eklenince (kategori, en az tutar) · fatura ödenince · listedeki açık ürün sayısı eşiği geçince · yapılacak tamamlanınca | Telegram mesajı (kendine ya da Telegram'ı bağlı başka bir kullanıcıya) · harcama ekle · yapılacak ekle · alışveriş listesine ekle · not ekle |
+
+Metinlerde `{tarih}`, `{ay}`, `{tutar}`, `{fatura}`, `{liste}`, `{adet}`, `{is}`, `{kim}` gibi yer tutucular kullanılır. Zamanlı kurallar 5 dakikalık `/hatirlatma` görevinde, her dönemde (gün/hafta/ay) bir kez çalışır; cron bir süre çalışmasa da dönem içinde geç de olsa yapılır. Otomasyonun yaptığı işlem başka bir otomasyonu tetiklemez, bir kural günde en fazla 20 kez çalışır, eylem hata verse de asıl işlem (ör. harcama kaydı) bozulmaz. **▶️ Şimdi dene** eylemi örnek değerlerle hemen bir kez yapar.
 
 **Belgeler:** Seçilen süre kadar önce (1 hafta – 6 ay) ve bittiği gün 09:00'da mesaj gelir (“🛂 30 gün sonra bitiyor: Pasaport (Ayşe)”); panoda ve takvimde 30 gün önceden görünür. Belge yenilenip tarih değiştirilince hatırlatmalar yeni tarihe göre kurulur. Gizlilik için belge numarası ya da fotoğrafı saklanmaz.
 

@@ -12,7 +12,7 @@ from itertools import groupby
 
 from flask import Blueprint, Response, flash, g, redirect, render_template, request, url_for
 
-from .. import ai, assistant, budgets
+from .. import ai, assistant, automation, budgets
 from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
@@ -181,10 +181,12 @@ def create():
     # Hızlı formdaki "yeni kategori" kutusu seçili çipin önüne geçer
     category = normalize_category(form_str("category_new", 40) or form_str("category", 40))
     day = form_date("date") or today_str()
+    note = form_str("note", 200)
     execute(
         "INSERT INTO expenses (user_id, amount, category, note, date) VALUES (?, ?, ?, ?, ?)",
-        (g.user["id"], amount, category, form_str("note", 200), day),
+        (g.user["id"], amount, category, note, day),
     )
+    automation.fire("expense_added", g.user["id"], **{"tutar": amount, "kategori": category, "not": note})
     flash(f"{fmt_money(amount)} · {category} eklendi.", "success")
     return redirect_back("expenses.index", **_month_args(day))
 

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Otomasyon{% endblock %}
+{% block head %}
+<style>
+  .auto-step { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; margin: 0 0 12px; }
+  .auto-step legend { font-weight: 600; padding: 0 6px; }
+  .auto-step fieldset { border: 0; padding: 0; margin: 10px 0 0; }
+  .auto-rule .flow { font-size: .9rem; }
+  .auto-rule.off { opacity: .55; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ph code { cursor: help; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("⚙️ Otomasyon", "Eğer şu olursa bunu yap: zamanı gelince ya da bir olay olunca kendiliğinden çalışan kurallar") }}
+
+{% macro sel(name, options, value) -%}
+  <select name="{{ name }}">
+    {% for v, label in options %}<option value="{{ v }}" {% if (value | string) == (v | string) %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+{%- endmacro %}
+{% set f = form %}
+
+<section class="card" id="kural">
+  <h2>{{ ("✏️ " ~ editing.name) if editing else "＋ Yeni kural" }}</h2>
+  {% if not editing %}
+    <div class="chips" style="margin-bottom: 12px">
+      <span class="muted small">Hazır örnek:</span>
+      <a class="btn sm" href="{{ url_for('automations.index', ornek='kira') }}#kural">🏠 Her ay kira harcaması</a>
+      <a class="btn sm" href="{{ url_for('automations.index', ornek='market') }}#kural">🛒 Market listesi kalabalık</a>
+      <a class="btn sm" href="{{ url_for('automations.index', ornek='fatura') }}#kural">🧾 Fatura ödenince haber ver</a>
+      <a class="btn sm" href="{{ url_for('automations.index', ornek='cuma') }}#kural">💸 Cuma harcama kontrolü</a>
+    </div>
+  {% endif %}
+  <form method="post" action="{{ url_for('automations.edit', rule_id=editing.id) if editing else url_for('automations.create') }}">
+    {{ ui.csrf() }}
+    {{ ui.field("Kural adı", "name", f.get('name', ''), required=True, attrs='maxlength="80"', placeholder="ör. Kira") }}
+
+    <div class="auto-step">
+      <legend>1️⃣ Ne zaman?</legend>
+      <label class="field"><span>Tetikleyici</span>{{ sel("trigger_type", triggers.items(), f.get('trigger_type', 'daily')) }}</label>
+
+      <fieldset data-show-for="trigger_type=daily,weekly,monthly">
+        <div class="form-row three">
+          <label class="field" data-show-for="trigger_type=weekly"><span>Gün</span>
+            {{ sel("weekday", weekday_options, f.get('weekday', '0')) }}</label>
+          <div data-show-for="trigger_type=monthly">{{ ui.field("Ayın günü", "day", f.get('day', '1'), type="number", attrs='min="1" max="31"', hint="31 yazarsan kısa aylarda son gün") }}</div>
+          {{ ui.field("Saat", "time", f.get('time', '09:00'), type="time") }}
+        </div>
+      </fieldset>
+      <fieldset data-show-for="trigger_type=expense_added">
+        <div class="form-row">
+          {{ ui.field("Kategori (boşsa hepsi)", "exp_category", f.get('exp_category', ''), attrs='maxlength="40"', placeholder="ör. Market") }}
+          {{ ui.field("En az tutar (boşsa hepsi)", "exp_min", f.get('exp_min', ''), attrs='inputmode="decimal"', placeholder="ör. 1.000") }}
+        </div>
+      </fieldset>
+      <fieldset data-show-for="trigger_type=list_count">
+        <div class="form-row">
+          <label class="field"><span>Liste</span>
+            {{ sel("list_id", [('', '— seç —')] + all_list_options, f.get('list_id', '')) }}</label>
+          {{ ui.field("Açık ürün sayısı", "count", f.get('count', '10'), type="number", attrs='min="1" max="500"', hint="Sayı bu eşiği geçtiği anda bir kez çalışır") }}
+        </div>
+      </fieldset>
+      <fieldset data-show-for="trigger_type=todo_done">
+        <label class="field"><span>Liste</span>
+          {{ sel("done_list", [('', 'Erişebildiğim herhangi bir liste')] + all_list_options, f.get('done_list', '')) }}</label>
+      </fieldset>
+      <fieldset data-show-for="trigger_type=bill_paid"><p class="muted small" style="margin: 0">Web'den ya da Telegram'daki ✅ Ödendi butonundan ödenen her faturada çalışır.</p></fieldset>
+    </div>
+
+    <div class="auto-step">
+      <legend>2️⃣ Ne yapılsın?</legend>
+      <label class="field"><span>Eylem</span>{{ sel("action_type", actions.items(), f.get('action_type', 'notify')) }}</label>
+
+      <fieldset data-show-for="action_type=notify">
+        <label class="field"><span>Kime</span>
+          {{ sel("notify_to", [('me', 'Bana')] + people_options, f.get('notify_to', 'me')) }}</label>
+        {{ ui.textarea("Mesaj", "notify_text", f.get('notify_text', ''), rows=3, placeholder="ör. {fatura} faturası ödendi ({tutar}).") }}
+        {% if not people %}<p class="muted small">Başka birine göndermek için onun da Telegram'ı panoya bağlaması gerekir.</p>{% endif %}
+      </fieldset>
+      <fieldset data-show-for="action_type=expense">
+        <div class="form-row three">
+          {{ ui.field("Tutar (₺)", "expense_amount", f.get('expense_amount', ''), attrs='inputmode="decimal"', placeholder="15.000") }}
+          {{ ui.field("Kategori", "expense_category", f.get('expense_category', ''), attrs='maxlength="40"', placeholder="ör. Ev") }}
+          {{ ui.field("Not", "expense_note", f.get('expense_note', ''), attrs='maxlength="200"', placeholder="ör. {ay} kirası") }}
+        </div>
+      </fieldset>
+      <fieldset data-show-for="action_type=todo">
+        <div class="form-row">
+          <label class="field"><span>Liste</span>{{ sel("todo_list", [('', '— seç —')] + todo_list_options, f.get('todo_list', '')) }}</label>
+          {{ ui.field("Yapılacak", "todo_text", f.get('todo_text', ''), attrs='maxlength="500"', placeholder="ör. Faturaları kontrol et") }}
+        </div>
+        {{ ui.checkbox("Son tarihi o gün olsun", "todo_due_today", f.get('todo_due_today')) }}
+      </fieldset>
+      <fieldset data-show-for="action_type=shopping">
+        <div class="form-row">
+          <label class="field"><span>Liste</span>{{ sel("shopping_list", [('', '— seç —')] + shopping_list_options, f.get('shopping_list', '')) }}</label>
+          {{ ui.field("Ürünler (virgülle)", "shopping_text", f.get('shopping_text', ''), attrs='maxlength="500"', placeholder="ör. süt, ekmek, yumurta") }}
+        </div>
+      </fieldset>
+      <fieldset data-show-for="action_type=note">
+        {{ ui.field("Başlık", "note_title", f.get('note_title', ''), attrs='maxlength="200"') }}
+        {{ ui.textarea("İçerik", "note_text", f.get('note_text', ''), rows=3) }}
+      </fieldset>
+
+      <p class="muted small ph" style="margin: 8px 0 0">Metinlerde kullanılabilir:
+        {% for p in common %}<code>{{ '{' ~ p ~ '}' }}</code> {% endfor %}
+        {% for t, items in placeholders.items() if items %}<span data-show-for="trigger_type={{ t }}">{% for p in items %}<code>{{ '{' ~ p ~ '}' }}</code> {% endfor %}</span>{% endfor %}
+      </p>
+    </div>
+
+    <div class="row-flex">
+      <button class="btn primary">{{ "Kaydet" if editing else "Kuralı kur" }}</button>
+      {% if editing %}<a class="btn" href="{{ url_for('automations.index') }}">Vazgeç</a>{% endif %}
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Kurallar <span class="pill-count">{{ rules | length }}</span></h2>
+  {% if rules %}
+    <ul class="rows">
+      {% for r in rules %}
+        <li class="auto-rule {{ 'off' if not r.enabled }}" style="display: block">
+          <div class="title"><b>{{ r.name }}</b>{% if not r.enabled %} <span class="badge">kapalı</span>{% endif %}</div>
+          <div class="flow">⏱️ {{ describe_trigger(r) }} → {{ describe_action(r) }}</div>
+          <div class="meta">
+            <span>Son çalışma: {{ last_run_text(r.last_run_at) }}{% if r.run_count %} · {{ r.run_count }} kez{% endif %}</span>
+            {% if r.last_error %}<span style="color: var(--danger)">⚠️ {{ r.last_error }}</span>{% endif %}
+          </div>
+          <div class="row-flex" style="margin-top: 8px">
+            {{ ui.post_button(url_for('automations.toggle', rule_id=r.id), "Kapat" if r.enabled else "Aç") }}
+            {{ ui.post_button(url_for('automations.test_run', rule_id=r.id), "▶️ Şimdi dene", "", "Eylemi şimdi bir kez yapar") }}
+            <a class="btn sm" href="{{ url_for('automations.edit', rule_id=r.id) }}#kural">✏️ Düzenle</a>
+            {{ ui.delete_button(url_for('automations.delete', rule_id=r.id), "Sil", "Kural silinsin mi?") }}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ ui.empty("Henüz kural yok. Yukarıdaki hazır örneklerden biriyle başlayabilirsin.", "⚙️") }}
+  {% endif %}
+</section>
+
+{% if logs %}
+  <details class="card">
+    <summary><b>Son çalışmalar</b> <span class="pill-count">{{ logs | length }}</span></summary>
+    <ul class="rows">
+      {% for l in logs %}
+        <li><span class="ico">{{ '✅' if l.ok else '⚠️' }}</span>
+          <div class="grow"><div class="title">{{ l.name }}</div><div class="meta"><span>{{ l.ran_at | localdt }}</span><span>{{ l.detail }}</span></div></div></li>
+      {% endfor %}
+    </ul>
+  </details>
+{% endif %}
+
+<p class="muted small center">Zamanlı kurallar 5 dakikalık hatırlatma görevinde çalışır; her dönemde (gün, hafta, ay) bir kez.
+  Otomasyonun yaptığı işlem başka bir otomasyonu tetiklemez. Bir kural günde en fazla 20 kez çalışır.</p>
+{% endblock %}

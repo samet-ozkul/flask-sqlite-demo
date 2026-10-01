@@ -122,7 +122,7 @@ def _cb_todo(action, item_id, raw, user_ids, callback_id):
     if item is None:
         telegram.answer_callback(callback_id, "Madde bulunamadı, silinmiş olabilir.")
         return []
-    todo.set_done(item_id, action == "done")
+    todo.set_done(item_id, action == "done", actor_id=user_ids[0])
     if action == "done":
         note = " · sonraki eklendi 🔁" if item["repeat"] and item["due_date"] and not item["done"] else ""
         telegram.answer_callback(callback_id, "✅ Tamamlandı" + note)

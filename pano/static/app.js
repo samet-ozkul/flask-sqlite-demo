@@ -21,6 +21,26 @@ document.addEventListener("click", (e) => {
   if (btn.dataset.move === "down" && row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row);
 });
 
+// data-show-for="alan=değer1,değer2": formdaki alanın değeri listedeyse gösterir; değilse gizler ve
+// içindeki alanları devre dışı bırakır (gönderilmez, zorunlu alan engeli olmaz). JS yoksa hepsi görünür.
+function syncShowFor(form) {
+  const blocks = form.querySelectorAll("[data-show-for]");
+  blocks.forEach((el) => {
+    const [name, values] = el.dataset.showFor.split("=");
+    const field = form.elements[name];
+    if (field) el.classList.toggle("hidden", !values.split(",").includes(field.value));
+  });
+  blocks.forEach((el) => el.querySelectorAll("input, select, textarea").forEach((input) => {
+    input.disabled = input.closest("[data-show-for].hidden") !== null;
+  }));
+}
+document.querySelectorAll("form").forEach((form) => {
+  if (form.querySelector("[data-show-for]")) {
+    syncShowFor(form);
+    form.addEventListener("change", () => syncShowFor(form));
+  }
+});
+
 // Kullanıcı menüsü dışına tıklanınca kapat
 document.addEventListener("click", (e) => {
   document.querySelectorAll("details.usermenu[open]").forEach((d) => {
