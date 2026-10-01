@@ -12,7 +12,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 | 🚗 Ev ve araç | **Araç** (muayene, sigorta, kasko, bakım, yakıt tüketimi) · **Garanti** (fatura fotoğrafı, bitiş tarihi) · **Ev Envanteri** (“matkap nerede?”) · **Belgeler** (pasaport, ehliyet, kimlik, ruhsat, poliçe bitiş tarihleri; 1 hafta–6 ay önceden Telegram hatırlatması) |
 | 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Günlük** (her gün bir satır ve ruh hali emojisi, ay takvimi, “1 yıl önce bugün”, akşam Telegram'dan “Bugün nasıldı?”) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) · **İzleme / Okuma** (film, dizi, kitap listesi; kapaklı arama, puan) · **Kişiler** (iletişim hatırlatıcı: “dedeni 3 haftadır aramadın”, tek dokunuşla 📞 Aradım, arama/WhatsApp bağlantısı, doğum günleri) |
 | ⚙️ Altyapı | Kullanıcı yönetimi, tek tıkla yedek al/geri yükle, disk kullanımı, Telegram günlük özeti, telefona uygulama olarak yükleme (PWA) · **Çöp kutusu** (silinen kayıt 30 gün saklanır, tek tıkla geri gelir) · **Tema** (otomatik / açık / koyu) · **Pano düzeni** (kartları seç ve sırala) |
-| 🧰 Araçlar | **Zaman Takibi** (başlat/durdur sayacı, elle kayıt, proje bazında haftalık/aylık rapor, saatlik ücretle kazanç, Excel/CSV; bottan `/baslat`, `/durdur`, `/zaman`) · **Hesaplayıcılar** (kredi taksiti ve ödeme planı, mevduat getirisi, KDV, yüzde, tarih/iş günü/yaş, birim çevirici, döviz/altın, hesap bölüşme, yakıt maliyeti) · **Kanban** (sütunlu iş/proje panoları, sürükle-bırak, renk etiketi, son tarih, paylaşılan pano) |
+| 🧰 Araçlar | **Zaman Takibi** (başlat/durdur sayacı, elle kayıt, proje bazında haftalık/aylık rapor, saatlik ücretle kazanç, Excel/CSV; bottan `/baslat`, `/durdur`, `/zaman`) · **Hesaplayıcılar** (kredi taksiti ve ödeme planı, mevduat getirisi, KDV, yüzde, tarih/iş günü/yaş, birim çevirici, döviz/altın, hesap bölüşme, yakıt maliyeti) · **Kanban** (sütunlu iş/proje panoları, sürükle-bırak, renk etiketi, son tarih, paylaşılan pano) · **Profil Sayfası** (Linktree / dijital kartvizit benzeri herkese açık sayfa: linkler, ara/WhatsApp/e-posta butonları, QR kod, rehbere ekle) |
 
 **Menü:** Bilgisayarda üst çubukta en çok kullandığın modüller (☆ ile seçilir, Ayarlar → 📌 Menü kısayolları'ndan sıralanır) ve **☰ Modüller** açılır menüsü (gruplu, aramalı) durur; telefonda alt çubukta ilk 3 kısayol. **Ctrl+K** ya da **/** ile hızlı geçiş: modül adını yaz, Enter (eşleşme yoksa her yerde arar).
 
@@ -261,6 +261,10 @@ Ayarlar → **📅 Telefon takvimine abonelik** → *Takvim adresi oluştur*. Fa
 - **Google Takvim:** bilgisayardan calendar.google.com → Diğer takvimler **+** → *URL ile* → adresi yapıştır.
 
 Adres gizli bir anahtar içerir, giriş gerektirmez; kimseyle paylaşma. *Yeni adres oluştur* eski adresi geçersiz kılar, *Kapat* aboneliği tamamen kapatır.
+
+## Herkese açık profil sayfası
+
+Menü → Araçlar → **🌐 Profil Sayfası**: ad, başlık, kısa yazı, emoji ya da fotoğraf, vurgu rengi, iletişim bilgileri ve en fazla 12 link ile `https://SİTE/p/adres` adresinde girişsiz açılan tek bir sayfa. Sayfada 📞 Ara, 💬 WhatsApp, ✉️ E-posta ve **📇 Rehbere ekle** (vCard) butonları olur; QR kodu kartvizit için PNG olarak indirilebilir. Varsayılan olarak kapalıdır ve arama motorlarına kapalıdır (`noindex`). Sayfada sadece bu ekranda yazılanlar görünür; notlar, harcamalar ve diğer kayıtlar asla gösterilmez. Linkler sadece `http(s)://`, `mailto:` ve `tel:` olabilir; fotoğraf 400×400'e küçültülür, konum (EXIF) bilgisi silinir ve veritabanında saklanır (yedeğe girer). Kapalı sayfa ile olmayan sayfa dışarıdan aynı “bulunamadı” sayfasını gösterir; sahibi kapalıyken de önizleyebilir.
 
 ## Telefona uygulama olarak ekleme
 

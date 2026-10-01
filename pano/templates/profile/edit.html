@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Profil Sayfası{% endblock %}
+{% block head %}
+<style>
+  .pf-top { display: grid; gap: 14px; align-items: center; grid-template-columns: 1fr; }
+  @media (min-width: 560px) { .pf-top { grid-template-columns: 200px 1fr; } }
+  .qr-box svg { width: min(200px, 100%); height: auto; aspect-ratio: 1; border-radius: 8px; display: block; margin: 0 auto; }
+  .pf-url { overflow-wrap: anywhere; }
+  .pf-stats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 10px; }
+  .pf-photo { display: flex; gap: 12px; align-items: center; margin: -4px 0 12px; }
+  .pf-photo img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+  .pf-photo .check { margin: 0; }
+  .pf-accents { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pf-accents label { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; cursor: pointer;
+                      border: 1px solid var(--border); border-radius: 99px; font-size: .88rem; }
+  .pf-accents label:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+  .pf-accents input { margin: 0; }
+  .pf-accents .dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; }
+  .pf-links > li { display: grid; gap: 6px; grid-template-columns: 1fr auto; align-items: center; }
+  .pf-links > li .url { grid-column: 1 / -1; }
+  @media (min-width: 640px) {
+    .pf-links > li { grid-template-columns: 1fr 2fr auto; }
+    .pf-links > li .url { grid-column: auto; }
+  }
+  .pf-links .acts { display: flex; gap: 4px; grid-row: 1; grid-column: 2; }
+  @media (min-width: 640px) { .pf-links .acts { grid-column: 3; } }
+  .pf-links input { padding: 8px 10px; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🌐 Profil Sayfası", "Herkese açık tek sayfa: kartvizit, linkler, iletişim ve QR kod") %}
+  {% if current %}<a class="btn" href="{{ url }}" target="_blank" rel="noopener">👁️ Önizle</a>{% endif %}
+{% endcall %}
+
+{% macro link_row(label="", link_url="") -%}
+  <li>
+    <input name="link_label" value="{{ label }}" maxlength="60" placeholder="Etiket (ör. Instagram)" aria-label="Etiket">
+    <input class="url" name="link_url" value="{{ link_url }}" maxlength="500" inputmode="url" autocapitalize="off"
+           spellcheck="false" placeholder="https://…" aria-label="Adres">
+    <span class="acts">
+      <button type="button" class="btn sm" data-move="up" title="Yukarı" aria-label="Yukarı">↑</button>
+      <button type="button" class="btn sm" data-move="down" title="Aşağı" aria-label="Aşağı">↓</button>
+      <button type="button" class="btn sm danger" data-remove title="Sil" aria-label="Sil">✕</button>
+    </span>
+  </li>
+{%- endmacro %}
+
+{% if current %}
+  <section class="card">
+    <div class="pf-top">
+      <div class="qr-box">{{ qr | safe }}</div>
+      <div>
+        <h2 style="margin-bottom: 4px">Sayfan</h2>
+        <a class="pf-url" href="{{ url }}" target="_blank" rel="noopener">{{ url }}</a>
+        <div class="pf-stats">
+          {% if current.enabled %}<span class="badge good">Yayında</span>{% else %}<span class="badge">Kapalı</span>{% endif %}
+          <span class="muted small">👁️ {{ current.views }} ziyaret</span>
+          {% if current.noindex %}<span class="muted small">· 🙈 arama motorlarına kapalı</span>{% endif %}
+        </div>
+        <a class="btn sm primary" href="{{ url_for('profile.qr_png') }}">⬇️ QR'ı PNG indir</a>
+        <p class="muted small">Kartvizite, e-posta imzasına ya da masaya koy; okutan doğrudan bu sayfaya gelir.
+          {% if not current.enabled %}Sayfa kapalıyken başkaları “bulunamadı” görür; önizlemeyi sadece sen görürsün.{% endif %}</p>
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<form method="post" action="{{ url_for('profile.edit') }}" enctype="multipart/form-data">
+  {{ ui.csrf() }}
+  <section class="card">
+    <h2>Adres ve görünürlük</h2>
+    {{ ui.checkbox("🌐 Sayfa yayında: adresi bilen herkes görebilir", "enabled", form.enabled) }}
+    {{ ui.field("Adres", "slug", form.slug, required=True,
+                attrs='maxlength="40" autocapitalize="off" autocomplete="off" spellcheck="false"',
+                hint="3-30 karakter: küçük harf (a-z), rakam ve tire. Türkçe harfler dönüştürülür (ş → s). "
+                     ~ "Değiştirirsen eski adres ve QR artık açılmaz.") }}
+    <p class="muted small pf-url" style="margin-top: -6px">{{ base_url }}<b>{{ form.slug }}</b></p>
+    {{ ui.checkbox("🙈 Arama motorlarında görünmesin (Google vb. dizine eklemesin)", "noindex", form.noindex) }}
+  </section>
+
+  <section class="card">
+    <h2>Kimlik</h2>
+    <div class="form-row">
+      {{ ui.field("Ad", "display_name", form.display_name, attrs='maxlength="60"', placeholder="ör. Samet Özkul") }}
+      {{ ui.field("Başlık", "headline", form.headline, attrs='maxlength="100"', placeholder="ör. Yazılım geliştirici · Konya") }}
+    </div>
+    {{ ui.textarea("Kısa yazı", "bio", form.bio, rows=3, placeholder="Kendinden birkaç cümle (en fazla 500 karakter)") }}
+    <div class="form-row">
+      {{ ui.field("Emoji", "avatar_emoji", form.avatar_emoji, attrs='maxlength="16"', placeholder="ör. 👨‍💻",
+                  hint="Fotoğraf yoksa resim yerine gösterilir") }}
+      <label class="field"><span>Fotoğraf</span>
+        <input type="file" name="photo" accept="image/*">
+        <small class="muted">Kare kırpılır, en fazla 400×400'e küçültülür; konum (EXIF) bilgisi silinir.</small>
+      </label>
+    </div>
+    {% if current and current.has_photo %}
+      <div class="pf-photo">
+        <img src="{{ url_for('profile.photo', slug=current.slug, v=current.updated_at) }}" alt="Fotoğraf">
+        {{ ui.checkbox("Fotoğrafı kaldır", "remove_photo") }}
+      </div>
+    {% endif %}
+    <div class="field"><span>Vurgu rengi</span>
+      <div class="pf-accents">
+        {% for key, (label, light, _dark) in accents.items() %}
+          <label><input type="radio" name="accent" value="{{ key }}" {% if key == (form.accent or default_accent) %}checked{% endif %}>
+            <span class="dot" style="background: {{ light }}"></span>{{ label }}</label>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>İletişim</h2>
+    <div class="form-row three">
+      {{ ui.field("E-posta", "email", form.email, type="email", attrs='maxlength="120"', placeholder="ad@ornek.com") }}
+      {{ ui.field("Telefon", "phone", form.phone, type="tel", attrs='maxlength="30"', placeholder="0532 123 45 67") }}
+      {{ ui.field("Konum", "location", form.location, attrs='maxlength="80"', placeholder="ör. Konya") }}
+    </div>
+    <p class="muted small" style="margin-top: 0">Boş bırakılan gösterilmez. Telefon varsa 📞 Ara ve 💬 WhatsApp butonları çıkar.</p>
+  </section>
+
+  <section class="card">
+    <h2>Linkler <span class="muted small">en fazla {{ max_links }}</span></h2>
+    <ul class="rows pf-links" id="pf-links" data-max="{{ max_links }}">
+      {% for l in form.links %}{{ link_row(l.label, l.url) }}{% endfor %}
+      {% if form.links | length < max_links %}{{ link_row() }}{% endif %}
+    </ul>
+    <template id="pf-link-row">{{ link_row() }}</template>
+    <button type="button" class="btn sm hidden" id="pf-add" style="margin-top: 8px">＋ Link ekle</button>
+    <p class="muted small">Sadece <code>https://</code>, <code>http://</code>, <code>mailto:</code> ve <code>tel:</code> adresleri;
+      “instagram.com/…” gibi yazarsan başına https:// eklenir. Boş satır kaydedilmez, ↑ ↓ ile sırala.</p>
+  </section>
+
+  <button class="btn primary block">Kaydet</button>
+</form>
+
+<p class="muted small center" style="margin-top: 14px">Bu sayfada sadece burada yazdıkların görünür; notların, harcamaların ve
+  diğer kayıtların asla gösterilmez. Kapalı sayfa ile olmayan sayfa dışarıdan aynı görünür.</p>
+<script src="{{ url_for('static', filename='profile.js') }}?v=1" defer></script>
+{% endblock %}

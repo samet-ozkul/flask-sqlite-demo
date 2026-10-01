@@ -702,6 +702,28 @@ MIGRATIONS = [
     CREATE INDEX idx_cards_column ON cards(column_id, position);
     CREATE INDEX idx_cards_board ON cards(board_id, due_date);
     """,
+    # 25: herkese açık profil sayfası (/p/<adres>); fotoğraf veritabanında (sahipsiz dosya temizliği silmesin)
+    """
+    CREATE TABLE public_profiles (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        slug TEXT UNIQUE NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 0,
+        display_name TEXT NOT NULL DEFAULT '',
+        headline TEXT NOT NULL DEFAULT '',
+        bio TEXT NOT NULL DEFAULT '',
+        avatar_emoji TEXT NOT NULL DEFAULT '',
+        photo BLOB,                                -- en fazla 400×400 JPEG, EXIF'siz
+        accent TEXT NOT NULL DEFAULT '',           -- profile.ACCENTS anahtarı
+        email TEXT NOT NULL DEFAULT '',
+        phone TEXT NOT NULL DEFAULT '',
+        location TEXT NOT NULL DEFAULT '',
+        links TEXT NOT NULL DEFAULT '[]',          -- JSON: [{"label": ..., "url": ...}], en fazla 12
+        noindex INTEGER NOT NULL DEFAULT 1,        -- arama motorları dizine eklemesin
+        views INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)
