@@ -586,6 +586,10 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_transfers_user ON transfers(user_id, expires_at);
     """,
+    # 20: menü kısayolları (virgülle ayrılmış modül anahtarları; NULL = varsayılanlar)
+    """
+    ALTER TABLE users ADD COLUMN nav_pins TEXT;
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

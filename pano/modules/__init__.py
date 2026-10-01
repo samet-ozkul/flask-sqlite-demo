@@ -35,11 +35,39 @@ MODULES = [
 CORE = ["dashboard", "settings", "admin", "cron", "bot", "search", "trashbin"]
 
 
+GROUP_ICONS = {"Genel": "📅", "Listeler ve notlar": "📝", "Para": "💰", "Ev ve araç": "🏠", "Kişisel": "🧘",
+               "Araçlar": "🧰"}
+
+# Menü kısayolları: kullanıcı seçmediyse bunlar (üst çubukta hepsi, telefonda alt çubukta ilk 3'ü)
+DEFAULT_PINS = ["lists", "notes", "expenses", "agenda"]
+MAX_PINS = 6
+
+
 def module_groups():
     groups = {}
-    for _mod, endpoint, title, icon, group in MODULES:
-        groups.setdefault(group, []).append({"endpoint": endpoint, "title": title, "icon": icon})
+    for mod, endpoint, title, icon, group in MODULES:
+        groups.setdefault(group, []).append({"key": mod, "endpoint": endpoint, "title": title, "icon": icon})
     return groups
+
+
+def module_by_key():
+    return {m[0]: {"key": m[0], "endpoint": m[1], "title": m[2], "icon": m[3], "group": m[4]} for m in MODULES}
+
+
+def user_pins(user):
+    """Kullanıcının menü kısayolları (sırayla); kaydı yoksa varsayılanlar."""
+    known = module_by_key()
+    raw = user["nav_pins"] if user is not None else None
+    keys = DEFAULT_PINS if raw is None else [k for k in raw.split(",") if k]
+    return [known[k] for k in dict.fromkeys(keys) if k in known][:MAX_PINS]
+
+
+def current_module(endpoint):
+    """İstek hangi modülün sayfasında? (blueprint adına göre) — yoksa None."""
+    if not endpoint:
+        return None
+    bp = endpoint.split(".")[0]
+    return next((m for m in module_by_key().values() if m["endpoint"].split(".")[0] == bp), None)
 
 
 def register_blueprints(app):

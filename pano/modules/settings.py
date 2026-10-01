@@ -99,6 +99,23 @@ def theme():
     return redirect_back("settings.index")
 
 
+@bp.route("/kisayollar", methods=["POST"])
+@login_required
+def nav_pins():
+    from . import MAX_PINS, module_by_key
+    if request.form.get("reset"):
+        value = None
+        flash("Menü kısayolları varsayılana döndü.", "success")
+    else:
+        known = module_by_key()
+        keep = set(request.form.getlist("show"))
+        order = [k for k in dict.fromkeys(request.form.getlist("order")) if k in known and k in keep][:MAX_PINS]
+        value = ",".join(order)
+        flash("Menü kısayolları kaydedildi.", "success")
+    execute("UPDATE users SET nav_pins = ? WHERE id = ?", (value, g.user["id"]))
+    return redirect(url_for(".index") + "#kisayollar")
+
+
 @bp.route("/pano", methods=["POST"])
 @login_required
 def dashboard_layout():

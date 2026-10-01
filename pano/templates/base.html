@@ -10,19 +10,47 @@
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Pano">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=5">
   {% block head %}{% endblock %}
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="{{ url_for('dashboard.index') }}"><span class="brand-mark">▦</span> Pano</a>
     {% if g.user %}
-      <nav class="topnav">
-        {% for _m, endpoint, title, icon, _g in MODULES %}
-          <a href="{{ url_for(endpoint) }}" class="{{ 'active' if request.endpoint and request.endpoint.split('.')[0] == endpoint.split('.')[0] }}" title="{{ title }}">{{ icon }}<span>{{ title }}</span></a>
+      {% set cur_key = nav_current.key if nav_current else '' %}
+      <nav class="topnav" aria-label="Kısayollar">
+        {% for m in nav_pins %}
+          <a href="{{ url_for(m.endpoint) }}" class="{{ 'active' if m.key == cur_key }}" title="{{ m.title }}">{{ m.icon }}<span>{{ m.title }}</span></a>
         {% endfor %}
+        <details class="navmenu dropdown">
+          <summary class="{{ 'active' if nav_current and cur_key not in nav_pin_keys }}">
+            ☰ {% if nav_current and cur_key not in nav_pin_keys %}{{ nav_current.icon }} {{ nav_current.title }}{% else %}Modüller{% endif %} <span class="caret">▾</span>
+          </summary>
+          <div class="navmenu-panel">
+            <input type="search" class="navmenu-filter" placeholder="Modül ara…" aria-label="Modül ara" autocomplete="off">
+            <div class="navmenu-groups">
+              {% for group, items in nav_groups.items() %}
+                <div class="navmenu-group">
+                  <div class="navmenu-title">{{ nav_group_icons.get(group, '') }} {{ group }}</div>
+                  {% for m in items %}
+                    <div class="navmenu-item {{ 'active' if m.key == cur_key }}" data-name="{{ m.title }}">
+                      <a href="{{ url_for(m.endpoint) }}">{{ m.icon }} {{ m.title }}</a>
+                      <form method="post" action="{{ url_for('dashboard.pin') }}">
+                        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+                        <input type="hidden" name="module" value="{{ m.key }}">
+                        <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+                        <button class="pin {{ 'on' if m.key in nav_pin_keys }}" title="{{ 'Kısayollardan kaldır' if m.key in nav_pin_keys else 'Kısayollara ekle' }}"
+                                aria-label="{{ 'Kısayollardan kaldır' if m.key in nav_pin_keys else 'Kısayollara ekle' }}">{{ '★' if m.key in nav_pin_keys else '☆' }}</button>
+                      </form>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </details>
       </nav>
-      <a class="search-link" href="{{ url_for('search.index') }}" title="Ara" aria-label="Ara">🔍</a>
+      <a class="search-link" href="{{ url_for('search.index') }}" data-quickjump title="Hızlı geçiş ve arama (Ctrl+K)" aria-label="Hızlı geçiş ve arama">🔍<span class="search-text">Git ya da ara…</span><span class="kbd">Ctrl K</span></a>
       <details class="usermenu">
         <summary aria-label="Kullanıcı menüsü">{{ (g.user.display_name or g.user.username)[:1] | upper }}</summary>
         <div class="usermenu-panel">
@@ -57,13 +85,24 @@
   <nav class="bottomnav" aria-label="Hızlı erişim">
     {% set current = request.endpoint.split('.')[0] if request.endpoint else '' %}
     <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if current == 'dashboard' and request.endpoint != 'dashboard.menu' }}"><span>🏠</span>Pano</a>
-    <a href="{{ url_for('lists.index') }}" class="{{ 'active' if current == 'lists' }}"><span>🛒</span>Listeler</a>
-    <a href="{{ url_for('notes.index') }}" class="{{ 'active' if current == 'notes' }}"><span>📝</span>Notlar</a>
-    <a href="{{ url_for('expenses.index') }}" class="{{ 'active' if current == 'expenses' }}"><span>💸</span>Harcama</a>
+    {% for m in nav_pins[:3] %}
+      <a href="{{ url_for(m.endpoint) }}" class="{{ 'active' if nav_current and m.key == nav_current.key }}"><span>{{ m.icon }}</span><em>{{ m.title }}</em></a>
+    {% endfor %}
     <a href="{{ url_for('dashboard.menu') }}" class="{{ 'active' if request.endpoint == 'dashboard.menu' }}"><span>☰</span>Menü</a>
   </nav>
   {% endif %}
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=4" defer></script>
+  {% if g.user %}
+  {# Hızlı geçiş: Ctrl+K ya da / — modül adı yaz, Enter; eşleşme yoksa her yerde ara #}
+  <dialog class="quickjump" id="quickjump" aria-label="Hızlı geçiş">
+    <form method="get" action="{{ url_for('search.index') }}">
+      <input type="search" name="q" placeholder="Modül adı ya da aranacak şey…" autocomplete="off" aria-label="Hızlı geçiş">
+    </form>
+    <ul class="quickjump-list"></ul>
+    <p class="muted small quickjump-hint">↑ ↓ seç · Enter aç · Esc kapat</p>
+    <script type="application/json" id="quickjump-data">{{ nav_quickjump | tojson }}</script>
+  </dialog>
+  {% endif %}
+  <script src="{{ url_for('static', filename='app.js') }}?v=5" defer></script>
 </body>
 </html>

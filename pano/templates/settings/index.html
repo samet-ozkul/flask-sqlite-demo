@@ -30,6 +30,33 @@
   <p class="muted small">Otomatik: telefonun ya da bilgisayarın açık/koyu ayarına uyar. Kullanıcı menüsünden de değiştirilebilir.</p>
 </section>
 
+<section class="card" id="kisayollar">
+  <h2>📌 Menü kısayolları</h2>
+  <form method="post" action="{{ url_for('settings.nav_pins') }}">
+    {{ ui.csrf() }}
+    {% if nav_pins %}
+      <ul class="rows layout-list">
+        {% for m in nav_pins %}
+          <li>
+            <input type="hidden" name="order" value="{{ m.key }}">
+            <label class="check"><input type="checkbox" name="show" value="{{ m.key }}" checked> {{ m.icon }} {{ m.title }}</label>
+            <button class="btn sm" data-move="up" title="Yukarı" aria-label="Yukarı">↑</button>
+            <button class="btn sm" data-move="down" title="Aşağı" aria-label="Aşağı">↓</button>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted small">Hiç kısayol yok.</p>
+    {% endif %}
+    <div class="row-flex" style="margin-top: 10px">
+      <button class="btn primary">Kaydet</button>
+      <button class="btn sm" name="reset" value="1">Varsayılana dön</button>
+      <a class="btn sm" href="{{ url_for('dashboard.menu') }}">☆ Kısayol ekle</a>
+    </div>
+  </form>
+  <p class="muted small">Üst çubukta görünürler; telefonda alt çubukta ilk {{ 3 }} tanesi. Eklemek için ☰ Modüller menüsünde ya da Menü sayfasında modülün yanındaki ☆'a dokun (en fazla {{ nav_max_pins }}).</p>
+</section>
+
 <section class="card" id="pano-duzeni">
   <h2>🧩 Pano düzeni</h2>
   <form method="post" action="{{ url_for('settings.dashboard_layout') }}">
