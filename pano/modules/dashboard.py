@@ -1,12 +1,12 @@
 """🏠 Pano: günün özeti ve tüm modüllere giriş."""
-from flask import Blueprint, g, render_template
+from flask import Blueprint, flash, g, render_template, request, url_for
 
 from .. import external
 from ..auth import login_required
-from ..db import query, query_one
+from ..db import execute, query, query_one
 from ..reminders import medications_today, upcoming
 from ..storage import usage
-from ..utils import MONTHS_TR, WEEKDAYS_TR, month_bounds, now_local, today, today_str
+from ..utils import MONTHS_TR, WEEKDAYS_TR, month_bounds, now_local, redirect_back, today, today_str
 
 bp = Blueprint("dashboard", __name__)
 
@@ -136,3 +136,41 @@ def index():
 @login_required
 def menu():
     return render_template("dashboard/menu.html")
+
+
+# ---------- Üst menü ----------
+@bp.app_context_processor
+def _nav_context():
+    """Her sayfada menü verisi: kısayollar, gruplar, bulunulan modül, hızlı geçiş listesi."""
+    from . import GROUP_ICONS, MAX_PINS, current_module, module_groups, user_pins
+    if not getattr(g, "user", None):
+        return {}
+    pins = user_pins(g.user)
+    groups = module_groups()
+    quick = [{"t": m["title"], "i": m["icon"], "u": url_for(m["endpoint"]), "g": group}
+             for group, mods in groups.items() for m in mods]
+    quick += [{"t": title, "i": icon, "u": url_for(endpoint), "g": "Hesap"} for title, icon, endpoint in (
+        ("Pano", "🏠", "dashboard.index"), ("Ayarlar", "⚙️", "settings.index"), ("Çöp kutusu", "🗑️", "trashbin.index"))]
+    return {
+        "nav_pins": pins, "nav_pin_keys": {p["key"] for p in pins}, "nav_groups": groups, "nav_group_icons": GROUP_ICONS,
+        "nav_current": current_module(request.endpoint), "nav_max_pins": MAX_PINS, "nav_quickjump": quick,
+    }
+
+
+@bp.route("/menu/sabitle", methods=["POST"])
+@login_required
+def pin():
+    """☆ ile kısayol ekle/kaldır (en fazla MAX_PINS; yeni eklenen sona)."""
+    from . import MAX_PINS, module_by_key, user_pins
+    key = request.form.get("module", "")
+    if key in module_by_key():
+        keys = [p["key"] for p in user_pins(g.user)]
+        if key in keys:
+            keys.remove(key)
+        elif len(keys) >= MAX_PINS:
+            flash(f"En fazla {MAX_PINS} kısayol olabilir; önce birini kaldır.", "warning")
+            return redirect_back("dashboard.menu")
+        else:
+            keys.append(key)
+        execute("UPDATE users SET nav_pins = ? WHERE id = ?", (",".join(keys), g.user["id"]))
+    return redirect_back("dashboard.menu")

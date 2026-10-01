@@ -13,6 +13,8 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 | 🧘 Kişisel | **Alışkanlıklar** (seri, takvim) · **Günlük** (her gün bir satır ve ruh hali emojisi, ay takvimi, “1 yıl önce bugün”, akşam Telegram'dan “Bugün nasıldı?”) · **Sağlık** (kilo, tansiyon, şeker, nabız, ilaçlar, randevular) · **Tarifler** (malzemeleri alışveriş listesine ekle) · **Önemli Günler** (doğum günü, yıldönümü; yaş/yıl hesabı) · **İzleme / Okuma** (film, dizi, kitap listesi; kapaklı arama, puan) |
 | ⚙️ Altyapı | Kullanıcı yönetimi, tek tıkla yedek al/geri yükle, disk kullanımı, Telegram günlük özeti, telefona uygulama olarak yükleme (PWA) · **Çöp kutusu** (silinen kayıt 30 gün saklanır, tek tıkla geri gelir) · **Tema** (otomatik / açık / koyu) · **Pano düzeni** (kartları seç ve sırala) |
 
+**Menü:** Bilgisayarda üst çubukta en çok kullandığın modüller (☆ ile seçilir, Ayarlar → 📌 Menü kısayolları'ndan sıralanır) ve **☰ Modüller** açılır menüsü (gruplu, aramalı) durur; telefonda alt çubukta ilk 3 kısayol. **Ctrl+K** ya da **/** ile hızlı geçiş: modül adını yaz, Enter (eşleşme yoksa her yerde arar).
+
 ## 512 MB disk nasıl korunuyor?
 
 - Fotoğraflar en fazla 1600 px'e küçültülüp JPEG olarak kaydedilir (tipik fatura fotoğrafı 3-5 MB → ~250 KB), konum (EXIF/GPS) bilgisi silinir. Listelerde ~30 KB'lık küçük önizleme gösterilir.

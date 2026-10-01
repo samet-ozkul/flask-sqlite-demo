@@ -3,15 +3,24 @@
 {% block content %}
 <h1>Menü</h1>
 <form method="get" action="{{ url_for('search.index') }}" class="search" style="margin-top: 12px">
-  <input type="search" name="q" placeholder="Her yerde ara…">
+  <input type="search" name="q" placeholder="Modül ya da her yerde ara…" class="menu-filter" autocomplete="off">
   <button class="btn">🔍</button>
 </form>
-{% for group, items in module_groups().items() %}
+<p class="muted small">☆ ile alt çubuğa kısayol ekle (ilk 3 tanesi alt çubukta, hepsi bilgisayarda üst çubukta görünür).</p>
+{% for group, items in nav_groups.items() %}
   <section class="menu-group">
-    <h2>{{ group }}</h2>
+    <h2>{{ nav_group_icons.get(group, '') }} {{ group }}</h2>
     <div class="tiles">
       {% for m in items %}
-        <a class="tile" href="{{ url_for(m.endpoint) }}"><span>{{ m.icon }}</span>{{ m.title }}</a>
+        <div class="tile-wrap" data-name="{{ m.title }}">
+          <a class="tile" href="{{ url_for(m.endpoint) }}"><span>{{ m.icon }}</span>{{ m.title }}</a>
+          <form method="post" action="{{ url_for('dashboard.pin') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <input type="hidden" name="module" value="{{ m.key }}">
+            <input type="hidden" name="next" value="{{ url_for('dashboard.menu') }}">
+            <button class="pin {{ 'on' if m.key in nav_pin_keys }}" aria-label="{{ 'Kısayollardan kaldır' if m.key in nav_pin_keys else 'Kısayollara ekle' }}">{{ '★' if m.key in nav_pin_keys else '☆' }}</button>
+          </form>
+        </div>
       {% endfor %}
     </div>
   </section>

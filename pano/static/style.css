@@ -95,15 +95,60 @@ p { margin: .4rem 0; }
 .brand { font-weight: 700; font-size: 1.1rem; color: var(--text); display: flex; align-items: center; gap: 6px; }
 .brand:hover { text-decoration: none; }
 .brand-mark { color: var(--primary); font-size: 1.3rem; }
-.topnav { display: none; flex: 1; gap: 2px; overflow-x: auto; scrollbar-width: none; }
-.topnav a {
-  display: flex; align-items: center; gap: 5px; white-space: nowrap;
-  padding: 6px 9px; border-radius: 8px; color: var(--muted); font-size: .88rem;
+/* Kısayollar + "☰ Modüller" açılır menüsü (bilgisayarda); telefonda alt çubuk ve Menü sayfası */
+.topnav { display: none; flex: 1; gap: 2px; align-items: center; min-width: 0; }
+.topnav > a, .navmenu > summary {
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 7px 11px; border-radius: 9px; color: var(--muted); font-size: .9rem; cursor: pointer;
 }
-.topnav a span { display: none; }
-.topnav a:hover, .topnav a.active { background: var(--surface-2); color: var(--text); text-decoration: none; }
-.search-link { margin-left: auto; font-size: 1.1rem; padding: 4px 6px; border-radius: 8px; }
+.topnav > a span { display: none; }
+.topnav > a:hover, .navmenu > summary:hover, .navmenu[open] > summary { background: var(--surface-2); color: var(--text); text-decoration: none; }
+.topnav > a.active, .navmenu > summary.active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+.navmenu { position: static; }  /* panel üst çubuğa göre konumlanır (taşmasın) */
+.navmenu > summary { list-style: none; }
+.navmenu > summary::-webkit-details-marker { display: none; }
+.caret { font-size: .7rem; opacity: .7; }
+.navmenu-panel {
+  position: absolute; left: 50%; transform: translateX(-50%); top: calc(100% + 6px); z-index: 30;
+  width: min(820px, calc(100vw - 32px)); max-height: min(75vh, 660px); overflow: auto; padding: 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .18);
+}
+.navmenu-filter { width: 100%; margin-bottom: 10px; }
+.navmenu-groups { columns: 3 210px; column-gap: 18px; }
+.navmenu-group { break-inside: avoid; margin-bottom: 12px; }
+.navmenu-title { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 4px 8px; }
+.navmenu-item { display: flex; align-items: center; border-radius: 8px; }
+.navmenu-item:hover { background: var(--surface-2); }
+.navmenu-item a { flex: 1; min-width: 0; padding: 6px 8px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.navmenu-item a:hover { text-decoration: none; }
+.navmenu-item.active a { color: var(--primary); font-weight: 600; }
+.navmenu-item form { margin: 0; }
+.pin { background: none; border: 0; cursor: pointer; color: var(--muted); font-size: 1rem; line-height: 1; padding: 5px 8px; border-radius: 6px; }
+.pin:hover, .pin.on { color: var(--warn); }
+.search-link {
+  margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 9px;
+  background: none; border: 1px solid transparent; color: var(--muted); font: inherit; font-size: 1.05rem; cursor: pointer;
+}
 .search-link:hover { background: var(--surface-2); text-decoration: none; }
+.search-link .search-text, .search-link .kbd { display: none; }
+.kbd { font-size: .7rem; border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; color: var(--muted); }
+
+/* Hızlı geçiş (Ctrl+K) */
+.quickjump {
+  width: min(560px, calc(100vw - 32px)); margin: 12vh auto auto; padding: 0;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .3);
+}
+.quickjump::backdrop { background: rgba(10, 12, 20, .45); }
+.quickjump form { margin: 0; padding: 12px; border-bottom: 1px solid var(--border); }
+.quickjump input { width: 100%; font-size: 1.05rem; }
+.quickjump-list { list-style: none; margin: 0; padding: 6px; max-height: 52vh; overflow: auto; }
+.quickjump-list a { display: flex; gap: 10px; align-items: center; padding: 9px 10px; border-radius: 8px; color: var(--text); }
+.quickjump-list a:hover { text-decoration: none; }
+.quickjump-list .g { margin-left: auto; font-size: .75rem; color: var(--muted); }
+.quickjump-list li.sel a, .quickjump-list a:hover { background: var(--primary-soft); }
+.quickjump-hint { margin: 0; padding: 4px 14px 10px; }
 .usermenu { position: relative; }
 .usermenu summary {
   list-style: none; cursor: pointer; width: 34px; height: 34px; border-radius: 50%;
@@ -133,6 +178,7 @@ p { margin: .4rem 0; }
   font-size: .72rem; color: var(--muted); gap: 1px;
 }
 .bottomnav a span { font-size: 1.25rem; line-height: 1; }
+.bottomnav a em { font-style: normal; max-width: 100%; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bottomnav a.active { color: var(--primary); font-weight: 600; }
 .bottomnav a:hover { text-decoration: none; }
 
@@ -140,8 +186,11 @@ p { margin: .4rem 0; }
   body { padding-bottom: 0; }
   .bottomnav { display: none; }
   .topnav { display: flex; }
+  .search-link { border-color: var(--border); min-width: 170px; justify-content: flex-start; font-size: .9rem; }
+  .search-link .search-text, .search-link .kbd { display: inline; }
+  .search-link .kbd { margin-left: auto; }
 }
-@media (min-width: 1280px) { .topnav a span { display: inline; } }
+@media (min-width: 1100px) { .topnav > a span { display: inline; } }
 
 /* ---------- Yerleşim ---------- */
 .container { max-width: 980px; margin: 0 auto; padding: 16px; }
@@ -311,6 +360,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .tile span { font-size: 1.7rem; }
 .tile:hover { border-color: var(--primary); text-decoration: none; }
+.tile-wrap { position: relative; }
+.tile-wrap .tile { height: 100%; }
+.tile-wrap form { position: absolute; top: 2px; right: 2px; margin: 0; }
 .menu-group h2 { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 8px; }
 
 /* ---------- Pano ---------- */
