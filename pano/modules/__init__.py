@@ -32,6 +32,7 @@ MODULES = [
     ("specialdays", "specialdays.index", "Önemli Günler", "🎂", "Kişisel"),
     ("contacts", "contacts.index", "Kişiler", "📇", "Kişisel"),
     ("timetrack", "timetrack.index", "Zaman Takibi", "⏱️", "Araçlar"),
+    ("calculators", "calculators.index", "Hesaplayıcılar", "🧮", "Araçlar"),
 ]
 
 # Menüde gösterilmeyen altyapı modülleri

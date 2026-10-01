@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Hesaplayıcılar{% endblock %}
+{% block head %}
+<style>
+  .calc-jump { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  #calc > section { scroll-margin-top: 70px; }
+  .calc-out { margin: 4px 0 0; }
+  .calc-out .stat { min-width: 0; padding: 10px 12px; }
+  .calc-out .stat .value { font-size: 1.15rem; overflow-wrap: anywhere; }
+  .calc-out .stat.main { border-color: var(--primary); background: var(--primary-soft); }
+  .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; }
+  .chips label { position: relative; }
+  .chips input { position: absolute; opacity: 0; pointer-events: none; }
+  .chips label span {
+    display: inline-flex; align-items: center; min-height: 38px; padding: 6px 12px;
+    border-radius: 99px; border: 1px solid var(--border); background: var(--surface);
+    cursor: pointer; font-size: .92rem; user-select: none;
+  }
+  .chips input:checked + span { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+  .chips input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .calc-sub { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 14px; }
+  .calc-line { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .calc-line .res { grid-column: 1 / -1; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  @media (min-width: 560px) {
+    .calc-line { grid-template-columns: 1fr 1fr 1.3fr; }
+    .calc-line .res { grid-column: auto; }
+  }
+  .calc-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: end; }
+  .calc-pair .btn { margin-bottom: 12px; min-height: 44px; }
+  .calc-all { list-style: none; padding: 0; margin: 10px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; }
+  .calc-all li { background: var(--surface-2); border-radius: var(--radius-sm); padding: 6px 10px; font-size: .88rem;
+                 font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .calc-plan { margin-top: 12px; }
+  .calc-plan > summary { cursor: pointer; }
+  .calc-plan .table-wrap { max-height: 420px; overflow: auto; margin-top: 8px; }
+  .calc-plan table { font-size: .82rem; }
+  .calc-plan th, .calc-plan td { padding: 6px 5px; white-space: nowrap; }
+  .calc-plan thead th { position: sticky; top: 0; background: var(--surface); }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("🧮 Hesaplayıcılar", "Kredi, mevduat, KDV, yüzde, tarih, birim, döviz… yazdıkça hesaplanır") }}
+
+{% set dec = 'inputmode="decimal" autocomplete="off"' %}
+{% set whole = 'inputmode="numeric" autocomplete="off"' %}
+
+<nav class="calc-jump" aria-label="Hesaplayıcılar">
+  {% for anchor, icon, title in sections %}<a class="btn sm" href="#{{ anchor }}">{{ icon }} {{ title }}</a>{% endfor %}
+</nav>
+
+<noscript><div class="flash error">Hesaplayıcılar tarayıcında çalışır; JavaScript açık olmalı.</div></noscript>
+
+<div id="calc">
+  <script type="application/json" id="calc-rates">{{ rates | tojson }}</script>
+
+  {# ---------- Kredi ---------- #}
+  <section class="card" id="kredi">
+    <h2>🏦 Kredi</h2>
+    <form data-calc="kredi" autocomplete="off">
+      <div class="form-row three">
+        {{ ui.money_field("Kredi tutarı (₺)", "amount", placeholder="100.000") }}
+        {{ ui.field("Aylık faiz (%)", "rate", placeholder="3,09", attrs=dec) }}
+        {{ ui.field("Vade (ay)", "months", placeholder="12", attrs=whole) }}
+      </div>
+      <label class="check"><input type="checkbox" name="tax" value="1">
+        <span>Vergi ekle <span class="muted small">(KKDF %15 + BSMV %15 faize eklenir; ihtiyaç/taşıt kredisi — konut kredisinde yok)</span></span></label>
+      <div class="stats calc-out">
+        <div class="stat main"><div class="label">Aylık taksit</div><div class="value" data-out="payment">—</div><div class="sub" data-out="eff"></div></div>
+        <div class="stat"><div class="label">Toplam ödeme</div><div class="value" data-out="total">—</div></div>
+        <div class="stat"><div class="label">Toplam faiz</div><div class="value" data-out="interest">—</div><div class="sub" data-out="cost"></div></div>
+        <div class="stat tax-only hidden"><div class="label">Vergi (KKDF + BSMV)</div><div class="value" data-out="tax">—</div></div>
+      </div>
+      <details class="calc-plan">
+        <summary><b>Ödeme planı</b> <span class="muted small">(ay ay taksit, faiz, anapara, kalan)</span></summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="num">Ay</th><th class="num">Taksit</th><th class="num">Faiz</th><th class="num tax-only hidden">Vergi</th>
+              <th class="num">Anapara</th><th class="num">Kalan</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </details>
+    </form>
+  </section>
+
+  {# ---------- Mevduat ---------- #}
+  <section class="card" id="mevduat">
+    <h2>🐷 Mevduat</h2>
+    <form data-calc="mevduat" autocomplete="off">
+      <div class="form-row">
+        {{ ui.money_field("Tutar (₺)", "amount", placeholder="100.000") }}
+        {{ ui.field("Yıllık faiz (%)", "rate", placeholder="40", attrs=dec) }}
+        {{ ui.field("Vade (gün)", "days", placeholder="32", attrs=whole) }}
+        {{ ui.field("Stopaj (%)", "withholding", "15", attrs=dec, hint="Güncel stopaj oranını bankandan kontrol et.") }}
+      </div>
+      <div class="stats calc-out">
+        <div class="stat"><div class="label">Brüt getiri</div><div class="value" data-out="gross">—</div></div>
+        <div class="stat"><div class="label">Stopaj</div><div class="value" data-out="tax">—</div></div>
+        <div class="stat main"><div class="label">Net getiri</div><div class="value" data-out="net">—</div></div>
+        <div class="stat"><div class="label">Vade sonu bakiye</div><div class="value" data-out="final">—</div></div>
+      </div>
+      <p class="muted small">Brüt getiri = tutar × yıllık faiz × gün / 365.</p>
+    </form>
+  </section>
+
+  {# ---------- KDV ---------- #}
+  <section class="card" id="kdv">
+    <h2>🧾 KDV</h2>
+    <form data-calc="kdv" autocomplete="off">
+      {{ ui.money_field("Tutar (₺)", "amount", placeholder="1.000") }}
+      <div class="chips" role="radiogroup" aria-label="KDV oranı">
+        <span class="muted small">Oran:</span>
+        {% for r in (1, 10, 20) %}<label><input type="radio" name="rate" value="{{ r }}" {{ 'checked' if r == 20 }}><span>%{{ r }}</span></label>{% endfor %}
+        <label><input type="radio" name="rate" value="custom"><span>Özel</span></label>
+      </div>
+      <div data-show-for="rate=custom">{{ ui.field("Özel oran (%)", "custom", placeholder="8", attrs=dec) }}</div>
+      <div class="chips" role="radiogroup" aria-label="Girilen tutar">
+        <label><input type="radio" name="mode" value="inc" checked><span>KDV dahil fiyattan</span></label>
+        <label><input type="radio" name="mode" value="exc"><span>KDV hariç fiyattan</span></label>
+      </div>
+      <div class="stats calc-out">
+        <div class="stat"><div class="label">KDV'siz</div><div class="value" data-out="net">—</div></div>
+        <div class="stat main"><div class="label">KDV</div><div class="value" data-out="vat">—</div></div>
+        <div class="stat"><div class="label">KDV'li</div><div class="value" data-out="gross">—</div></div>
+      </div>
+    </form>
+  </section>
+
+  {# ---------- Yüzde ---------- #}
+  <section class="card" id="yuzde">
+    <h2>💯 Yüzde</h2>
+    <form data-calc="yuzde" autocomplete="off">
+      <h3>X'in %Y'si kaç?</h3>
+      <div class="calc-line">
+        <input name="x1" {{ dec | safe }} placeholder="X (ör. 250)" aria-label="X">
+        <input name="y1" {{ dec | safe }} placeholder="Y % (ör. 18)" aria-label="Y (yüzde)">
+        <div class="res">= <span data-out="of">—</span></div>
+      </div>
+      <h3>X, Y'nin yüzde kaçı?</h3>
+      <div class="calc-line">
+        <input name="x2" {{ dec | safe }} placeholder="X (ör. 45)" aria-label="X">
+        <input name="y2" {{ dec | safe }} placeholder="Y (ör. 180)" aria-label="Y">
+        <div class="res">= <span data-out="what">—</span></div>
+      </div>
+      <h3>X'ten Y'ye değişim yüzdesi</h3>
+      <div class="calc-line">
+        <input name="x3" {{ dec | safe }} placeholder="X: eski (ör. 80)" aria-label="X (eski değer)">
+        <input name="y3" {{ dec | safe }} placeholder="Y: yeni (ör. 100)" aria-label="Y (yeni değer)">
+        <div class="res">= <span data-out="change">—</span></div>
+      </div>
+      <h3>X'e %Y ekle / çıkar</h3>
+      <div class="calc-line">
+        <input name="x4" {{ dec | safe }} placeholder="X (ör. 1.500)" aria-label="X">
+        <input name="y4" {{ dec | safe }} placeholder="Y % (ör. 25)" aria-label="Y (yüzde)">
+        <div class="res">+ <span data-out="plus">—</span> · − <span data-out="minus">—</span></div>
+      </div>
+    </form>
+  </section>
+
+  {# ---------- Tarih ---------- #}
+  <section class="card" id="tarih">
+    <h2>📅 Tarih</h2>
+    <form data-calc="tarih" autocomplete="off">
+      <h3>İki tarih arası</h3>
+      <div class="form-row">
+        {{ ui.field("Başlangıç", "d1", type="date") }}
+        {{ ui.field("Bitiş", "d2", type="date") }}
+      </div>
+      <label class="check"><input type="checkbox" name="inclusive" value="1">
+        <span>Başlangıç gününü de say <span class="muted small">(kapalıyken başlangıç günü sayılmaz, bitiş günü sayılır)</span></span></label>
+      <div class="stats calc-out">
+        <div class="stat main"><div class="label">Gün</div><div class="value" data-out="days">—</div><div class="sub" data-out="approx"></div></div>
+        <div class="stat"><div class="label">İş günü</div><div class="value" data-out="workdays">—</div>
+          <div class="sub">Cumartesi-pazar hariç; resmi tatiller düşülmez</div></div>
+      </div>
+
+      <div class="calc-sub">
+        <h3>Tarihe gün ekle / çıkar</h3>
+        <div class="form-row three">
+          {{ ui.field("Tarih", "base", type="date") }}
+          {{ ui.select("İşlem", "op", [("add", "Ekle (+)"), ("sub", "Çıkar (−)")]) }}
+          {{ ui.field("Gün", "n", placeholder="30", attrs='inputmode="numeric" autocomplete="off"') }}
+        </div>
+        <div class="stats calc-out">
+          <div class="stat main"><div class="label">Sonuç</div><div class="value" data-out="added">—</div></div>
+        </div>
+      </div>
+
+      <div class="calc-sub">
+        <h3>Yaş</h3>
+        {{ ui.field("Doğum tarihi", "birth", type="date") }}
+        <div class="stats calc-out">
+          <div class="stat main"><div class="label">Yaş</div><div class="value" data-out="age">—</div><div class="sub" data-out="next"></div></div>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  {# ---------- Birim çevirici ---------- #}
+  <section class="card" id="birim">
+    <h2>📏 Birim çevirici</h2>
+    <form data-calc="birim" autocomplete="off">
+      <div class="form-row">
+        <label class="field"><span>Tür</span><select name="cat"></select></label>
+        {{ ui.field("Değer", "value", "1", attrs=dec) }}
+      </div>
+      <div class="calc-pair">
+        <label class="field"><span>Bu birimden</span><select name="from"></select></label>
+        <button class="btn" type="button" data-swap title="Yer değiştir" aria-label="Birimlerin yerini değiştir">⇄</button>
+        <label class="field"><span>Bu birime</span><select name="to"></select></label>
+      </div>
+      <div class="stats calc-out">
+        <div class="stat main"><div class="label">Sonuç</div><div class="value" data-out="result">—</div></div>
+      </div>
+      <ul class="calc-all" data-list aria-label="Diğer birimler"></ul>
+      <p class="muted small">Dönüm = 1.000 m² · mil = kara mili (1.609,344 m) · galon = ABD galonu (3,785 L) · ons = 28,35 g.</p>
+    </form>
+  </section>
+
+  {# ---------- Döviz / altın ---------- #}
+  <section class="card" id="doviz">
+    <h2>💱 Döviz / altın</h2>
+    {% if rates %}
+      <form data-calc="doviz" autocomplete="off">
+        {{ ui.money_field("Tutar", "amount", 100) }}
+        <div class="calc-pair">
+          <label class="field"><span>Bu birimden</span>
+            <select name="from">{% for c, n in currencies %}<option value="{{ c }}" {{ 'selected' if c == currencies[1][0] }}>{{ n }}</option>{% endfor %}</select></label>
+          <button class="btn" type="button" data-swap title="Yer değiştir" aria-label="Para birimlerinin yerini değiştir">⇄</button>
+          <label class="field"><span>Bu birime</span>
+            <select name="to">{% for c, n in currencies %}<option value="{{ c }}" {{ 'selected' if c == 'TRY' }}>{{ n }}</option>{% endfor %}</select></label>
+        </div>
+        <div class="stats calc-out">
+          <div class="stat main"><div class="label">Sonuç</div><div class="value" data-out="result">—</div></div>
+        </div>
+        <ul class="calc-all" data-list aria-label="Diğer para birimleri"></ul>
+        <p class="muted small">
+          {% for c, _n in currencies if c != 'TRY' %}1 {{ symbols[c] }} = {{ values[c] | num }} ₺{{ " · " if not loop.last }}{% endfor %}<br>
+          {% if rate_date %}Döviz: Avrupa Merkez Bankası referans kuru, {{ rate_date | date_tr }}.{% endif %}
+          {% if 'XAU' in values %}Gram altın 8 saatte bir güncellenir.{% endif %}
+          Bankaların alış-satış kurları farklıdır.
+        </p>
+      </form>
+    {% else %}
+      <p class="muted">Kur alınamadı; biraz sonra tekrar dene.</p>
+    {% endif %}
+  </section>
+
+  {# ---------- Hesap bölüşme / bahşiş ---------- #}
+  <section class="card" id="bolus">
+    <h2>🍽️ Hesap bölüşme / bahşiş</h2>
+    <form data-calc="bolus" autocomplete="off">
+      <div class="form-row">
+        {{ ui.money_field("Hesap (₺)", "amount", placeholder="1.250") }}
+        {{ ui.field("Kişi sayısı", "people", "2", attrs=whole) }}
+      </div>
+      <div class="chips" role="radiogroup" aria-label="Bahşiş">
+        <span class="muted small">Bahşiş:</span>
+        {% for t in (0, 5, 10, 15) %}<label><input type="radio" name="tip" value="{{ t }}" {{ 'checked' if t == 10 }}><span>%{{ t }}</span></label>{% endfor %}
+      </div>
+      <div class="stats calc-out">
+        <div class="stat main"><div class="label">Kişi başı</div><div class="value" data-out="per">—</div></div>
+        <div class="stat"><div class="label">Toplam bahşiş</div><div class="value" data-out="tip">—</div></div>
+        <div class="stat"><div class="label">Bahşişli toplam</div><div class="value" data-out="total">—</div></div>
+      </div>
+    </form>
+  </section>
+
+  {# ---------- Yakıt maliyeti ---------- #}
+  <section class="card" id="yakit">
+    <h2>⛽ Yakıt maliyeti</h2>
+    <form data-calc="yakit" autocomplete="off">
+      <div class="form-row">
+        {{ ui.field("Mesafe (km)", "distance", placeholder="450", attrs=dec) }}
+        {{ ui.field("Tüketim (L/100 km)", "per100", placeholder="6,5", attrs=dec) }}
+        {{ ui.money_field("Litre fiyatı (₺)", "price", placeholder="45,50") }}
+        {{ ui.field("Kişi sayısı", "people", "1", attrs=whole) }}
+      </div>
+      <label class="check"><input type="checkbox" name="round" value="1"> Gidiş-dönüş (mesafe × 2)</label>
+      <div class="stats calc-out">
+        <div class="stat"><div class="label">Yakıt</div><div class="value" data-out="liters">—</div><div class="sub" data-out="km"></div></div>
+        <div class="stat main"><div class="label">Toplam maliyet</div><div class="value" data-out="cost">—</div></div>
+        <div class="stat"><div class="label">Kişi başı</div><div class="value" data-out="per">—</div></div>
+      </div>
+    </form>
+  </section>
+</div>
+
+<p class="muted small center">Hesaplar tarayıcında yapılır, sunucuya gönderilmez; girdiğin değerler sadece bu cihazda hatırlanır.
+  Sonuçlar bilgi amaçlıdır.</p>
+<script src="{{ url_for('static', filename='calculators.js') }}?v=1" defer></script>
+{% endblock %}
