@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ p.name }} · Zaman Takibi{% endblock %}
+{% block content %}
+{% call ui.page_header(color_icon(p.color) ~ " " ~ p.name, back=url_for('timetrack.projects')) %}
+  {{ ui.post_button(url_for('timetrack.archive_project', project_id=p.id), "Arşivden çıkar" if p.archived else "Arşivle") }}
+  {{ ui.delete_button(url_for('timetrack.delete_project', project_id=p.id), "Sil", "Proje ve bütün kayıtları silinsin mi? (Çöp kutusundan geri getirilebilir.)") }}
+{% endcall %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    <div class="form-row three">
+      {{ ui.field("Ad", "name", p.name, required=True, attrs='maxlength="60" autocomplete="off"') }}
+      <label class="field"><span>Renk</span>
+        <select name="color">
+          <option value="">{{ color_icon('') }} Renksiz</option>
+          {% for k, (label, icon) in colors.items() %}<option value="{{ k }}" {% if k == p.color %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      {{ ui.money_field("Saatlik ücret (₺)", "hourly_rate", p.hourly_rate, placeholder="Boşsa kazanç yok") }}
+    </div>
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+{% if p.archived %}<p class="muted small">Bu proje arşivde: sayaçta seçilmez, raporlarda kayıtları görünmeye devam eder.</p>{% endif %}
+{% endblock %}

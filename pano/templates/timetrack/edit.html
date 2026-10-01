@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Kaydı düzenle{% endblock %}
+{% block content %}
+{% call ui.page_header(e.icon ~ " Kaydı düzenle", back=back) %}
+  <form method="post" action="{{ url_for('timetrack.delete', entry_id=e.id) }}" class="inline" data-confirm="Bu kayıt silinsin mi?">
+    {{ ui.csrf() }}<input type="hidden" name="next" value="{{ back }}">
+    <button class="btn danger sm">Sil</button>
+  </form>
+{% endcall %}
+
+<div class="card">
+  <form method="post">
+    {{ ui.csrf() }}
+    <input type="hidden" name="next" value="{{ back }}">
+    <div class="form-row">
+      {{ ui.field("Tarih", "date", e.start.date().isoformat(), type="date", required=True) }}
+      <label class="field"><span>Proje</span>
+        <select name="project_id">
+          <option value="">{{ no_project_icon }} {{ no_project }}</option>
+          {% for p in projects %}<option value="{{ p.id }}" {% if p.id == e.project_id %}selected{% endif %}>{{ color_icon(p.color) }} {{ p.name }}{% if p.archived %} (arşivde){% endif %}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    {% if e.running %}
+      {{ ui.field("Başlangıç", "start", e.start.strftime('%H:%M'), type="time", required=True) }}
+      <p class="muted small">Sayaç çalışıyor; bitiş durdurunca yazılır.</p>
+    {% else %}
+      <div class="form-row three">
+        {{ ui.field("Başlangıç", "start", e.start.strftime('%H:%M'), type="time") }}
+        {{ ui.field("Bitiş", "end", e.end.strftime('%H:%M'), type="time", hint="Başlangıçtan erkense ertesi gün sayılır") }}
+        {{ ui.field("ya da süre", "duration", placeholder="1:30 · 90 dk · 2 saat", attrs='maxlength="30" autocomplete="off"', hint="Bitişi boşaltırsan kullanılır") }}
+      </div>
+    {% endif %}
+    {{ ui.field("Not", "note", e.note, attrs='maxlength="200" autocomplete="off"') }}
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+
+<p class="muted small">{{ duration(e.seconds) }}{% if e.running %} (çalışıyor){% endif %}{% if e.earning is not none %} · {{ e.earning | money }}{% endif %}
+  · {{ e.start.strftime('%d.%m.%Y %H:%M') }}{% if e.end %} – {{ e.end.strftime('%d.%m.%Y %H:%M' if e.next_day else '%H:%M') }}{% endif %}
+  · Eklenme: {{ e.created_at | localdt }}</p>
+{% endblock %}

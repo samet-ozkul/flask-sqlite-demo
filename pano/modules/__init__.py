@@ -31,6 +31,7 @@ MODULES = [
     ("watchlist", "watchlist.index", "İzleme / Okuma", "🎬", "Kişisel"),
     ("specialdays", "specialdays.index", "Önemli Günler", "🎂", "Kişisel"),
     ("contacts", "contacts.index", "Kişiler", "📇", "Kişisel"),
+    ("timetrack", "timetrack.index", "Zaman Takibi", "⏱️", "Araçlar"),
 ]
 
 # Menüde gösterilmeyen altyapı modülleri

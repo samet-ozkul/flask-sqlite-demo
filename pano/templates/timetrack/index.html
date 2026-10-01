@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Zaman Takibi{% endblock %}
+{% block head %}
+<style>
+  .tt-timer { text-align: center; }
+  .tt-clock { font-size: 2.8rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; margin: 6px 0 4px; }
+  .tt-timer .title { font-weight: 600; overflow-wrap: anywhere; }
+  .tt-timer form .form-row { text-align: left; }
+  .tt-big { min-height: 56px; width: 100%; max-width: 380px; font-size: 1.15rem; }
+  .tt-switch { margin-top: 14px; text-align: left; }
+  .tt-switch > summary { cursor: pointer; color: var(--muted); font-size: .9rem; text-align: center; }
+  .tt-switch[open] > summary { margin-bottom: 10px; }
+  .tt-running { color: var(--ok); font-weight: 600; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("⏱️ Zaman Takibi", "Ne kadar çalıştın? Başlat, durdur; proje bazında rapor ve kazanç") %}
+  <a class="btn sm" href="{{ url_for('timetrack.report') }}">📊 Rapor</a>
+  <a class="btn sm" href="{{ url_for('timetrack.projects') }}">📁 Projeler</a>
+{% endcall %}
+
+{% macro project_select(selected=None) -%}
+  <label class="field"><span>Proje</span>
+    <select name="project_id">
+      <option value="">{{ no_project_icon }} {{ no_project }}</option>
+      {% for p in projects %}<option value="{{ p.id }}" {% if p.id == selected %}selected{% endif %}>{{ color_icon(p.color) }} {{ p.name }}</option>{% endfor %}
+    </select>
+  </label>
+{%- endmacro %}
+
+{% macro start_form(label) -%}
+  <form method="post" action="{{ url_for('timetrack.start') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="form-row">
+      {{ project_select(last_project) }}
+      <label class="field"><span>Not</span>
+        <input type="text" name="note" maxlength="200" autocomplete="off" placeholder="Ne üzerinde çalışıyorsun?"></label>
+    </div>
+    <button class="btn primary tt-big">{{ label }}</button>
+  </form>
+{%- endmacro %}
+
+<section class="card tt-timer">
+  {% if current %}
+    <div class="tt-running small">▶️ Çalışıyor · başlangıç {{ current.start.strftime('%H:%M') }}{% if current.start.date() != today %} ({{ current.start.date() | date_tr }}){% endif %}</div>
+    <div class="tt-clock" data-started="{{ current.started_ms }}" data-now="{{ now_ms }}">{{ clock(current.seconds) }}</div>
+    <div class="title">{{ current.icon }} {{ current.label }}{% if current.note %} <span class="muted">· {{ current.note }}</span>{% endif %}</div>
+    <form method="post" action="{{ url_for('timetrack.stop') }}" style="margin-top: 14px">
+      {{ ui.csrf() }}
+      <button class="btn primary tt-big">⏹️ Durdur</button>
+    </form>
+    <p class="small"><a href="{{ url_for('timetrack.edit', entry_id=current.id) }}">Başlangıcı, projeyi ya da notu düzelt</a></p>
+    <details class="tt-switch">
+      <summary>↪️ Başka işe geç (bu sayaç durur)</summary>
+      {{ start_form("▶️ Yeni sayaç başlat") }}
+    </details>
+  {% else %}
+    {{ start_form("▶️ Başlat") }}
+    {% if not projects %}<p class="muted small" style="margin-top: 10px">Projeye göre ayırmak ve kazancı görmek için <a href="{{ url_for('timetrack.projects') }}">proje ekle</a>.</p>{% endif %}
+  {% endif %}
+</section>
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Bugün</div>
+    <div class="value">{{ duration(today_sum.total) }}</div>
+    <div class="sub">{{ today_sum.count }} kayıt{% if today_sum.earning is not none %} · {{ today_sum.earning | money }}{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Bu hafta</div>
+    <div class="value">{{ duration(week.total) }}</div>
+    <div class="sub">{% if week.earning is not none %}{{ week.earning | money }}{% else %}{{ week.count }} kayıt{% endif %}</div>
+  </div>
+</div>
+
+<section class="card">
+  <h2>Bugünün kayıtları <a class="more" href="{{ url_for('timetrack.report') }}">Rapor →</a></h2>
+  {% if entries %}
+    <ul class="rows">
+      {% for e in entries %}
+        <li>
+          <span class="ico">{{ e.icon }}</span>
+          <div class="grow">
+            <div class="title">{{ e.note or e.label }}</div>
+            <div class="meta">
+              <span>{{ e.start.strftime('%H:%M') }}–{% if e.end %}{{ e.end.strftime('%H:%M') }}{% if e.next_day %} (+1 gün){% endif %}{% else %}<span class="tt-running">şimdi</span>{% endif %}</span>
+              {% if e.note %}<span>{{ e.label }}</span>{% endif %}
+              {% if e.earning is not none %}<span>{{ e.earning | money }}</span>{% endif %}
+            </div>
+          </div>
+          <span class="amount">{{ duration(e.seconds) }}</span>
+          <div class="actions">
+            {% if not e.running %}{{ ui.post_button(url_for('timetrack.resume', entry_id=e.id), "▶️", "", "Aynı işe yeniden başla") }}{% endif %}
+            <a class="btn sm" href="{{ url_for('timetrack.edit', entry_id=e.id) }}" title="Düzenle" aria-label="Düzenle">✎</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ ui.empty("Bugün henüz kayıt yok. Sayacı başlat ya da elle ekle.", "⏱️") }}
+  {% endif %}
+</section>
+
+<div class="card">
+  <details class="add">
+    <summary>＋ Elle kayıt ekle</summary>
+    <form method="post" action="{{ url_for('timetrack.create') }}">
+      {{ ui.csrf() }}
+      <div class="form-row">
+        {{ ui.field("Tarih", "date", today.isoformat(), type="date", required=True) }}
+        {{ project_select(last_project) }}
+      </div>
+      <div class="form-row three">
+        {{ ui.field("Başlangıç", "start", type="time") }}
+        {{ ui.field("Bitiş", "end", type="time", hint="Başlangıçtan erkense ertesi gün sayılır") }}
+        {{ ui.field("ya da süre", "duration", placeholder="1:30 · 90 dk · 2 saat", attrs='maxlength="30" autocomplete="off"') }}
+      </div>
+      {{ ui.field("Not", "note", attrs='maxlength="200" autocomplete="off"') }}
+      <p class="muted small">Başlangıç ve bitiş ya da sadece süre yeter. Sadece süre yazarsan bugün için şu anda biter, geçmiş bir gün için 09:00'da başlar.</p>
+      <button class="btn primary">Ekle</button>
+    </form>
+  </details>
+</div>
+{% if current %}<script src="{{ url_for('static', filename='timetrack.js') }}?v=1" defer></script>{% endif %}
+{% endblock %}

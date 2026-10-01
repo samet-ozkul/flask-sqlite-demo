@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Rapor · Zaman Takibi{% endblock %}
+{% block head %}
+<style>
+  .day-head {
+    display: flex; justify-content: space-between; gap: 8px; padding: 14px 0 4px;
+    font-size: .85rem; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border);
+  }
+  .day-head:first-of-type { padding-top: 0; }
+  .tt-range input { flex: 1 1 140px; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("📊 Zaman raporu", title, back=url_for('timetrack.index')) %}
+  <a class="btn sm" href="{{ url_for('timetrack.export', **range_args) }}" title="Bu aralığı Excel/CSV olarak indir">⬇️ Excel</a>
+{% endcall %}
+
+<nav class="tabs">
+  {% for k, label in ranges.items() if k != 'ozel' %}
+    <a href="{{ url_for('timetrack.report', aralik=k) }}" class="{{ 'active' if k == key }}">{{ label }}</a>
+  {% endfor %}
+  {% if key == 'ozel' %}<a class="active" href="{{ self_url }}">{{ ranges.ozel }}</a>{% endif %}
+</nav>
+
+<form method="get" class="search tt-range">
+  <input type="hidden" name="aralik" value="ozel">
+  <input type="date" name="bas" value="{{ first.isoformat() }}" aria-label="İlk gün" required>
+  <input type="date" name="bit" value="{{ last.isoformat() }}" aria-label="Son gün" required>
+  <button class="btn">Göster</button>
+</form>
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Toplam</div>
+    <div class="value">{{ duration(s.total) }}</div>
+    <div class="sub">{{ s.count }} kayıt</div>
+  </div>
+  {% if s.earning is not none %}
+  <div class="stat">
+    <div class="label">Kazanç</div>
+    <div class="value">{{ s.earning | money }}</div>
+    <div class="sub">saatlik ücreti olan projeler</div>
+  </div>
+  {% endif %}
+</div>
+
+{% if bars %}
+<div class="card">
+  <h2>Projeler</h2>
+  {{ ui.bars(bars) }}
+</div>
+{% endif %}
+
+{% if day_bars %}
+<div class="card">
+  <h2>Gün gün</h2>
+  {{ ui.bars(day_bars) }}
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Kayıtlar</h2>
+  {% for day in days_list %}
+    <div class="day-head"><span>{{ day.date | date_tr(True) }}</span><span>{{ duration(day.total) }}</span></div>
+    <ul class="rows">
+      {% for e in day.entries %}
+        <li>
+          <span class="ico">{{ e.icon }}</span>
+          <div class="grow">
+            <div class="title">{{ e.note or e.label }}</div>
+            <div class="meta">
+              <span>{{ e.start.strftime('%H:%M') }}–{% if e.end %}{{ e.end.strftime('%H:%M') }}{% if e.next_day %} (+1 gün){% endif %}{% else %}şimdi{% endif %}</span>
+              {% if e.note %}<span>{{ e.label }}</span>{% endif %}
+              {% if e.earning is not none %}<span>{{ e.earning | money }}</span>{% endif %}
+            </div>
+          </div>
+          <span class="amount">{{ duration(e.seconds) }}</span>
+          <div class="actions"><a class="btn sm" href="{{ url_for('timetrack.edit', entry_id=e.id, next=self_url) }}" title="Düzenle" aria-label="Düzenle">✎</a></div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ ui.empty("Bu aralıkta kayıt yok.", "⏱️") }}
+  {% endfor %}
+</div>
+
+<p class="muted small center">Kayıt başladığı güne yazılır; çalışan sayaç şu ana kadar sayılır. Kazanç projenin güncel saatlik ücretiyle hesaplanır.</p>
+{% endblock %}

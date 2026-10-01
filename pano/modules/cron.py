@@ -292,6 +292,19 @@ def todo_reminders(secret):
         except telegram.TelegramError as e:
             result["errors"].append(f"günlük {user['username']}: {e}")
 
+    # Zaman takibi: 10 saattir çalışan (unutulmuş olabilecek) sayaç için bir kez uyarı
+    from .timetrack import long_running, mark_warned, stop_buttons, warn_message
+    result["timers_warned"] = 0
+    for entry in long_running(now):
+        try:
+            telegram.send_message(entry["chat_id"], warn_message(entry, now, url_for("timetrack.index", _external=True),
+                                                                 telegram.escape),
+                                  buttons=stop_buttons(entry["id"]) if with_buttons else None)
+            mark_warned(entry["id"])
+            result["timers_warned"] += 1
+        except telegram.TelegramError as e:
+            result["errors"].append(f"sayaç {entry['id']}: {e}")
+
     # Aktarma kutusu: süresi dolan metin ve dosyalar
     from .transfer import purge_expired
     result["transfers_purged"] = purge_expired()

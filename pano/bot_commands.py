@@ -37,6 +37,9 @@ COMMANDS = [
     ("etkinlik", "Ortak etkinlik ekle: /etkinlik piknik pazar 11:00"),
     ("gunluk", "Günlüğe yaz: /gunluk bugün çok yoğundu"),
     ("aktar", "Aktarma kutusuna metin koy: /aktar metin"),
+    ("baslat", "Zaman sayacını başlat: /baslat proje not"),
+    ("durdur", "Zaman sayacını durdur"),
+    ("zaman", "Çalışan sayaç ve bugünün toplamı"),
     ("bugun", "Günün özeti"),
     ("rapor", "Geçen ayın raporu (/rapor bu ay)"),
     ("ara", "Her yerde ara: /ara matkap"),
@@ -58,6 +61,8 @@ HELP = """<b>Kişisel Pano komutları</b>
 📓 <code>/gunluk 🙂 bugün yürüyüşe çıktım</code> — günlüğe yaz (başa emoji koyarsan ruh hali olur)
 📋 <code>/liste</code> ya da <code>/liste market</code> — açık maddeler
 📤 <code>/aktar metin</code> — bilgisayarda açmak için aktarma kutusuna koy (dosya gönderirsen “📤 Aktar”)
+⏱️ <code>/baslat web sitesi tasarım</code> — zaman sayacını başlat (baştaki kelimeler proje adıysa o projeye)
+    <code>/durdur</code> — sayacı durdur · <code>/zaman</code> — çalışan sayaç ve bugünün toplamı
 ☀️ <code>/bugun</code> — günün özeti
 📊 <code>/rapor</code> — geçen ayın raporu · <code>/rapor bu ay</code>
 🔍 <code>/ara matkap</code> — notlar, envanter, garantiler... her yerde ara
@@ -151,6 +156,7 @@ def handle_message(msg):
             "etkinlik": cmd_event,
             "gunluk": cmd_journal, "g": cmd_journal,
             "aktar": cmd_transfer,
+            "baslat": cmd_timer_start, "durdur": cmd_timer_stop, "zaman": cmd_timer_status,
             "liste": cmd_list, "l": cmd_list,
             "bugun": cmd_today,
             "rapor": cmd_report,
@@ -172,7 +178,8 @@ def handle_callback(cq, chat_id, message_id):
     data = cq.get("data") or ""
     prefix = data.split(":", 1)[0]
     handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
-                "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood, "ct": cb_contact, "ctz": cb_contact}
+                "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood, "ct": cb_contact, "ctz": cb_contact,
+                "tt": cb_timer}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -762,6 +769,58 @@ def _transfer_file(user, chat_id, message_id, callback_id, pending):
         return
     telegram.edit_message(chat_id, message_id, f"📤 <b>{esc(pending['name'])}</b> aktarma kutusuna kondu, 1 saat duracak.\n"
                                                f'<a href="{esc(link("transfer.index"))}">Aktar →</a>')
+
+
+# ---------- Zaman takibi ----------
+def cmd_timer_start(user, chat_id, rest):
+    """'/baslat web sitesi ana sayfa': baştaki kelimeler bir projenin adıysa o proje, kalanı not."""
+    from .modules import timetrack as tt
+    project, note = tt.match_project(user["id"], rest)
+    entry_id, stopped = tt.start_timer(user["id"], project["id"] if project else None, note)
+    lines = ["▶️ <b>Sayaç başladı</b>", tt.entry_line(tt.get_entry(entry_id, user["id"]), esc)]
+    if stopped:
+        lines.append(f"⏹️ Önceki sayaç durdu: {tt.fmt_duration(tt.seconds_of(stopped))} · {tt.entry_line(stopped, esc)}")
+    lines.append(f'<a href="{esc(link("timetrack.index"))}">Zaman takibi →</a>')
+    telegram.send_message(chat_id, "\n".join(lines), buttons=tt.stop_buttons(entry_id))
+
+
+def cmd_timer_stop(user, chat_id, rest):
+    from .modules import timetrack as tt
+    stopped = tt.stop_timer(user["id"])
+    if stopped is None:
+        telegram.send_message(chat_id, "⏱️ Çalışan sayaç yok. Başlatmak için: <code>/baslat proje not</code>")
+        return
+    telegram.send_message(chat_id, tt.stopped_message(stopped, link("timetrack.edit", entry_id=stopped["id"]), esc))
+
+
+def cmd_timer_status(user, chat_id, rest):
+    from .modules import timetrack as tt
+    text, current = tt.status_message(user["id"], link("timetrack.index"), esc)
+    telegram.send_message(chat_id, text, buttons=tt.stop_buttons(current["id"]) if current else None)
+
+
+def cb_timer(user, chat_id, message_id, callback_id, data):
+    """⏹️ Durdur butonu (tt:<kayıt_id>): sadece o sayacı durdurur."""
+    from .modules import timetrack as tt
+    raw = data.split(":")[1] if ":" in data else ""
+    entry = tt.get_entry(int(raw), user["id"]) if raw.isdigit() else None
+    if entry is None:
+        telegram.answer_callback(callback_id, "Kayıt bulunamadı, silinmiş olabilir.")
+        return
+    stopped = tt.stop_entry(entry["id"], user["id"])
+    if stopped is None:
+        telegram.answer_callback(callback_id, "Bu sayaç zaten durmuş.")
+        try:
+            telegram.edit_buttons(chat_id, message_id, [])
+        except telegram.TelegramError:
+            pass
+        return
+    telegram.answer_callback(callback_id, f"⏹️ Durdu: {tt.fmt_duration(tt.seconds_of(stopped))}")
+    try:
+        telegram.edit_message(chat_id, message_id, tt.stopped_message(stopped, link("timetrack.edit", entry_id=stopped["id"]),
+                                                                      esc))
+    except telegram.TelegramError:
+        pass
 
 
 # ---------- Yapay zekâ: fiş okuma ----------
