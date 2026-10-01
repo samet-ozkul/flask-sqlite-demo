@@ -19,6 +19,7 @@ MODULES = [
     ("assets", "assets.index", "Varlıklar", "💰", "Para"),
     ("goals", "goals.index", "Hedefler", "🏁", "Para"),
     ("splits", "splits.index", "Ortak Harcama", "👥", "Para"),
+    ("orders", "orders.index", "Siparişler", "🚚", "Para"),
     ("car", "car.index", "Araç", "🚗", "Ev ve araç"),
     ("warranty", "warranty.index", "Garanti", "🛡️", "Ev ve araç"),
     ("inventory", "inventory.index", "Ev Envanteri", "📦", "Ev ve araç"),

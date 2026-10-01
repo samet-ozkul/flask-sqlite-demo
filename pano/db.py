@@ -620,6 +620,32 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_contact_logs ON contact_logs(contact_id, date);
     """,
+    # 22: siparişler, kargo takibi ve iade süresi (sent_flags: "tür:tarih" virgüllü, her hatırlatma bir kez)
+    """
+    CREATE TABLE orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        store TEXT NOT NULL DEFAULT '',
+        item TEXT NOT NULL,
+        amount REAL,
+        ordered_on TEXT NOT NULL,
+        expected_on TEXT,
+        delivered_on TEXT,
+        carrier TEXT NOT NULL DEFAULT '',
+        tracking_no TEXT NOT NULL DEFAULT '',
+        tracking_url TEXT NOT NULL DEFAULT '',
+        order_url TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'ordered'
+            CHECK (status IN ('ordered', 'shipped', 'delivered', 'returning', 'returned', 'cancelled')),
+        return_days INTEGER NOT NULL DEFAULT 14,  -- 0 = iade takibi yok
+        return_by TEXT,                           -- teslimde delivered_on + return_days
+        expense_id INTEGER,                       -- harcamaya eklendiyse (FK yok: çöpten geri getirme bozulmasın)
+        sent_flags TEXT NOT NULL DEFAULT '',
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_orders_user ON orders(user_id, status);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

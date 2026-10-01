@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "orders/_form.html" import order_fields, return_badge with context %}
+{% block title %}{{ o.item }}{% endblock %}
+{% block head %}
+<style>
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; }
+  .kv dt { color: var(--muted); font-size: .88rem; }
+  .kv dd { margin: 0; overflow-wrap: anywhere; }
+  .order-steps { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  .order-steps form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .order-steps .check { margin: 0; font-size: .85rem; color: var(--muted); }
+</style>
+{% endblock %}
+{% block content %}
+{% set status_label, status_icon = statuses[o.status] %}
+{% call ui.page_header(status_icon ~ " " ~ o.item, o.store or None, back=url_for('orders.index', sekme=back_tab)) %}
+  {{ ui.delete_button(url_for('orders.delete', order_id=o.id), "Sil", "Sipariş silinsin mi? Harcamalara eklenen kayıt silinmez.") }}
+{% endcall %}
+
+<div class="card">
+  <h2><span>{{ status_label }}</span> {{ return_badge(left) }}</h2>
+  <dl class="kv">
+    <dt>Sipariş</dt><dd>{{ o.ordered_on | date_tr(True) }}</dd>
+    {% if o.expected_on %}
+      <dt>Beklenen teslim</dt>
+      <dd>{{ o.expected_on | date_tr(True) }}{% if o.status in ('ordered', 'shipped') %} {{ ui.due_badge(o.expected_on, 1) }}{% endif %}</dd>
+    {% endif %}
+    {% if o.delivered_on %}<dt>Teslim</dt><dd>{{ o.delivered_on | date_tr(True) }}</dd>{% endif %}
+    {% if o.return_by %}
+      <dt>İade son günü</dt><dd>{{ o.return_by | date_tr(True) }} <span class="muted small">({{ o.return_days }} gün)</span></dd>
+    {% elif o.status == 'delivered' %}
+      <dt>İade</dt><dd class="muted">takip edilmiyor</dd>
+    {% endif %}
+    {% if o.amount is not none %}<dt>Tutar</dt><dd>{{ o.amount | money }}</dd>{% endif %}
+    {% if o.carrier or o.tracking_no %}
+      <dt>Kargo</dt><dd>{{ o.carrier }}{% if o.tracking_no %} <code>{{ o.tracking_no }}</code>{% endif %}</dd>
+    {% endif %}
+  </dl>
+  {% if o.note %}<p class="muted" style="white-space: pre-line; margin-top: 10px">{{ o.note }}</p>{% endif %}
+
+  <div class="order-steps">
+    {% for s, label in actions %}
+      <form method="post" action="{{ url_for('orders.set_status', order_id=o.id) }}"
+            {% if s == 'cancelled' %}data-confirm="Sipariş iptal edildi olarak işaretlensin mi?"{% endif %}>
+        {{ ui.csrf() }}
+        <input type="hidden" name="status" value="{{ s }}">
+        <button class="btn sm {{ 'ok' if s in ('delivered', 'returned') else ('danger' if s == 'cancelled') }}">{{ label }}</button>
+        {% if expense and s in ('returned', 'cancelled') %}{{ ui.checkbox("Harcama kaydını da sil", "drop_expense", True) }}{% endif %}
+      </form>
+    {% endfor %}
+    {% if track %}<a class="btn sm" href="{{ track }}" target="_blank" rel="noopener noreferrer">📍 Kargo takip</a>{% endif %}
+    {% if o.order_url %}<a class="btn sm" href="{{ o.order_url }}" target="_blank" rel="noopener noreferrer">🧾 Sipariş sayfası</a>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <details class="add">
+    <summary>✏️ Düzenle</summary>
+    <form method="post">
+      {{ ui.csrf() }}
+      {{ order_fields(o, expense) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+<p class="muted small">Eklenme: {{ o.created_at | localdt }}</p>
+{% endblock %}

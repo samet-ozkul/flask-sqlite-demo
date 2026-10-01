@@ -86,6 +86,16 @@ def events_between(user_id, start, end, external=False):
         add("document", r["id"], r["expires_on"], f"{r['name']} bitiyor", DOC_KINDS[r["kind"]][1], "documents.edit",
             detail=r["holder"], doc_id=r["id"])
 
+    # Siparişler: beklenen teslim (iptal edilenler hariç) ve iade son günü (iade başlatılınca tamamlandı sayılır)
+    for r in query("SELECT * FROM orders WHERE user_id = ? AND status != 'cancelled' AND expected_on BETWEEN ? AND ?",
+                   (user_id, s, e)):
+        add("order", r["id"], r["expected_on"], f"{r['item']} bekleniyor", "🚚", "orders.edit", detail=r["store"],
+            done=r["status"] not in ("ordered", "shipped"), order_id=r["id"])
+    for r in query("SELECT * FROM orders WHERE user_id = ? AND status IN ('delivered', 'returning', 'returned')"
+                   " AND return_by BETWEEN ? AND ?", (user_id, s, e)):
+        add("order-return", r["id"], r["return_by"], f"{r['item']} iade son günü", "↩️", "orders.edit",
+            detail=r["store"], done=r["status"] != "delivered", order_id=r["id"])
+
     from .modules.events import visible_events
     for r in visible_events(user_id, " AND e.date BETWEEN ? AND ?", (s, e)):
         add("event", r["id"], r["date"], r["title"], "👨‍👩‍👧" if r["shared"] else "📅", "events.edit",
