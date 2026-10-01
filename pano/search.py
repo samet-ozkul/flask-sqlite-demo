@@ -25,6 +25,7 @@ def _order_detail(r):
 
 def _sources(user_id):
     """(etiket, ikon, sorgu, parametreler, aranan alanlar, başlık, ayrıntı, adres)"""
+    from .modules.kanban import CARD_SELECT
     return [
         ("Notlar", "📝", "SELECT * FROM notes WHERE user_id = ? ORDER BY id DESC LIMIT ?", (user_id,),
          ("title", "content", "tags"), lambda r: r["title"] or r["content"][:60], lambda r: r["content"],
@@ -100,6 +101,9 @@ def _sources(user_id):
          ("name", "relation", "phone", "phone_digits", "email", "note"), lambda r: r["name"],
          lambda r: " · ".join(x for x in (r["relation"], r["phone"], r["email"]) if x),
          lambda r: url_for("contacts.detail", contact_id=r["id"])),
+        ("Kanban", "🗂️", CARD_SELECT + " WHERE (b.user_id = ? OR b.shared = 1) ORDER BY c.id DESC LIMIT ?", (user_id,),
+         ("title", "note", "board_name"), lambda r: r["title"] + (" ✓" if r["done"] else ""),
+         lambda r: f"{r['board_name']} · {r['column_name']}", lambda r: url_for("kanban.card", card_id=r["id"])),
     ]
 
 

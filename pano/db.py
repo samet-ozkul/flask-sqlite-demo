@@ -669,6 +669,39 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_time_entries_user ON time_entries(user_id, started_at);
     """,
+    # 24: kanban panoları (sütunlar ve kartlar; en sağdaki sütun "bitti" sayılır)
+    """
+    CREATE TABLE boards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        shared INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE board_columns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_board_columns_board ON board_columns(board_id, position);
+    CREATE TABLE cards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        column_id INTEGER NOT NULL REFERENCES board_columns(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        due_date TEXT,
+        color TEXT NOT NULL DEFAULT '',
+        position INTEGER NOT NULL DEFAULT 0,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_cards_column ON cards(column_id, position);
+    CREATE INDEX idx_cards_board ON cards(board_id, due_date);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

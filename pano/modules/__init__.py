@@ -33,6 +33,7 @@ MODULES = [
     ("contacts", "contacts.index", "Kişiler", "📇", "Kişisel"),
     ("timetrack", "timetrack.index", "Zaman Takibi", "⏱️", "Araçlar"),
     ("calculators", "calculators.index", "Hesaplayıcılar", "🧮", "Araçlar"),
+    ("kanban", "kanban.index", "Kanban", "🗂️", "Araçlar"),
 ]
 
 # Menüde gösterilmeyen altyapı modülleri

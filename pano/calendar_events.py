@@ -1,8 +1,8 @@
 """Tüm tarihli kayıtlar tek listede: takvim sayfası ve telefon takvimi aboneliği (ICS) kullanır.
 
 Kaynaklar: faturalar, abonelik yenilemeleri, borç/alacak vadeleri, araç tarihleri, garanti bitişleri,
-randevular, yapılacaklar (açık), önemli günler, kişilerin doğum günleri. Abonelik, önemli günler ve
-doğum günleri aralık içinde çoğaltılır.
+randevular, yapılacaklar (açık), kanban kartları (bitti sütunu hariç), önemli günler, kişilerin doğum günleri.
+Abonelik, önemli günler ve doğum günleri aralık içinde çoğaltılır.
 """
 from datetime import date, timedelta
 
@@ -80,6 +80,11 @@ def events_between(user_id, start, end, external=False):
     ):
         add("todo", r["id"], r["due_date"], r["text"], "☑️", "lists.detail", detail=r["list_name"],
             time=r["due_time"], list_id=r["list_id"])
+
+    from .modules.kanban import open_cards
+    for r in open_cards(user_id, " AND c.due_date BETWEEN ? AND ?", (s, e)):
+        add("kanban", r["id"], r["due_date"], r["title"], "🗂️", "kanban.board",
+            detail=f"{r['board_name']} · {r['column_name']}", board_id=r["board_id"], _anchor=f"kart-{r['id']}")
 
     from .modules.documents import KINDS as DOC_KINDS
     for r in query("SELECT * FROM documents WHERE user_id = ? AND expires_on BETWEEN ? AND ?", (user_id, s, e)):

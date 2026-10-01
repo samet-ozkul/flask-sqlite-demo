@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Kanban{% endblock %}
+{% block head %}
+<style>
+  .board-rows > li { padding: 0; }
+  .board-rows a.board-link { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 12px 0; color: var(--text); }
+  .board-rows a.board-link:hover { text-decoration: none; }
+  .board-rows a.board-link:hover .title { color: var(--primary); }
+  .board-rows .pill-count { font-size: .85rem; padding: 2px 9px; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("🗂️ Kanban", "İş ve proje panoları: sütunlar, kartlar, sürükle-bırak") }}
+
+<div class="card">
+  <details class="add" {% if not boards %}open{% endif %}>
+    <summary>＋ Yeni pano</summary>
+    <form method="post" action="{{ url_for('kanban.create') }}">
+      {{ ui.csrf() }}
+      <div class="form-row">
+        {{ ui.field("Pano adı", "name", required=True, placeholder="Ev tadilatı, Tez, Yan proje...", attrs='maxlength="80"') }}
+        {{ ui.select("Sütunlar", "template", templates, "basic") }}
+      </div>
+      {{ ui.checkbox("Paylaşılan (tüm kullanıcılar görebilir ve düzenleyebilir)", "shared") }}
+      <p class="muted small">Sütunlar sonradan eklenip yeniden adlandırılabilir. En sağdaki sütun “bitti” sayılır.</p>
+      <button class="btn primary block">Oluştur</button>
+    </form>
+  </details>
+</div>
+
+{% if boards %}
+  <div class="card">
+    <ul class="rows board-rows">
+      {% for b in boards %}
+        <li>
+          <a class="board-link" href="{{ url_for('kanban.board', board_id=b.id) }}">
+            <span class="ico">🗂️</span>
+            <span class="grow">
+              <span class="title">{{ b.name }}</span>
+              <span class="meta">
+                <span>{{ b.column_count }} sütun</span>
+                {% if b.user_id != g.user.id %}
+                  <span>👤 {{ b.owner_display or b.owner_username }}</span>
+                {% elif b.shared %}
+                  <span class="tag">paylaşılan</span>
+                {% endif %}
+                {% if b.next_due %}{{ ui.due_badge(b.next_due) }}{% endif %}
+              </span>
+            </span>
+            <span class="pill-count" title="Açık / toplam kart">{{ b.open_count }}/{{ b.card_count }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  {{ ui.empty("Henüz pano yok. Bir projeyi sütunlara bölerek başlayabilirsin!", "🗂️") }}
+{% endif %}
+{% endblock %}

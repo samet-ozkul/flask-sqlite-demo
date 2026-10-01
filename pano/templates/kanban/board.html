@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ board.name }}{% endblock %}
+{% block head %}
+{% include "kanban/_colors.html" %}
+<style>
+  .container { max-width: 1280px; }
+  .kboard { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding: 2px 2px 12px; overscroll-behavior-x: contain; }
+  .kcol {
+    position: relative; flex: 1 0 250px; max-width: 340px; display: flex; flex-direction: column; gap: 8px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px;
+    scroll-snap-align: start;
+  }
+  /* Telefonda bir sütun ekranı doldurur, yandaki biraz görünür; kaydırınca sütuna oturur */
+  @media (max-width: 640px) {
+    .kboard { scroll-snap-type: x mandatory; }
+    .kcol { flex: 0 0 85vw; max-width: none; }
+  }
+  .kboard.dragging { scroll-snap-type: none; }
+  .kcol-head { display: flex; align-items: center; gap: 6px; padding-right: 34px; min-height: 30px; }
+  .kcol-head h2 { margin: 0; font-size: 1rem; min-width: 0; overflow-wrap: anywhere; }
+  .kcol-head .tag { background: var(--ok-soft); color: var(--ok); }
+  .kcol-menu > summary, .kmenu > summary {
+    list-style: none; position: absolute; cursor: pointer; display: grid; place-items: center;
+    width: 32px; height: 30px; border-radius: 8px; color: var(--muted); font-weight: 700;
+  }
+  .kcol-menu > summary::-webkit-details-marker, .kmenu > summary::-webkit-details-marker { display: none; }
+  .kcol-menu > summary:hover, .kcol-menu[open] > summary { background: var(--surface); color: var(--text); }
+  .kmenu > summary:hover, .kmenu[open] > summary { background: var(--surface-2); color: var(--text); }
+  .kcol-menu > summary { top: 10px; right: 8px; }
+  .kcol-menu:not([open]) { margin-bottom: -8px; } /* kapalıyken boşluk bırakmasın */
+  .kcol-panel { display: flex; flex-direction: column; gap: 8px; padding: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .kcards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-height: 44px; }
+  .kcard {
+    position: relative; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--k, var(--border));
+    border-radius: var(--radius-sm); box-shadow: var(--shadow); scroll-margin: 72px 16px 16px;
+    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation;
+  }
+  .kcard-link { display: block; padding: 8px 36px 8px 10px; color: var(--text); }
+  .kcard-link:hover { text-decoration: none; }
+  .kcard-link:hover .kcard-title { color: var(--primary); }
+  .kcard-title { display: block; font-weight: 500; overflow-wrap: anywhere; }
+  .kcard-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; font-size: .8rem; }
+  .kmenu > summary { top: 4px; right: 2px; }
+  .kmenu-panel { display: flex; gap: 4px; padding: 0 8px 8px; }
+  .kmenu-panel .btn { flex: 1; min-height: 38px; padding: 4px; }
+  .kmenu-panel .btn:disabled, .kcol-panel .btn:disabled { opacity: .35; cursor: default; }
+  .kcol.done .kcard-title { color: var(--muted); }
+  .kcol.done .kcard .badge { background: var(--surface-2); color: var(--muted); }
+  .kadd { display: flex; gap: 6px; }
+  .kadd input { flex: 1; min-width: 0; }
+  .kcol.knew { background: transparent; border-style: dashed; }
+  .kcard.ghost { opacity: .35; }
+  .kcard.floating { position: fixed; z-index: 60; margin: 0; pointer-events: none; max-width: 90vw; outline: 2px solid var(--primary); transform: rotate(2deg); }
+  .settings hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
+</style>
+{% endblock %}
+{% block content %}
+{% set owner_name = board.owner_display or board.owner_username %}
+{{ ui.page_header("🗂️ " ~ board.name,
+                  ("paylaşılan pano" if board.shared else "kişisel pano") ~ ("" if is_owner else " · " ~ owner_name ~ " panosu"),
+                  back=url_for('kanban.index')) }}
+
+<div class="kboard" id="kboard" data-csrf="{{ csrf_token() }}" data-move-url="{{ url_for('kanban.move', card_id=0) }}">
+  {% for col in columns %}
+    {% set cs = cards.get(col.id, []) %}
+    {% set col_first, col_last = loop.first, loop.last %}
+    {% set is_done = loop.last and not loop.first %}
+    <section class="kcol {{ 'done' if is_done }}" id="sutun-{{ col.id }}" data-col="{{ col.id }}" aria-label="{{ col.name }}">
+      <header class="kcol-head">
+        <h2>{{ col.name }}</h2>
+        {% if is_done %}<span class="tag" title="En sağdaki sütun: buradaki kartlar bitmiş sayılır">✓ bitti</span>{% endif %}
+        <span class="pill-count kcount" title="Kart sayısı">{{ cs | length }}</span>
+      </header>
+      <details class="kcol-menu">
+        <summary aria-label="Sütun ayarları" title="Sütun ayarları">⋯</summary>
+        <div class="kcol-panel">
+          <form method="post" action="{{ url_for('kanban.rename_column', column_id=col.id) }}" class="quick">
+            {{ ui.csrf() }}
+            <input name="name" value="{{ col.name }}" required maxlength="40" aria-label="Sütun adı" autocomplete="off">
+            <button class="btn sm">Kaydet</button>
+          </form>
+          <div class="row-flex">
+            <form method="post" action="{{ url_for('kanban.move_column', column_id=col.id) }}" class="inline">
+              {{ ui.csrf() }}
+              <button class="btn sm" name="dir" value="left" {{ 'disabled' if col_first }}>← Sola</button>
+              <button class="btn sm" name="dir" value="right" {{ 'disabled' if col_last }}>Sağa →</button>
+            </form>
+            <span class="spacer"></span>
+            {% if columns | length > 1 %}
+              {{ ui.delete_button(url_for('kanban.delete_column', column_id=col.id), "Sil",
+                                  "“" ~ col.name ~ "” sütunu silinsin mi? İçindeki kartlar " ~ ("sağdaki" if col_first else "soldaki") ~ " sütuna taşınır.") }}
+            {% endif %}
+          </div>
+        </div>
+      </details>
+      <ul class="kcards">
+        {% for c in cs %}
+          <li class="kcard{{ ' c-' ~ c.color if c.color }}" id="kart-{{ c.id }}" data-id="{{ c.id }}">
+            <a class="kcard-link" href="{{ url_for('kanban.card', card_id=c.id) }}" draggable="false">
+              <span class="kcard-title">{{ c.title }}</span>
+              {% if c.due_date or c.note %}
+                <span class="kcard-meta">
+                  {% if c.due_date %}{{ ui.due_badge(c.due_date) }}{% endif %}
+                  {% if c.note %}<span title="Not var" aria-label="Not var">📝</span>{% endif %}
+                </span>
+              {% endif %}
+            </a>
+            <details class="kmenu">
+              <summary aria-label="Kartı taşı" title="Taşı">⋯</summary>
+              <form method="post" action="{{ url_for('kanban.move', card_id=c.id) }}" class="kmenu-panel">
+                {{ ui.csrf() }}
+                <button class="btn sm" name="dir" value="left" title="Soldaki sütuna" aria-label="Soldaki sütuna" {{ 'disabled' if col_first }}>←</button>
+                <button class="btn sm" name="dir" value="up" title="Yukarı" aria-label="Yukarı" {{ 'disabled' if loop.first }}>↑</button>
+                <button class="btn sm" name="dir" value="down" title="Aşağı" aria-label="Aşağı" {{ 'disabled' if loop.last }}>↓</button>
+                <button class="btn sm" name="dir" value="right" title="Sağdaki sütuna" aria-label="Sağdaki sütuna" {{ 'disabled' if col_last }}>→</button>
+              </form>
+            </details>
+          </li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="{{ url_for('kanban.add_card', board_id=board.id) }}" class="kadd">
+        {{ ui.csrf() }}
+        <input type="hidden" name="column_id" value="{{ col.id }}">
+        <input name="title" required maxlength="200" placeholder="＋ Kart ekle" aria-label="{{ col.name }} sütununa kart ekle" autocomplete="off">
+        <button class="btn sm primary" title="Ekle" aria-label="Ekle">＋</button>
+      </form>
+    </section>
+  {% endfor %}
+  {% if columns | length < max_columns %}
+    <section class="kcol knew" aria-label="Yeni sütun">
+      <form method="post" action="{{ url_for('kanban.add_column', board_id=board.id) }}" class="kadd">
+        {{ ui.csrf() }}
+        <input name="name" required maxlength="40" placeholder="＋ Yeni sütun" aria-label="Yeni sütun adı" autocomplete="off">
+        <button class="btn sm">Ekle</button>
+      </form>
+    </section>
+  {% endif %}
+</div>
+<p class="muted small">Kartları sürükleyerek (telefonda basılı tutup) ya da ⋯ menüsündeki oklarla taşı.
+  En sağdaki sütun “bitti” sayılır; son tarihli kartlar orada değilse yaklaşanlarda ve takvimde görünür.</p>
+
+{# Pano ayarları: sadece sahibi #}
+{% if is_owner %}
+  <div class="card settings">
+    <details class="add">
+      <summary>⚙️ Pano ayarları</summary>
+      <form method="post" action="{{ url_for('kanban.update', board_id=board.id) }}">
+        {{ ui.csrf() }}
+        {{ ui.field("Pano adı", "name", board.name, required=True, attrs='maxlength="80"') }}
+        {{ ui.checkbox("Paylaşılan (tüm kullanıcılar görebilir ve düzenleyebilir)", "shared", board.shared) }}
+        <button class="btn primary">Kaydet</button>
+      </form>
+      <hr>
+      {{ ui.delete_button(url_for('kanban.delete', board_id=board.id), "Panoyu sil",
+                          "Pano, sütunları ve kartları silinsin mi? Çöp kutusundan geri getirebilirsin.") }}
+    </details>
+  </div>
+{% endif %}
+<script src="{{ url_for('static', filename='kanban.js') }}?v=1" defer></script>
+{% endblock %}
