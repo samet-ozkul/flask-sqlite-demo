@@ -8,6 +8,7 @@ MODULES = [
     ("notes", "notes.index", "Notlar", "📝", "Listeler ve notlar"),
     ("lists", "lists.index", "Listeler", "🛒", "Listeler ve notlar"),
     ("links", "links.index", "Sonra Bak", "🔖", "Listeler ve notlar"),
+    ("vault", "vault.index", "Şifreli Kasa", "🔐", "Listeler ve notlar"),
     ("expenses", "expenses.index", "Harcamalar", "💸", "Para"),
     ("bills", "bills.index", "Faturalar", "🧾", "Para"),
     ("subscriptions", "subscriptions.index", "Abonelikler", "🔁", "Para"),

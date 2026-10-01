@@ -520,6 +520,26 @@ MIGRATIONS = [
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     """,
+    # 17: şifreli kasa (sunucuda sadece şifreli veri ve sarılmış anahtar durur)
+    """
+    CREATE TABLE vault_meta (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        salt TEXT NOT NULL,
+        iterations INTEGER NOT NULL,
+        wrapped_key TEXT NOT NULL,
+        hint TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE vault_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        data TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_vault_items_user ON vault_items(user_id);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

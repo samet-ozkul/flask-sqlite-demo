@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Şifreli Kasa{% endblock %}
+{% block head %}
+<style>
+  .vault-status { min-height: 1.4em; }
+  .vault-item .body { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); border-radius: var(--radius-sm);
+                      padding: 10px 12px; margin-top: 8px; font-family: ui-monospace, Consolas, monospace; font-size: .9rem; }
+  .vault-item .title { font-weight: 600; overflow-wrap: anywhere; }
+  .vault-item .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .vault-lock { font-size: 2.4rem; text-align: center; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🔐 Şifreli Kasa", "Abone numaraları, poliçe bilgileri, Wi-Fi şifresi gibi hassas notlar") %}
+  {% if meta %}<button class="btn sm hidden" id="v-lock-btn" type="button">🔒 Kilitle</button>{% endif %}
+{% endcall %}
+
+<div id="vault" data-csrf="{{ csrf_token() }}"
+     data-setup-url="{{ url_for('vault.setup') }}" data-create-url="{{ url_for('vault.create') }}"
+     data-item-url="{{ url_for('vault.update', item_id=0) }}" data-change-url="{{ url_for('vault.change_passphrase') }}">
+  <script type="application/json" id="vault-meta">{{ ({'salt': meta.salt, 'iterations': meta.iterations, 'wrapped_key': meta.wrapped_key, 'hint': meta.hint} if meta else none) | tojson }}</script>
+  <script type="application/json" id="vault-items">{{ items | tojson }}</script>
+
+  <noscript><div class="flash error">Kasa şifrelemeyi tarayıcında yapar; JavaScript açık olmalı.</div></noscript>
+  <div class="flash error hidden" id="v-unsupported">Bu tarayıcı güvenli şifrelemeyi desteklemiyor (site HTTPS ile açılmalı ve tarayıcı güncel olmalı).</div>
+
+  {# ---------- Kurulum ---------- #}
+  <section class="card hidden" id="v-setup">
+    <h2>Kasayı kur</h2>
+    <p class="muted small">Bir <b>kasa parolası</b> belirle. Kayıtlar bu parolayla senin tarayıcında şifrelenir; parola sunucuya hiç gönderilmez.
+      <b>Unutursan kasadaki bilgiler kurtarılamaz</b> — ne yönetici ne de yedekler açabilir. Hesap şifrenden farklı olması önerilir.</p>
+    <form id="v-setup-form" autocomplete="off">
+      <div class="form-row">
+        {{ ui.field("Kasa parolası", "pass", type="password", required=True, attrs='minlength="10" autocomplete="new-password"', hint="En az 10 karakter; birkaç kelimelik bir cümle iyi bir seçim.") }}
+        {{ ui.field("Kasa parolası (tekrar)", "pass2", type="password", required=True, attrs='minlength="10" autocomplete="new-password"') }}
+      </div>
+      {{ ui.field("İpucu (isteğe bağlı)", "hint", attrs='maxlength="100"', hint="Şifrelenmeden saklanır; parolanın kendisini yazma.") }}
+      <button class="btn primary">Kasayı oluştur</button>
+    </form>
+  </section>
+
+  {# ---------- Kilitli ---------- #}
+  <section class="card hidden" id="v-locked">
+    <div class="vault-lock">🔒</div>
+    <form id="v-unlock-form" autocomplete="off">
+      {{ ui.field("Kasa parolası", "pass", type="password", required=True, attrs='autocomplete="current-password" autofocus') }}
+      {% if meta and meta.hint %}<p class="muted small">İpucu: {{ meta.hint }}</p>{% endif %}
+      <button class="btn primary block">Kasayı aç</button>
+    </form>
+    <p class="muted small center" style="margin-top: 10px">{{ items | length }} şifreli kayıt · 5 dakika işlem yapılmazsa kasa kendiliğinden kilitlenir.</p>
+  </section>
+
+  {# ---------- Açık ---------- #}
+  <div class="hidden" id="v-open">
+    <section class="card">
+      <div class="row-flex">
+        <input type="search" id="v-filter" placeholder="Kasada ara…" style="flex: 1; min-width: 160px">
+        <button class="btn primary" type="button" id="v-new-btn">＋ Yeni kayıt</button>
+      </div>
+      <form id="v-edit-form" class="hidden" style="margin-top: 14px" autocomplete="off">
+        <input type="hidden" name="id">
+        {{ ui.field("Başlık", "title", required=True, attrs='maxlength="200"', placeholder="ör. Doğalgaz abone no") }}
+        {{ ui.textarea("İçerik", "body", rows=5, placeholder="Numara, kullanıcı adı, şifre, not…") }}
+        <div class="row-flex">
+          <button class="btn primary">Şifrele ve kaydet</button>
+          <button class="btn" type="button" id="v-cancel-btn">Vazgeç</button>
+        </div>
+      </form>
+    </section>
+    <section class="card">
+      <ul class="rows" id="v-list"></ul>
+      <div id="v-empty" class="hidden">{{ ui.empty("Kasa boş. İlk kaydını ekle.", "🔐") }}</div>
+    </section>
+
+    <details class="card">
+      <summary><b>Kasa parolasını değiştir</b></summary>
+      <form id="v-change-form" autocomplete="off" style="margin-top: 12px">
+        {{ ui.field("Mevcut kasa parolası", "old", type="password", required=True, attrs='autocomplete="current-password"') }}
+        <div class="form-row">
+          {{ ui.field("Yeni kasa parolası", "pass", type="password", required=True, attrs='minlength="10" autocomplete="new-password"') }}
+          {{ ui.field("Yeni kasa parolası (tekrar)", "pass2", type="password", required=True, attrs='minlength="10" autocomplete="new-password"') }}
+        </div>
+        {{ ui.field("İpucu (isteğe bağlı)", "hint", meta.hint if meta else "", attrs='maxlength="100"') }}
+        {{ ui.field("Hesap şifren", "password", type="password", required=True, attrs='autocomplete="current-password"', hint="Oturumu açık bırakılmış bir cihazdan kasanın kilitlenmesini önlemek için.") }}
+        <button class="btn">Değiştir</button>
+      </form>
+    </details>
+  </div>
+
+  <p class="vault-status muted small center" id="v-status" role="status"></p>
+</div>
+
+{% if meta %}
+  <details class="card" style="margin-top: 14px">
+    <summary><b>Kasa parolamı unuttum</b></summary>
+    <p class="muted small">Kasa parolası olmadan kayıtlar açılamaz. Kasayı sıfırlarsan <b>bütün kayıtlar kalıcı olarak silinir</b> ve yeni bir parolayla baştan kurarsın.</p>
+    <form method="post" action="{{ url_for('vault.reset') }}" data-confirm="Kasadaki bütün kayıtlar kalıcı olarak silinsin mi?">
+      {{ ui.csrf() }}
+      <div class="form-row">
+        {{ ui.field("Hesap şifren", "password", type="password", required=True, attrs='autocomplete="current-password"') }}
+        {{ ui.field("Onay için SİL yaz", "confirm", required=True, attrs='autocomplete="off"') }}
+      </div>
+      <button class="btn danger">Kasayı sıfırla</button>
+    </form>
+  </details>
+{% endif %}
+
+<p class="muted small center" style="margin-top: 14px">Şifreleme: AES-256-GCM, anahtar kasa parolasından PBKDF2-SHA256 ile türetilir.
+  Kasa içeriği genel aramada, yapay zekâda ve Telegram'da yer almaz.</p>
+<script src="{{ url_for('static', filename='vault.js') }}?v=1" defer></script>
+{% endblock %}
