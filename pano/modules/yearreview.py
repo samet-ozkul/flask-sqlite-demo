@@ -372,7 +372,8 @@ def _misc(p):
 
 
 def heatmap(p, year, t):
-    """GitHub benzeri ızgara: sütunlar haftalar (pazartesi üstte); hücre sınıfı h0–h4 yoğunluk, hx yıl dışı/gelecek."""
+    """GitHub benzeri ızgara: sütunlar haftalar (pazartesi üstte); hücre sınıfı h0–h4 yoğunluk, hx yıl dışı/gelecek.
+    today: bugünün hücre sırası (devam eden yılda telefonda ızgara oraya kaydırılır), yoksa None."""
     counts = {r["d"]: r["n"] for r in query(
         f"SELECT d, COUNT(*) AS n FROM ({_activity_sql(True)}) WHERE d >= :a AND d < :b GROUP BY d", p)
         if r["d"] <= t.isoformat()}
@@ -396,6 +397,7 @@ def heatmap(p, year, t):
     best_month = min(per_month.items(), key=lambda kv: (-kv[1], kv[0])) if per_month else None
     return {
         "cols": cols, "cells": cells, "total": sum(counts.values()), "active_days": len(counts),
+        "today": (t - start).days if first <= t <= last else None,
         "months": [((date(year, m, 1) - start).days // 7 + 1, MONTHS_TR_SHORT[m - 1]) for m in range(1, 13)],
         "best_day": (parse_date(best_day[0]), best_day[1]) if best_day else None,
         "best_month": (MONTHS_TR[best_month[0] - 1], best_month[1]) if best_month else None,

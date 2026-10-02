@@ -68,6 +68,7 @@
   .yr-heat i.h1 { background: var(--heat-1); } .yr-heat i.h2 { background: var(--heat-2); }
   .yr-heat i.h3 { background: var(--heat-3); } .yr-heat i.h4 { background: var(--heat-4); }
   .yr-heat i.hx { background: transparent; }
+  .yr-heat i[data-today] { outline: 2px solid var(--primary); outline-offset: 1px; }
   .heat-legend { display: flex; align-items: center; justify-content: flex-end; gap: 3px; font-size: .75rem; color: var(--muted); margin-top: 4px; }
   .stars { color: var(--warn); white-space: nowrap; }
 </style>
@@ -113,11 +114,11 @@
 {% if heat.total %}
 <section class="card yr-heat">
   <h2>📅 Etkinlik</h2>
-  <div class="heat-wrap">
+  <div class="heat-wrap"{% if heat.today is not none %} data-scroll-to="[data-today]"{% endif %}>
     <div class="heat" style="--cols: {{ heat.cols }}">
       <div class="heat-months">{% for col, label in heat.months %}<span style="grid-column: {{ col }} / span 4">{{ label }}</span>{% endfor %}</div>
       <div class="heat-wd">{% for w in weekdays %}<span>{{ w }}</span>{% endfor %}</div>
-      <div class="heat-grid">{% for cls, title in heat.cells %}<i class="{{ cls }}"{% if title %} title="{{ title }}"{% endif %}></i>{% endfor %}</div>
+      <div class="heat-grid">{% for cls, title in heat.cells %}<i class="{{ cls }}"{% if title %} title="{{ title }}"{% endif %}{% if loop.index0 == heat.today %} data-today{% endif %}></i>{% endfor %}</div>
     </div>
   </div>
   <div class="heat-legend">Az <i class="h0"></i><i class="h1"></i><i class="h2"></i><i class="h3"></i><i class="h4"></i> Çok</div>

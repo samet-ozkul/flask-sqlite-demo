@@ -330,11 +330,15 @@ def test_heatmap():
     assert len(re.findall(r'class="h[1-4]"', grid)) == len(expected)
     assert len(re.findall(r'class="h[0-4]"', grid)) == 275  # 1 Ocak – 2 Ekim; gelecek günler boş
     assert "1 Oca: " in grid  # UTC'de 2025'te olan kayıtlar yerel güne yazıldı
+    # Devam eden yılda bugün işaretli ve telefonda ızgara oraya kaydırılır
+    assert heat["today"] == 275 + 2 and 'data-scroll-to="[data-today]"' in page  # 2026 pazartesi 29 Aralık'tan başlar
+    assert len(re.findall(r"data-today", grid)) == 1 and 'title="2 Eki' in grid.split("data-today", 1)[0][-80:]
     # Biten yıl: yılın tüm günleri
     page = ADMIN.text("/yil-ozeti/?yil=2025")
     grid = page.split('class="heat-grid">', 1)[1].split("</div>", 1)[0]
     assert len(re.findall(r'class="h[0-4]"', grid)) == 365
     assert len(re.findall(r'class="h[1-4]"', grid)) == len(ACT["2025"])
+    assert "data-today" not in grid and "data-scroll-to" not in page and build(1, 2025)["heat"]["today"] is None
     print("  heatmap OK")
 
 
