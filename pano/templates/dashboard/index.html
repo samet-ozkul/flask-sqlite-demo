@@ -11,6 +11,10 @@
   <div class="flash warning">Depolama alanının %{{ disk.percent }}'i dolu ({{ disk.used | size }} / {{ disk.quota | size }}). <a href="{{ url_for('admin.backup') }}">Yedek al ve temizle</a></div>
 {% endif %}
 
+{% if year_review %}
+  <div class="flash"><a href="{{ url_for('yearreview.index', yil=year_review) }}">📊 {{ year_review }} yıl özetin hazır →</a></div>
+{% endif %}
+
 {# Kartlar Ayarlar → Pano düzeni'nde seçilen sırayla #}
 <div class="grid two dash">
 {% for card in cards %}

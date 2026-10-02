@@ -121,8 +121,10 @@ def index():
             (uid,),
         )
 
+    from .yearreview import banner_year
     return render_template(
         "dashboard/index.html",
+        year_review=banner_year(uid),  # 15 Aralık – 31 Ocak arası "📊 Yıl özetin hazır"
         greeting=_greeting(now.hour),
         date_label=f"{t.day} {MONTHS_TR[t.month - 1]}, {WEEKDAYS_TR[t.weekday()]}",
         cards=cards,

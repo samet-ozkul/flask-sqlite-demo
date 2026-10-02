@@ -151,6 +151,12 @@ bindFilter(document.querySelector(".menu-filter"), ".tile-wrap", ".menu-group");
   dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });  // dışına tıklayınca kapat
 })();
 
+// data-scroll-to="seçici": yatay kayan kutu açılışta içindeki o öğeyi sağ kenarda gösterir (ör. ısı haritasında bugün)
+document.querySelectorAll("[data-scroll-to]").forEach((box) => {
+  const target = box.querySelector(box.dataset.scrollTo);
+  if (target) box.scrollLeft += target.getBoundingClientRect().right - box.getBoundingClientRect().right + 24;
+});
+
 // Uygulama gibi yüklenebilmesi için service worker
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
