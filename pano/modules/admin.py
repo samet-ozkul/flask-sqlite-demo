@@ -6,7 +6,7 @@ import time
 from flask import (Blueprint, current_app, flash, g, redirect, render_template, request, send_file,
                    session, url_for)
 
-from .. import ai, backup as backup_lib, bot_commands, telegram
+from .. import ai, backup as backup_lib, bot_commands, quota, telegram
 from ..auth import admin_required, create_user, large_upload, registration_open, set_password, validate_new_user
 from ..db import SCHEMA_VERSION, execute, get_db, query, query_one
 from ..external import purge_cache
@@ -120,15 +120,63 @@ def users():
         if error:
             flash(error, "error")
         else:
-            create_user(username, password, is_admin=form_bool("is_admin"))
+            limits, limit_error = _limit_fields()
+            if limit_error:
+                flash(limit_error, "error")
+                return redirect(url_for(".users"))
+            uid = create_user(username, password, is_admin=form_bool("is_admin"))
+            if any(v is not None for v in limits):  # formda girildiyse varsayılanın yerine
+                execute("UPDATE users SET quota_mb = ?, upload_max_mb = ? WHERE id = ?", (*limits, uid))
             flash(f"{username} oluşturuldu.", "success")
         return redirect(url_for(".users"))
     rows = query(
-        "SELECT u.*, (SELECT COUNT(*) FROM attachments a WHERE a.user_id = u.id) AS files,"
-        " (SELECT COALESCE(SUM(size), 0) FROM attachments a WHERE a.user_id = u.id) AS files_size"
+        "SELECT u.*, (SELECT COUNT(*) FROM attachments a WHERE a.user_id = u.id) AS files"
         " FROM users u ORDER BY u.id"
     )
-    return render_template("admin/users.html", users=rows)
+    return render_template("admin/users.html", users=rows, usage={r["id"]: quota.summary(r["id"]) for r in rows},
+                           global_quota_mb=current_app.config["STORAGE_QUOTA_MB"],
+                           default_quota=quota.env_default("DEFAULT_QUOTA_MB"),
+                           default_upload=quota.env_default("DEFAULT_UPLOAD_MAX_MB"))
+
+
+def _limit_fields():
+    """Formdaki kota alanları: ((quota_mb, upload_max_mb), hata). Boş = sınır yok."""
+    out = []
+    for name, label, maximum in (("quota_mb", "Depolama kotası", current_app.config["STORAGE_QUOTA_MB"]),
+                                 ("upload_max_mb", "Dosya sınırı", quota.MAX_UPLOAD_SETTING)):
+        raw = (request.form.get(name) or "").strip()
+        if not raw:
+            out.append(None)
+            continue
+        if not raw.isdigit():
+            return (None, None), f"{label} 0 ya da pozitif tam sayı (MB) olmalı; boş bırakılırsa sınır yok."
+        value = int(raw)
+        if value > maximum:
+            return (None, None), f"{label} en fazla {maximum} MB olabilir."
+        out.append(value)
+    return tuple(out), None
+
+
+@bp.route("/kullanicilar/<int:user_id>/sinirlar", methods=["POST"])
+@admin_required
+def set_limits(user_id):
+    user = query_one("SELECT username FROM users WHERE id = ?", (user_id,))
+    if user is None:
+        return redirect(url_for(".users"))
+    limits, error = _limit_fields()
+    if error:
+        flash(error, "error")
+        return redirect(url_for(".users"))
+    execute("UPDATE users SET quota_mb = ?, upload_max_mb = ? WHERE id = ?", (*limits, user_id))
+    q, up = limits
+    parts = [f"alan {q} MB" if q is not None else "alan sınırsız",
+             ("yükleme kapalı" if up == 0 else f"dosya başına {up} MB") if up is not None else "dosya boyutu sınırsız"]
+    flash(f"{user['username']}: " + ", ".join(parts) + ".", "success")
+    used = quota.usage(user_id)["total"]
+    if q is not None and used > q * quota.MB:
+        flash(f"{user['username']} şu an {used / quota.MB:.1f} MB kullanıyor; yeni dosya yükleyemez ama mevcutlar silinmez.",
+              "warning")
+    return redirect(url_for(".users") + f"#u{user_id}")
 
 
 @bp.route("/kullanicilar/<int:user_id>/sifre", methods=["POST"])

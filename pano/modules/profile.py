@@ -188,11 +188,14 @@ def contacts(p):
 
 
 # ---------- Fotoğraf ----------
-def process_photo(file_storage):
+def process_photo(file_storage, user_id=None):
     """Ortadan kare kırpar, en fazla 400×400 JPEG'e çevirir (EXIF/GPS yazılmaz); bayt döner, geçersizse ValueError."""
+    from .. import quota
     data = file_storage.read()
     if not data:
         raise ValueError("Fotoğraf dosyası boş.")
+    if user_id is not None:
+        quota.check_file(user_id, len(data), "Fotoğraf")
     try:
         img = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))  # telefon fotoğrafı yan durmasın
         if img.mode != "RGB":
@@ -205,6 +208,9 @@ def process_photo(file_storage):
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
         raise ValueError("Fotoğraf okunamadı; JPG, PNG ya da WEBP yükle.")
     out = buf.getvalue()
+    if user_id is not None:
+        old = query_one("SELECT COALESCE(length(photo), 0) AS n FROM public_profiles WHERE user_id = ?", (user_id,))
+        quota.check_space(user_id, len(out) - (old["n"] if old else 0))  # eski fotoğrafın yerine geçer
     if usage()["used"] + len(out) > quota_bytes():
         raise ValueError("Depolama kotası doldu; fotoğraf kaydedilemedi.")
     return out
@@ -345,7 +351,7 @@ def edit():
     upload = request.files.get("photo")
     if not error and upload and upload.filename:
         try:
-            photo = process_photo(upload)
+            photo = process_photo(upload, uid)
         except ValueError as e:
             error = str(e)
     if error:

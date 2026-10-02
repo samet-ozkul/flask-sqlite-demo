@@ -778,6 +778,11 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_scan_inbox_user ON scan_inbox(user_id, id);
     """,
+    # 28: kullanıcı başına depolama kotası ve dosya boyutu sınırı (NULL = sınır yok; upload_max_mb 0 = yükleme kapalı)
+    """
+    ALTER TABLE users ADD COLUMN quota_mb INTEGER;
+    ALTER TABLE users ADD COLUMN upload_max_mb INTEGER;
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

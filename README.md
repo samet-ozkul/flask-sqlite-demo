@@ -27,6 +27,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 - Yedekler sunucuda **saklanmaz**: indirilir ya da Telegram'a gönderilir.
 - **Aktar** dosyaları süreli durur (10 dk – 24 saat, varsayılan 1 saat), 5 dakikalık cron'da silinir, yedeğe girmez; dosya başına 25 MB, kişi başına toplam 100 MB.
 - Silinen kayıtların ek dosyaları çöp kutusunda 30 gün durur, sonra günlük cron ile kalıcı silinir; acele varsa **Çöp kutusu → Boşalt**.
+- **Kullanıcı başına sınır:** Yönetim → Kullanıcılar'da her kullanıcı için *depolama kotası* (dosyalarının toplam alanı: ekler, çöp kutusundaki ekler, Aktar, tarama kutusu, profil fotoğrafı) ve *dosya başına en fazla* boyut (0 = dosya yükleyemez) konur; boş = sınır yok. Kullanım çubuğu yönetim sayfasında, kişinin kendi kullanımı Ayarlar → 💾 Depolama'da görünür. Sınır dolunca yeni dosya reddedilir, mevcutlar silinmez.
 - Yönetim → **Temizlik**: sahipsiz dosyaları siler (çöp kutusundakilere dokunmaz), veritabanını sıkıştırır (VACUUM).
 - Yönetim sayfası tüm ev klasörünü ölçebilir; pip önbelleği şişerse `rm -rf ~/.cache/pip`.
 
@@ -131,6 +132,7 @@ Sonra 3. adımdaki **Static files** ayarını ekle, WSGI dosyasına yeni değiş
 | `GOLDAPI_KEY` | – | Panoda gram altın fiyatı (goldapi.io ücretsiz plan, 8 saatte bir sorgulanır) |
 | `TMDB_API_KEY` | – | İzleme listesinde film/dizi araması (themoviedb.org ücretsiz; v3 anahtarı ya da v4 okuma belirteci). Kitap araması anahtarsız çalışır |
 | `TRANSFER_MAX_MB`, `TRANSFER_TOTAL_MB` | – | Aktar: dosya başına üst sınır (varsayılan 25) ve kişi başına aynı anda toplam (varsayılan 100) |
+| `DEFAULT_QUOTA_MB`, `DEFAULT_UPLOAD_MAX_MB` | – | Yeni (yönetici olmayan) kullanıcıların başlangıç depolama kotası ve dosya başına sınırı (MB); boşsa sınırsız. Yönetici sonradan kullanıcı başına değiştirir |
 | `STORAGE_QUOTA_MB` | – | Veritabanı + dosyalar için üst sınır (varsayılan 350) |
 | `ALLOW_REGISTRATION` | – | `1` ise herkes kayıt olabilir (varsayılan kapalı) |
 | `APP_TZ` | – | Saat dilimi (varsayılan `Europe/Istanbul`) |

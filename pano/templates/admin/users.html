@@ -1,6 +1,17 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui %}
 {% block title %}Kullanıcılar{% endblock %}
+{% block head %}
+<style>
+  .q-bar { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin: 6px 0 2px; max-width: 320px; }
+  .q-bar span { display: block; height: 100%; background: var(--primary); }
+  .q-bar.warn span { background: var(--warn); }
+  .q-bar.full span { background: var(--danger); }
+  .q-form { display: flex; gap: 6px; flex-wrap: wrap; align-items: end; margin-top: 6px; }
+  .q-form label { display: flex; flex-direction: column; font-size: .78rem; color: var(--muted); }
+  .q-form input { width: 110px; }
+</style>
+{% endblock %}
 {% block content %}
 {{ ui.page_header("👥 Kullanıcılar", "Herkese açık kayıt kapalı; hesapları buradan oluşturursun.", back=url_for('admin.index')) }}
 
@@ -14,6 +25,12 @@
         {{ ui.field("Şifre", "password", type="password", required=True, attrs='minlength="8" autocomplete="new-password"') }}
       </div>
       {{ ui.checkbox("Yönetici yetkisi", "is_admin") }}
+      <div class="form-row">
+        {{ ui.field("Depolama kotası (MB)", "quota_mb", default_quota if default_quota is not none else "", type="number",
+                    attrs='min="0" max="' ~ global_quota_mb ~ '"', hint="Boş: sınır yok") }}
+        {{ ui.field("Dosya başına en fazla (MB)", "upload_max_mb", default_upload if default_upload is not none else "",
+                    type="number", attrs='min="0" max="1000"', hint="Boş: sınır yok · 0: dosya yükleyemez") }}
+      </div>
       <button class="btn primary">Oluştur</button>
     </form>
   </details>
@@ -22,7 +39,8 @@
 <section class="card">
   <ul class="rows">
     {% for u in users %}
-      <li style="flex-wrap: wrap">
+      {% set q = usage[u.id] %}
+      <li style="flex-wrap: wrap" id="u{{ u.id }}">
         <div class="grow">
           <div class="title">{{ u.display_name or u.username }} {% if u.display_name %}<span class="muted small">@{{ u.username }}</span>{% endif %}
             {% if u.is_admin %}<span class="badge good">yönetici</span>{% endif %}
@@ -30,9 +48,27 @@
             {% if u.id == g.user.id %}<span class="badge">sen</span>{% endif %}</div>
           <div class="meta">
             <span>{{ u.created_at | localdt('%d.%m.%Y') }}</span>
-            <span>{{ u.files }} dosya · {{ u.files_size | size }}</span>
+            <span>{{ u.files }} ek · toplam {{ q.usage.total | size }}{% if q.quota_mb is not none %} / {{ q.quota_mb }} MB{% endif %}</span>
+            <span>{% if q.upload_max_mb is none %}dosya boyutu sınırsız{% elif q.upload_max_mb == 0 %}🚫 yükleme kapalı{% else %}dosya başına {{ q.upload_max_mb }} MB{% endif %}</span>
             {% if u.telegram_chat_id %}<span>📨 Telegram</span>{% endif %}
           </div>
+          {% if q.quota_mb is not none %}
+            <div class="q-bar {{ 'full' if q.percent >= 100 else ('warn' if q.percent >= 80 else '') }}" title="%{{ q.percent }}"><span style="width: {{ q.percent }}%"></span></div>
+          {% endif %}
+          <details>
+            <summary class="muted small" style="cursor: pointer">💾 Alan ve dosya sınırı</summary>
+            <p class="muted small" style="margin: 6px 0 0">Ekler {{ q.usage.attachments | size }} · çöp kutusu {{ q.usage.trash | size }} ·
+              Aktar {{ q.usage.transfer | size }} · tarama {{ q.usage.scan | size }} · profil {{ q.usage.profile | size }}</p>
+            <form method="post" action="{{ url_for('admin.set_limits', user_id=u.id) }}" class="q-form">
+              {{ ui.csrf() }}
+              <label>Depolama kotası (MB)<input type="number" name="quota_mb" min="0" max="{{ global_quota_mb }}"
+                     value="{{ q.quota_mb if q.quota_mb is not none else '' }}" placeholder="sınırsız"></label>
+              <label>Dosya başına (MB)<input type="number" name="upload_max_mb" min="0" max="1000"
+                     value="{{ q.upload_max_mb if q.upload_max_mb is not none else '' }}" placeholder="sınırsız"></label>
+              <button class="btn sm primary">Kaydet</button>
+            </form>
+            <p class="muted small" style="margin: 4px 0 0">Boş: sınır yok (genel disk kotası {{ global_quota_mb }} MB yine geçerli) · dosya başına 0: hiç dosya yükleyemez.</p>
+          </details>
         </div>
         {% if u.id != g.user.id %}
           <div class="actions">

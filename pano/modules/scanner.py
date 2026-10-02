@@ -171,6 +171,11 @@ def inbox_add(user_id, data, filename="telegram.jpg"):
     mime = INBOX_MIMES.get(img.format)
     if mime is None:
         raise ScanError(f"{filename}: tarama için JPG, PNG ya da WEBP fotoğraf gönder.")
+    from .. import quota
+    try:
+        quota.check(user_id, len(data), filename or "Sayfa")
+    except quota.QuotaError as e:
+        raise ScanError(str(e))
     if storage.usage()["used"] + len(data) > storage.quota_bytes():
         raise ScanError("Sunucudaki depolama alanı dolu; sayfa kaydedilemedi.")
     stored = uuid.uuid4().hex
@@ -301,6 +306,13 @@ def _sources(uid, files):
 def make_pdf():
     uid = g.user["id"]
     uploaded = [f for f in request.files.getlist("files") if f and f.filename]
+    from .. import quota
+    try:
+        for f in uploaded:  # fotoğraflar saklanmaz ama yöneticinin dosya boyutu sınırı yüklemeye de uygulanır
+            quota.check_file(uid, storage._stream_size(f), f.filename)
+    except quota.QuotaError as e:
+        flash(str(e), "error")
+        return redirect(url_for(".index"))
     title = form_str("title", 100) or default_title()
     mode = form_choice("mode", MODES, DEFAULT_MODE)
     target = form_choice("target", TARGETS, "download")

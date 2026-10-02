@@ -322,9 +322,13 @@ def validate_new_user(username, password):
 
 
 def create_user(username, password, is_admin=False):
+    """Yeni kullanıcı; DEFAULT_QUOTA_MB / DEFAULT_UPLOAD_MAX_MB ayarlıysa (yönetici değilse) sınırlar onlarla başlar."""
+    from .quota import env_default
+    quota_mb, upload_max = (None, None) if is_admin else (env_default("DEFAULT_QUOTA_MB"),
+                                                          env_default("DEFAULT_UPLOAD_MAX_MB"))
     return execute(
-        "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)",
-        (username, generate_password_hash(password), 1 if is_admin else 0),
+        "INSERT INTO users (username, password_hash, is_admin, quota_mb, upload_max_mb) VALUES (?, ?, ?, ?, ?)",
+        (username, generate_password_hash(password), 1 if is_admin else 0, quota_mb, upload_max),
     ).lastrowid
 
 
