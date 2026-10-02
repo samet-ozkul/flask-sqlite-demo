@@ -8,7 +8,7 @@
 - UTC tutulan zamanlar (created_at, done_at, sayaç kayıtları) yıl sınırında tam, ısı haritasında APP_TZ'nin
   bugünkü farkıyla yerel güne çevrilir (Türkiye'de yaz/kış saati yok).
 - "📨 Telegram'a gönder" kısa metni kullanıcının kendi sohbetine yollar. Cron /gunluk 1 Ocak'ta geçen yılın
-  özetini Telegram'ı bağlı ve verisi olan herkese bir kez gönderir (durum app_state'te: yearreview:<id>:<yıl>).
+  özetini Telegram'ı bağlı, günlük özeti açık ve verisi olan herkese bir kez gönderir (app_state: yearreview:<id>:<yıl>).
 - Panoda 15 Aralık – 31 Ocak arası "📊 Yıl özetin hazır" şeridi (banner_year).
 Sorgular bölüm başına bir-iki toplu sorgudur; gün gün döngüyle sorgu atılmaz (CPU kısıtlı).
 """
@@ -540,13 +540,13 @@ def _state_key(user_id, year):
 
 
 def pending_new_year(now):
-    """1 Ocak'ta [(kullanıcı, geçen yıl)]: Telegram'ı bağlı, geçen yıl verisi olan ve henüz gönderilmemişler.
-    1 Ocak dışında boş liste."""
+    """1 Ocak'ta [(kullanıcı, geçen yıl)]: Telegram'ı bağlı, günlük özeti açık, geçen yıl verisi olan ve henüz
+    gönderilmemişler. 1 Ocak dışında boş liste."""
     if (now.month, now.day) != (1, 1):
         return []
     year = now.year - 1
     out = []
-    for user in query("SELECT * FROM users WHERE telegram_chat_id IS NOT NULL ORDER BY id"):
+    for user in query("SELECT * FROM users WHERE telegram_chat_id IS NOT NULL AND notify_daily = 1 ORDER BY id"):
         if query_one("SELECT 1 FROM app_state WHERE key = ?", (_state_key(user["id"], year),)):
             continue
         if has_data(user["id"], year):

@@ -128,7 +128,7 @@ def daily(secret):
                 except telegram.TelegramError as e:
                     result["errors"].append(f"{user['username']} rapor: {e}")
 
-    # Yılbaşı: geçen yılın özeti (1 Ocak; Telegram'ı bağlı ve geçen yıl verisi olan herkese, yılda bir kez)
+    # Yılbaşı: geçen yılın özeti (1 Ocak; Telegram'ı bağlı, günlük özeti açık ve geçen yıl verisi olana, yılda bir kez)
     from . import yearreview
     result["year_reviews"] = 0
     now = todo.now_local()

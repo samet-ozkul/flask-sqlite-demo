@@ -443,6 +443,12 @@ def test_new_year_cron():
     assert cron()["year_reviews"] == 0 and len(reviews()) == 2
     with app.app_context():
         assert query_one("SELECT value FROM app_state WHERE key = 'yearreview:1:2026'")["value"] == "2027-01-01"
+    # Günlük özeti kapatan kullanıcıya gitmez
+    run("DELETE FROM app_state WHERE key = 'yearreview:1:2026'")
+    run("UPDATE users SET notify_daily = 0 WHERE id = 1")
+    assert cron()["year_reviews"] == 0 and len(reviews()) == 2
+    run("UPDATE users SET notify_daily = 1 WHERE id = 1")
+    run("INSERT INTO app_state (key, value) VALUES ('yearreview:1:2026', '2027-01-01')")
     # 2 Ocak: henüz almamış (yeni bağlanan) kullanıcıya da gitmez
     run("UPDATE users SET telegram_chat_id = '400' WHERE id = ?", (CAN,))
     NOW[0] = datetime(2027, 1, 2, 8, 0, tzinfo=TZ)
