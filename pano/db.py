@@ -834,6 +834,73 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_wifi_cards_user ON wifi_cards(user_id);
     """,
+    # 33: randevu sayfası (/r/<adres>, girişsiz; kullanıcı başına tek sayfa). Saatler uygulamanın yerel saati
+    # (APP_TZ) 'YYYY-MM-DD HH:MM'; aynı başlangıca ikinci aktif randevu veritabanında da engellenir
+    """
+    CREATE TABLE booking_pages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        slug TEXT NOT NULL UNIQUE,
+        enabled INTEGER NOT NULL DEFAULT 0,
+        title TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        min_notice_hours INTEGER NOT NULL DEFAULT 2,  -- en az kaç saat önceden
+        horizon_days INTEGER NOT NULL DEFAULT 30,     -- bugünden itibaren kaç gün
+        slot_step INTEGER NOT NULL DEFAULT 30,        -- boş saatler kaç dakikada bir başlar
+        needs_approval INTEGER NOT NULL DEFAULT 1,
+        busy_from_calendar INTEGER NOT NULL DEFAULT 1, -- takvimdeki saatli kayıtlar dolu sayılır
+        weekly_hours TEXT NOT NULL DEFAULT '{}',      -- JSON: {"0": [["09:00", "12:00"], ["13:00", "17:00"]]} 0 = Pazartesi
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE booking_blocks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        start_date TEXT NOT NULL,                     -- 'YYYY-MM-DD', iki gün de dahil (tatil / izin)
+        end_date TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_booking_blocks_user ON booking_blocks(user_id, end_date);
+    CREATE TABLE booking_types (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        duration_min INTEGER NOT NULL DEFAULT 30,
+        location_kind TEXT NOT NULL DEFAULT 'online'
+            CHECK (location_kind IN ('in_person', 'phone', 'online', 'callback')),
+        location_detail TEXT NOT NULL DEFAULT '',     -- adres / aranacak numara / görüşme linki
+        buffer_min INTEGER NOT NULL DEFAULT 0,        -- öncesi ve sonrası boş kalacak dakika
+        active INTEGER NOT NULL DEFAULT 1,
+        sort INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_booking_types_user ON booking_types(user_id, sort);
+    CREATE TABLE bookings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type_id INTEGER REFERENCES booking_types(id) ON DELETE SET NULL,
+        type_name TEXT NOT NULL DEFAULT '',           -- tür sonradan değişse/silinse de randevuda kalır
+        location_kind TEXT NOT NULL DEFAULT '',
+        location_detail TEXT NOT NULL DEFAULT '',
+        buffer_min INTEGER NOT NULL DEFAULT 0,
+        start_at TEXT NOT NULL,                       -- yerel 'YYYY-MM-DD HH:MM'
+        end_at TEXT NOT NULL,
+        name TEXT NOT NULL,
+        contact TEXT NOT NULL,                        -- telefon ya da e-posta
+        note TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'pending'
+            CHECK (status IN ('pending', 'confirmed', 'rejected', 'cancelled')),
+        cancelled_by TEXT,                            -- 'owner' | 'visitor'
+        manage_token TEXT NOT NULL UNIQUE,            -- ziyaretçinin /r/i/<anahtar> bağlantısı
+        event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,   -- onaylanınca takvime eklenen etkinlik
+        ip_hash TEXT NOT NULL DEFAULT '',             -- SECRET_KEY ile HMAC; IP düz saklanmaz
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX idx_bookings_slot ON bookings(user_id, start_at) WHERE status IN ('pending', 'confirmed');
+    CREATE INDEX idx_bookings_user ON bookings(user_id, start_at);
+    CREATE INDEX idx_bookings_ip ON bookings(ip_hash, created_at);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

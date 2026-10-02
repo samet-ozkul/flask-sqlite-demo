@@ -1,0 +1,95 @@
+<!doctype html>
+{# Herkese açık randevu sayfaları: base.html kullanılmaz (menü, kullanıcı bilgisi, betik yok). Sadece booking_pages,
+   booking_types ve ziyaretçinin kendi randevusu; formlarda uygulamanın CSRF anahtarı (JS gerekmez). #}
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}{% endblock %}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+  <style>
+    :root {
+      --bg: #f5f6fa; --card: #ffffff; --text: #1c1e26; --muted: #6b7080; --border: #e3e5ec;
+      --accent: #4f46e5; --on-accent: #ffffff; --soft: #eef0ff;
+      --ok: #15803d; --ok-soft: #e6f6eb; --warn: #b45309; --warn-soft: #fdf2e0; --danger: #dc2626; --danger-soft: #fdecec;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f1117; --card: #181b24; --text: #e8e9ee; --muted: #9095a5; --border: #2a2e3a;
+              --accent: #818cf8; --on-accent: #0f1117; --soft: #23264a;
+              --ok: #4ade80; --ok-soft: #13291c; --warn: #fbbf24; --warn-soft: #2e2410; --danger: #f87171; --danger-soft: #2f1618; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+           padding: max(24px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+           font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    a { color: var(--accent); }
+    .owner { width: 100%; max-width: 520px; margin-bottom: 12px; padding: 8px 12px; border-radius: 10px; font-size: .88rem;
+             background: var(--card); border: 1px dashed var(--border); color: var(--muted); text-align: center; }
+    main { width: 100%; max-width: 520px; background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+           padding: 24px 18px 20px; }
+    h1 { font-size: 1.4rem; margin: 0 0 4px; line-height: 1.25; overflow-wrap: anywhere; }
+    h2 { font-size: 1rem; margin: 0 0 8px; }
+    .muted { color: var(--muted); }
+    .small { font-size: .86rem; }
+    p { margin: 6px 0 0; }
+    .desc { white-space: pre-line; overflow-wrap: anywhere; }
+    .back { display: inline-block; margin-bottom: 10px; font-size: .9rem; text-decoration: none; overflow-wrap: anywhere; }
+    .tz { margin-top: 12px; padding: 8px 12px; border-radius: 10px; background: var(--soft); font-size: .88rem; }
+    .types { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+    .types a { display: block; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); color: var(--text);
+               text-decoration: none; }
+    .types a:hover { border-color: var(--accent); }
+    .types b { display: block; font-size: 1.05rem; overflow-wrap: anywhere; }
+    .types span { color: var(--muted); font-size: .9rem; }
+    .day { padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .day:last-of-type { border-bottom: 0; }
+    .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+    .slots a { display: block; padding: 9px 4px; border-radius: 10px; border: 1px solid var(--accent); color: var(--accent);
+               text-align: center; text-decoration: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .slots a:hover { background: var(--accent); color: var(--on-accent); }
+    .pager { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .pager a { padding: 8px 12px; border-radius: 10px; background: var(--soft); text-decoration: none; font-size: .92rem; }
+    .summary { margin-top: 14px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); }
+    .summary > div { overflow-wrap: anywhere; }
+    .summary > div + div { margin-top: 4px; }
+    form label { display: block; margin-top: 12px; font-weight: 600; font-size: .92rem; }
+    input, textarea { display: block; width: 100%; margin-top: 4px; padding: 10px 12px; font: inherit; font-size: 16px;
+                      color: var(--text); background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+    input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+    textarea { min-height: 90px; resize: vertical; }
+    .hint { display: block; font-weight: 400; color: var(--muted); font-size: .82rem; margin-top: 3px; }
+    .check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; }
+    .check input { width: 18px; height: 18px; margin: 3px 0 0; flex-shrink: 0; accent-color: var(--accent); }
+    .btn { display: block; width: 100%; margin-top: 16px; padding: 13px 16px; border-radius: 12px; border: 0;
+           background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 600; text-align: center;
+           text-decoration: none; cursor: pointer; }
+    .btn:hover { filter: brightness(1.08); }
+    .btn.light { background: var(--soft); color: var(--text); }
+    .btn.danger { background: var(--danger-soft); color: var(--danger); }
+    .hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+    .alert { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); }
+    .notice { margin-bottom: 14px; padding: 10px 12px; border-radius: 10px; background: var(--ok-soft); color: var(--ok); }
+    .status { display: inline-block; margin-top: 4px; padding: 3px 12px; border-radius: 99px; font-weight: 600; font-size: .9rem; }
+    .status.pending { background: var(--warn-soft); color: var(--warn); }
+    .status.confirmed { background: var(--ok-soft); color: var(--ok); }
+    .status.rejected, .status.cancelled { background: var(--danger-soft); color: var(--danger); }
+    .save { margin-top: 14px; padding: 10px 12px; border-radius: 10px; border: 1px dashed var(--accent); font-size: .9rem; }
+    .save code { display: block; margin-top: 6px; font-size: .84rem; overflow-wrap: anywhere; user-select: all; }
+    footer { margin-top: 18px; font-size: .75rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  {% if owner %}
+    <div class="owner">{% if page.enabled %}Bu senin randevu sayfan{% else %}🔒 Sayfa kapalı: şu an sadece sen görüyorsun{% endif %}
+      · <a href="{{ url_for('booking.index') }}">✏️ Düzenle</a></div>
+  {% endif %}
+  <main>
+    {% block main %}{% endblock %}
+  </main>
+  <footer>Kişisel Pano</footer>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{% extends "booking/_public_layout.html" %}
+{# Bir görüşme türünün boş saatleri: 7 günlük pencere, her saat formu açan bir bağlantı (betik yok). #}
+{% block title %}{{ btype.name }} · {{ page.title or "Randevu al" }}{% endblock %}
+{% block main %}
+  {% set loc = locations[btype.location_kind] %}
+  <a class="back" href="{{ url_for('booking.public', slug=page.slug) }}">← {{ page.title or "Randevu al" }}</a>
+  <h1>{{ btype.name }}</h1>
+  <p class="muted">⏱️ {{ btype.duration_min }} dk · {{ loc[0] }} {{ loc[3] }}</p>
+  <p class="tz">🕒 {{ tz_note }}</p>
+  {% if any_free %}
+    {% for label, d, free in days %}
+      <section class="day">
+        <h2>{{ label }}</h2>
+        {% if free %}
+          <div class="slots">
+            {% for s in free %}<a href="{{ url_for('booking.request_form', slug=page.slug, type_id=btype.id, t=s.strftime(slot_format)) }}">{{ s.strftime('%H:%M') }}</a>{% endfor %}
+          </div>
+        {% else %}
+          <p class="muted small">Boş saat yok</p>
+        {% endif %}
+      </section>
+    {% endfor %}
+    {% if prev_start or next_start %}
+      <nav class="pager" aria-label="Günler">
+        {% if prev_start %}<a href="{{ url_for('booking.slots', slug=page.slug, type_id=btype.id, bas=prev_start) }}">← Önceki günler</a>{% else %}<span></span>{% endif %}
+        {% if next_start %}<a href="{{ url_for('booking.slots', slug=page.slug, type_id=btype.id, bas=next_start) }}">Sonraki günler →</a>{% endif %}
+      </nav>
+    {% endif %}
+  {% else %}
+    <p class="alert">Önümüzdeki günlerde boş saat yok; daha sonra tekrar bak.</p>
+  {% endif %}
+{% endblock %}

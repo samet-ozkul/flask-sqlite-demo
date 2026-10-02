@@ -1,0 +1,21 @@
+{% extends "booking/_public_layout.html" %}
+{# Herkese açık randevu sayfası: başlık, açıklama ve aktif görüşme türleri (adres/link burada gösterilmez). #}
+{% block title %}{{ page.title or "Randevu al" }}{% endblock %}
+{% block main %}
+  <h1>{{ page.title or "Randevu al" }}</h1>
+  {% if page.description %}<p class="desc">{{ page.description }}</p>{% endif %}
+  {% if types %}
+    <nav class="types" aria-label="Görüşme türleri">
+      {% for t in types %}
+        {% set loc = locations[t.location_kind] %}
+        <a href="{{ url_for('booking.slots', slug=page.slug, type_id=t.id) }}">
+          <b>{{ t.name }}</b>
+          <span>⏱️ {{ t.duration_min }} dk · {{ loc[0] }} {{ loc[3] }}</span>
+        </a>
+      {% endfor %}
+    </nav>
+  {% else %}
+    <p class="alert">Şu an randevu alınamıyor; daha sonra tekrar bak.</p>
+  {% endif %}
+  <p class="tz">🕒 {{ tz_note }} Bir görüşme türü seç, sonra boş saatlerden birini.</p>
+{% endblock %}
