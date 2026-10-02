@@ -24,6 +24,7 @@ MODULES = [
     ("warranty", "warranty.index", "Garanti", "🛡️", "Ev ve araç"),
     ("inventory", "inventory.index", "Ev Envanteri", "📦", "Ev ve araç"),
     ("documents", "documents.index", "Belgeler", "🪪", "Ev ve araç"),
+    ("homecare", "homecare.index", "Ev Bakımı", "🔧", "Ev ve araç"),
     ("habits", "habits.index", "Alışkanlıklar", "🔥", "Kişisel"),
     ("journal", "journal.index", "Günlük", "📓", "Kişisel"),
     ("weekly", "weekly.index", "Haftalık Değerlendirme", "🗓️", "Kişisel"),

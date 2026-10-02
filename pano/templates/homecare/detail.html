@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "homecare/_form.html" import task_fields with context %}
+{% block title %}{{ t.name }}{% endblock %}
+{% block head %}
+<style>
+  .stat .value.date { font-size: 1.1rem; }
+  .log-note { white-space: pre-line; }
+</style>
+{% endblock %}
+{% block content %}
+{% set period = period_label(t.interval_n, t.interval_unit) %}
+{% call ui.page_header(t.icon ~ " " ~ t.name, categories[t.category][0] ~ " · " ~ period ~ ("" if t.active else " · pasif"),
+                       back=url_for('homecare.index')) %}
+  {{ ui.post_button(url_for('homecare.toggle', task_id=t.id), "⏸️ Durdur" if t.active else "▶️ Etkinleştir", "",
+                    "Durdurulan işe hatırlatma gelmez" if t.active else "") }}
+  {{ ui.delete_button(url_for('homecare.delete', task_id=t.id), "Sil", "İş ve geçmişi silinsin mi? Çöp kutusundan geri getirebilirsin.") }}
+{% endcall %}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Sıradaki</div>
+    <div class="value date">{{ t.next_due | date_tr(True) }}</div>
+    <div class="sub">{% if t.active %}{{ ui.due_badge(t.next_due, warn_days(t)) }}{% else %}pasif{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Son yapılma</div>
+    <div class="value date">{{ stats.last_done | date_tr if stats.last_done else "—" }}</div>
+    <div class="sub">{{ stats.count }} kayıt</div>
+  </div>
+  <div class="stat">
+    <div class="label">Toplam harcanan</div>
+    <div class="value">{{ stats.total | money }}</div>
+    <div class="sub">{{ (stats.paid ~ " kayıtta tutar var") if stats.paid else "tutar girilmemiş" }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>✅ Yaptım</h2>
+  <form method="post" action="{{ url_for('homecare.done', task_id=t.id) }}">
+    {{ ui.csrf() }}
+    <div class="form-row three">
+      {{ ui.field("Tarih", "done_on", today_str(), type="date", required=True, attrs='max="' ~ today_str() ~ '"') }}
+      {{ ui.money_field("Tutar", "cost") }}
+      <label class="field"><span>Harcama kategorisi</span>
+        <select name="expense_category">
+          {% for c in expense_categories %}<option value="{{ c }}" {% if c == expense_category %}selected{% endif %}>{{ category_icon(c) }} {{ c }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    {{ ui.field("Not", "note", placeholder="ör. Servis geldi, filtre değişti", attrs='maxlength="500"') }}
+    {{ ui.checkbox("💸 Tutarı Harcamalar'a da ekle", "add_expense", True) }}
+    <p class="muted small">Sıradaki tarih = yapılma tarihi + periyot ({{ period | lower }}).</p>
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Geçmiş <span class="pill-count">{{ logs | length }}</span></h2>
+  {% if logs %}
+    <ul class="rows">
+      {% for l in logs %}
+        <li>
+          <span class="ico">✅</span>
+          <div class="grow">
+            <div class="title">{{ l.done_on | date_tr(True) }}</div>
+            {% if l.note or l.expense_live %}
+              <div class="meta">
+                {% if l.note %}<span class="log-note">{{ l.note }}</span>{% endif %}
+                {% if l.expense_live %}<a href="{{ url_for('expenses.edit', expense_id=l.expense_live) }}">💸 harcamalarda</a>{% endif %}
+              </div>
+            {% endif %}
+          </div>
+          {% if l.cost is not none %}<span class="amount">{{ l.cost | money }}</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    <form method="post" action="{{ url_for('homecare.undo', task_id=t.id) }}" class="row-flex" style="margin-top: 10px"
+          data-confirm="{{ last.done_on | date_tr }} kaydı geri alınsın mı?{{ ' Harcamalara eklenen tutar da silinir.' if last.expense_live }}">
+      {{ ui.csrf() }}
+      <button class="btn sm">↩️ Son kaydı geri al</button>
+      <span class="muted small">{{ last.done_on | date_tr }} kaydı silinir, sıradaki tarih {{ last.prev_due | date_tr }} olur{{ '; harcama kaydı da silinir' if last.expense_live }}.</span>
+    </form>
+  {% else %}
+    {{ ui.empty("Henüz kayıt yok. İşi yapınca yukarıdan kaydet; sıradaki tarih kendiliğinden hesaplanır.", "🗓️") }}
+  {% endif %}
+</div>
+
+<div class="card">
+  {% if t.notes %}<p class="muted" style="white-space: pre-line; margin-top: 0">{{ t.notes }}</p>{% endif %}
+  <details class="add">
+    <summary>✏️ Düzenle</summary>
+    <form method="post" action="{{ url_for('homecare.update', task_id=t.id) }}">
+      {{ ui.csrf() }}
+      {{ task_fields(t) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+{% endblock %}

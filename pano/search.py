@@ -23,6 +23,11 @@ def _order_detail(r):
                                   fmt_money(r["amount"]) if r["amount"] is not None else "") if x)
 
 
+def _home_period(r):
+    from .modules.homecare import task_period
+    return task_period(r).lower()
+
+
 def _map_title(r):
     from .modules.places import CATEGORIES
     if r["kind"] == "city":
@@ -111,6 +116,10 @@ def _sources(user_id):
          ("name", "holder", "note"), lambda r: r["name"],
          lambda r: " · ".join(x for x in (r["holder"], "bitiş " + fmt_date(r["expires_on"])) if x),
          lambda r: url_for("documents.edit", doc_id=r["id"])),
+        ("Ev Bakımı", "🔧", "SELECT * FROM home_tasks WHERE user_id = ? ORDER BY next_due LIMIT ?", (user_id,),
+         ("name", "notes"), lambda r: r["name"] + ("" if r["active"] else " (pasif)"),
+         lambda r: "sıradaki " + fmt_date(r["next_due"]) + " · " + _home_period(r),
+         lambda r: url_for("homecare.detail", task_id=r["id"])),
         ("İzleme / Okuma", "🎬", "SELECT * FROM watchlist WHERE user_id = ? ORDER BY id DESC LIMIT ?", (user_id,),
          ("title", "creator", "note", "year"), lambda r: r["title"] + (" ✓" if r["status"] == "done" else ""),
          lambda r: " · ".join(x for x in (r["year"], r["creator"]) if x),

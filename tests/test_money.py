@@ -51,6 +51,9 @@ def main():
     assert parse_number("1.234,56") == 1234.56
     assert parse_number("12,5") == 12.5
     assert parse_number("1234.56") == 1234.56
+    # Sonsuz / NaN geçersiz sayılır (form_int'te int(inf) hatası vermesin)
+    assert parse_number("1e999") is None and parse_number("inf") is None and parse_number("nan") is None
+    assert parse_number("-1e999") is None and parse_number("1e3") == 1000
     # Sadece binlik ayırıcılı yazım (money_field 1000'i "1.000" gösterir)
     pa = expenses_mod.parse_amount
     assert pa("1.234,56") == 1234.56 and pa("1.000") == 1000 and pa("12.500") == 12500

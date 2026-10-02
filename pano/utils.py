@@ -1,6 +1,7 @@
 """Tarih/saat, form okuma, biçimlendirme ve Jinja filtreleri."""
 import calendar
 import html
+import math
 import os
 import re
 from datetime import date, datetime, timedelta, timezone
@@ -111,7 +112,7 @@ def form_bool(name):
 
 
 def parse_number(value):
-    """'1.234,56' / '1234.56' / '12,5' -> float; boş/geçersizse None."""
+    """'1.234,56' / '1234.56' / '12,5' -> float; boş/geçersizse (sonsuz, NaN dahil) None."""
     if value is None:
         return None
     s = str(value).strip().replace(" ", "").replace("₺", "")
@@ -130,9 +131,10 @@ def parse_number(value):
         # fmt_number 1000'i "1.000" gösterdiği için formdan böyle geri gelir.
         s = s.replace(".", "")
     try:
-        return float(s)
+        n = float(s)
     except ValueError:
         return None
+    return n if math.isfinite(n) else None   # "1e999", "inf", "nan": int()'e çevrilirken 500 vermesin
 
 
 def form_float(name):

@@ -45,9 +45,14 @@
     {{ ui.textarea("Nasıl geçti?", "text", edit_entry.text if edit_entry else "", rows=4, placeholder="Bugün aklında kalan bir şey…") }}
     <div class="row-flex">
       <button class="btn primary">Kaydet</button>
-      {% if edit_entry %}{{ ui.delete_button(url_for('journal.delete', day=edit_day), "Sil", "Bu günün kaydı silinsin mi?") }}{% endif %}
+      {# Sil düğmesi aşağıdaki ayrı forma bağlı: form içinde form olunca tarayıcı içtekini yok sayıp kaydediyordu #}
+      {% if edit_entry %}<button class="btn danger sm" form="journal-delete">Sil</button>{% endif %}
     </div>
   </form>
+  {% if edit_entry %}
+    <form id="journal-delete" method="post" action="{{ url_for('journal.delete', day=edit_day) }}" hidden
+          data-confirm="Bu günün kaydı silinsin mi?">{{ ui.csrf() }}</form>
+  {% endif %}
 </div>
 
 {% if memories %}
