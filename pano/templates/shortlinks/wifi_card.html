@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "shortlinks/_wifi_form.html" import wifi_form %}
+{% block title %}{{ card.title }} · Wi-Fi kartı{% endblock %}
+{% block head %}
+<style>
+  .wifi-card { max-width: 420px; margin: 0 auto 14px; padding: 22px 18px; text-align: center; background: var(--surface);
+               border: 2px dashed var(--border); border-radius: 18px; }
+  .wifi-card h2 { font-size: 1.4rem; margin: 0; overflow-wrap: anywhere; }
+  .wifi-card .qr-box svg { width: min(280px, 100%); height: auto; aspect-ratio: 1; display: block; margin: 14px auto; border-radius: 8px; }
+  .wifi-card dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; max-width: 340px; margin: 0 auto; text-align: left; }
+  .wifi-card dt { color: var(--muted); }
+  .wifi-card dd { margin: 0; font-weight: 600; font-size: 1.1rem; overflow-wrap: anywhere;
+                  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .wifi-card .how { margin: 14px 0 0; }
+  .wifi-actions { justify-content: center; margin-bottom: 14px; }
+  @media print {
+    /* Sadece kart basılır; koyu temada da kâğıtta siyah yazı / beyaz zemin olsun diye renkler sabit */
+    .topbar, .bottomnav, .page-header, .flash, .no-print, dialog { display: none !important; }
+    body { background: #fff; padding: 0; }
+    .container { padding: 0; max-width: none; }
+    .wifi-card { color: #000; background: #fff; border-color: #888; margin-top: 12mm; box-shadow: none; break-inside: avoid; }
+    .wifi-card dt, .wifi-card .muted { color: #444; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("📶 " ~ card.title, "Yazdırılabilir misafir kartı", back=url_for('shortlinks.index', tab='wifi')) %}
+  {{ ui.delete_button(url_for('shortlinks.wifi_delete', card_id=card.id), "Sil", "Wi-Fi kartı silinsin mi?") }}
+{% endcall %}
+
+<article class="wifi-card">
+  <h2>📶 {{ card.title }}</h2>
+  <div class="qr-box">{{ qr | safe }}</div>
+  <dl>
+    <dt>Ağ adı</dt><dd>{{ card.ssid }}</dd>
+    {% if card.security == 'nopass' %}
+      <dt>Şifre</dt><dd>yok (açık ağ)</dd>
+    {% else %}
+      <dt>Şifre</dt><dd>{{ card.password }}</dd>
+    {% endif %}
+  </dl>
+  {% if card.hidden %}<p class="muted small">Gizli ağ: listede görünmez, QR ile bağlanılır.</p>{% endif %}
+  <p class="how"><b>Telefon kamerasıyla okut, otomatik bağlan</b></p>
+</article>
+
+<div class="row-flex wifi-actions no-print">
+  <button type="button" class="btn primary hidden" id="wifi-print">🖨️ Yazdır</button>
+  <a class="btn" href="{{ url_for('shortlinks.wifi_qr', card_id=card.id) }}">⬇️ QR'ı PNG indir</a>
+</div>
+
+<details class="card no-print" {% if open_edit %}open{% endif %}>
+  <summary><b>✏️ Düzenle</b></summary>
+  <div style="margin-top: 12px">{{ wifi_form(form, url_for('shortlinks.wifi_edit', card_id=card.id), security) }}</div>
+</details>
+<script src="{{ url_for('static', filename='shortlinks.js') }}?v=1" defer></script>
+{% endblock %}

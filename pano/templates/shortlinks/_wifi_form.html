@@ -1,0 +1,27 @@
+{% import "_macros.html" as ui %}
+{# Wi-Fi kartı formu: ekleme (Wi-Fi sekmesi) ve düzenleme (kart sayfası). f: dict ya da satır #}
+{% macro wifi_form(f, action, security, submit="Kaydet") -%}
+  <form method="post" action="{{ action }}">
+    {{ ui.csrf() }}
+    <div class="form-row">
+      {{ ui.field("Ağ adı (SSID)", "ssid", f.ssid, required=True, placeholder="ör. EvAgi_5G",
+                  attrs='maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"') }}
+      {{ ui.field("Başlık", "title", f.title, placeholder="Boşsa ağ adı (ör. Misafir ağı)", attrs='maxlength="60"') }}
+    </div>
+    <div class="form-row">
+      <label class="field"><span>Güvenlik</span>
+        <select name="security">
+          {% for key, label in security.items() %}<option value="{{ key }}" {% if key == (f.security or 'WPA') %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <div data-show-for="security=WPA,WEP">
+        {{ ui.field("Şifre", "password", f.password,
+                    attrs='maxlength="64" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"') }}
+      </div>
+    </div>
+    {{ ui.checkbox("🙈 Gizli ağ (ağ adı yayınlanmıyor)", "is_hidden", f.hidden) }}
+    <p class="muted small">🔓 Şifre sunucuda düz metin saklanır (Şifreli Kasa değildir); kartı göstermek istediğin
+      kişiler okutunca ağa bağlanır.</p>
+    <button class="btn primary">{{ submit }}</button>
+  </form>
+{%- endmacro %}

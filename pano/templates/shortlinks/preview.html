@@ -1,0 +1,51 @@
+<!doctype html>
+{# Kısa link önizlemesi: base.html kullanılmaz (menü, kullanıcı bilgisi, CSRF, betik yok); tıklanma sayılmaz. #}
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kısa link: {{ domain }}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+  <style>
+    :root {
+      --bg: #f5f6fa; --card: #ffffff; --text: #1c1e26; --muted: #6b7080; --border: #e3e5ec;
+      --accent: #4f46e5; --on-accent: #ffffff;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f1117; --card: #181b24; --text: #e8e9ee; --muted: #9095a5; --border: #2a2e3a;
+              --accent: #818cf8; --on-accent: #0f1117; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+           padding: max(24px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+           font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    main { width: 100%; max-width: 460px; background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+           padding: 26px 20px 22px; text-align: center; }
+    .icon { font-size: 2.6rem; line-height: 1; }
+    h1 { font-size: 1.15rem; margin: 10px 0 4px; font-weight: 600; }
+    .domain { font-size: 1.4rem; font-weight: 700; margin: 0; overflow-wrap: anywhere; color: var(--accent); }
+    .target { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); text-align: left;
+              font: .88rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+    .go { display: block; margin-top: 18px; padding: 13px 16px; border-radius: 12px; background: var(--accent);
+          color: var(--on-accent); text-decoration: none; font-weight: 600; }
+    .go:hover { filter: brightness(1.08); }
+    .hint { color: var(--muted); font-size: .85rem; margin: 14px 0 0; overflow-wrap: anywhere; }
+    footer { margin-top: 18px; font-size: .75rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="icon">🔗</div>
+    <h1>Bu kısa link şuraya gidiyor:</h1>
+    <p class="domain">{{ domain }}</p>
+    <p class="target">{{ link.target }}</p>
+    <a class="go" href="{{ link.target }}" rel="noopener noreferrer nofollow">Devam et →</a>
+    <p class="hint">Adresi tanımıyorsan devam etme. Kısa adres: {{ url }}</p>
+  </main>
+  <footer>Kişisel Pano</footer>
+</body>
+</html>

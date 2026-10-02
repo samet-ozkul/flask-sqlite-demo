@@ -10,7 +10,8 @@ Mesajı gönderen, bu sohbete bağlı pano kullanıcısıdır.
   /yap fatura öde yarın 14:00 -> yapılacak (sondaki tarih/saat kelimeleri anlaşılır)
   /liste [ad]                -> açık maddeler, dokununca işaretlenir
   /bugun                     -> günün özeti
-  link                       -> Sonra Bak'a kaydedilir
+  /kisalt url [kod]          -> kısa link (/k/kod)
+  link                      -> Sonra Bak'a kaydedilir
   fotoğraf / PDF             -> garantiye ya da nota eklenir (sorulur)
   konum                      -> park yeri ya da Harita'ya yer olarak kaydedilir (sorulur)
   düz yazı                   -> ne yapılacağı butonlarla sorulur
@@ -39,6 +40,7 @@ COMMANDS = [
     ("gunluk", "Günlüğe yaz: /gunluk bugün çok yoğundu"),
     ("aktar", "Aktarma kutusuna metin koy: /aktar metin"),
     ("tara", "Belge tara: /tara yaz, sayfaların fotoğraflarını gönder, PDF yap"),
+    ("kisalt", "Kısa link: /kisalt https://ornek.com/uzun-adres [kod]"),
     ("baslat", "Zaman sayacını başlat: /baslat proje not"),
     ("durdur", "Zaman sayacını durdur"),
     ("zaman", "Çalışan sayaç ve bugünün toplamı"),
@@ -64,6 +66,7 @@ HELP = """<b>Kişisel Pano komutları</b>
 📋 <code>/liste</code> ya da <code>/liste market</code> — açık maddeler
 📤 <code>/aktar metin</code> — bilgisayarda açmak için aktarma kutusuna koy (dosya gönderirsen “📤 Aktar”)
 📄 <code>/tara</code> — sayfaların fotoğraflarını gönder, bitince “📄 PDF yap” (orijinal renk; siyah-beyaz için <code>/tara siyah</code>)
+🔗 <code>/kisalt https://ornek.com/uzun-adres</code> — kısa link (sonuna kod yazılabilir: <code>... yaz-indirimi</code>)
 ⏱️ <code>/baslat web sitesi tasarım</code> — zaman sayacını başlat (baştaki kelimeler proje adıysa o projeye)
     <code>/durdur</code> — sayacı durdur · <code>/zaman</code> — çalışan sayaç ve bugünün toplamı
 ☀️ <code>/bugun</code> — günün özeti
@@ -167,6 +170,7 @@ def handle_message(msg):
             "gunluk": cmd_journal, "g": cmd_journal,
             "tara": cmd_scan,
             "aktar": cmd_transfer,
+            "kisalt": cmd_shorten,
             "baslat": cmd_timer_start, "durdur": cmd_timer_stop, "zaman": cmd_timer_status,
             "liste": cmd_list, "l": cmd_list,
             "bugun": cmd_today,
@@ -679,6 +683,26 @@ def save_link(user, chat_id, url, text):
         execute("INSERT INTO links (user_id, url, title) VALUES (?, ?, ?)", (user["id"], url, title))
         message = f"🔖 Sonra Bak'a kaydedildi: <b>{esc(title)}</b>"
     telegram.send_message(chat_id, f'{message}\n<a href="{esc(link("links.index"))}">Linkler →</a>')
+
+
+# ---------- Kısa link ----------
+def cmd_shorten(user, chat_id, rest):
+    """'/kisalt https://ornek.com/uzun yaz-indirimi': kısa link (kod isteğe bağlı, boşsa rastgele)."""
+    from .modules.links import domain_of
+    from .modules.shortlinks import LinkError, create_link, short_url
+    parts = rest.split(None, 1)
+    if not parts:
+        telegram.send_message(chat_id, "Örnek: <code>/kisalt https://ornek.com/cok-uzun-adres</code>\n"
+                                       "Kod da verilebilir: <code>/kisalt https://ornek.com/kampanya yaz-indirimi</code>")
+        return
+    try:
+        row = create_link(user["id"], parts[0], parts[1] if len(parts) > 1 else "")
+    except LinkError as e:
+        telegram.send_message(chat_id, f"⚠️ {esc(e)}")
+        return
+    telegram.send_message(chat_id, f"🔗 <b>Kısa link hazır</b>\n<code>{esc(short_url(row['code']))}</code>\n"
+                                   f"🎯 {esc(domain_of(row['target']))}\n"
+                                   f'<a href="{esc(link("shortlinks.detail", link_id=row["id"]))}">Yönet →</a>')
 
 
 # ---------- Fotoğraf / PDF ----------

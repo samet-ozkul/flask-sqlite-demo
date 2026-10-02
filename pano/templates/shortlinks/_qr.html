@@ -1,0 +1,25 @@
+{% import "_macros.html" as ui %}
+{# Serbest QR sekmesi: qr_form, free_kinds; oluşturulduysa qr (SVG) ve qr_data #}
+<div class="card">
+  <form method="post" action="{{ url_for('shortlinks.free_qr') }}">
+    {{ ui.csrf() }}
+    {{ ui.select("Tür", "kind", free_kinds.items(), qr_form.kind) }}
+    {{ ui.textarea("İçerik", "data", qr_form.data, rows=3, required=True,
+                   placeholder="Metin, https://ornek.com ya da 0532 123 45 67",
+                   hint="Telefon seçilirse okutan kişiye “ara” önerilir. Hiçbir şey kaydedilmez.") }}
+    <button class="btn primary">▦ QR oluştur</button>
+  </form>
+</div>
+
+{% if qr %}
+  <section class="card center">
+    <div class="qr-box">{{ qr | safe }}</div>
+    <p class="muted small qr-data">{{ qr_data }}</p>
+    <form method="post" action="{{ url_for('shortlinks.free_qr_png') }}">
+      {{ ui.csrf() }}
+      <input type="hidden" name="kind" value="{{ qr_form.kind }}">
+      <input type="hidden" name="data" value="{{ qr_form.data }}">
+      <button class="btn sm primary">⬇️ PNG indir</button>
+    </form>
+  </section>
+{% endif %}

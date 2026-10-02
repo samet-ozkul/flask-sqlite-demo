@@ -806,6 +806,34 @@ MIGRATIONS = [
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     """,
+    # 30: kısa linkler (/k/<kod>; kod tüm kullanıcılar arasında tekil, küçük harf) ve Wi-Fi QR kartları
+    """
+    CREATE TABLE short_links (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        code TEXT NOT NULL UNIQUE,
+        target TEXT NOT NULL,                      -- sadece http(s)://
+        title TEXT NOT NULL DEFAULT '',
+        clicks INTEGER NOT NULL DEFAULT 0,
+        last_click_at TEXT,                        -- UTC
+        expires_at TEXT,                           -- 'YYYY-MM-DD' (o gün dahil açılır); NULL = süresiz
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_short_links_user ON short_links(user_id, id);
+    CREATE TABLE wifi_cards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL DEFAULT '',
+        ssid TEXT NOT NULL,
+        password TEXT NOT NULL DEFAULT '',         -- düz metin (Şifreli Kasa değildir)
+        security TEXT NOT NULL DEFAULT 'WPA' CHECK (security IN ('WPA', 'WEP', 'nopass')),
+        hidden INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_wifi_cards_user ON wifi_cards(user_id);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

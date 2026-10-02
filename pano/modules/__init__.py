@@ -39,6 +39,7 @@ MODULES = [
     ("scanner", "scanner.index", "Belge Tara", "📄", "Araçlar"),
     ("emergency", "emergency.index", "Acil Durum Kartı", "🆘", "Araçlar"),
     ("yearreview", "yearreview.index", "Yıl Özeti", "📊", "Araçlar"),
+    ("shortlinks", "shortlinks.index", "Kısa Link & QR", "🔗", "Araçlar"),
 ]
 
 # Menüde gösterilmeyen altyapı modülleri

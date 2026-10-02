@@ -1,0 +1,41 @@
+{% import "_macros.html" as ui %}
+{% from "shortlinks/_wifi_form.html" import wifi_form %}
+{# Wi-Fi sekmesi: cards, wifi_values, security #}
+<div class="card">
+  <details class="add" {% if not cards or wifi_values.ssid %}open{% endif %}>
+    <summary>＋ Yeni Wi-Fi kartı</summary>
+    {{ wifi_form(wifi_values, url_for('shortlinks.wifi_create'), security, "Ekle") }}
+  </details>
+</div>
+
+{% if cards %}
+  <div class="card">
+    <ul class="rows">
+      {% for c in cards %}
+        <li>
+          <span class="ico">📶</span>
+          <div class="grow">
+            <a class="title" href="{{ url_for('shortlinks.wifi_card', card_id=c.id) }}">{{ c.title }}</a>
+            <div class="meta">
+              <span>{{ c.ssid }}</span><span>{{ security[c.security] }}</span>{% if c.hidden %}<span>🙈 gizli ağ</span>{% endif %}
+            </div>
+            {% if c.security != 'nopass' %}
+              <details class="wifi-pass"><summary>🔑 ••••••••</summary><code>{{ c.password }}</code></details>
+            {% endif %}
+          </div>
+          <div class="actions">
+            <a class="btn sm icon" href="{{ url_for('shortlinks.wifi_card', card_id=c.id) }}" title="Kartı aç, yazdır"
+               aria-label="Kartı aç, yazdır">🖨️</a>
+            <form method="post" action="{{ url_for('shortlinks.wifi_delete', card_id=c.id) }}" class="inline"
+                  data-confirm="Wi-Fi kartı silinsin mi?">
+              {{ ui.csrf() }}
+              <button class="btn sm icon danger" title="Sil" aria-label="Sil">🗑️</button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  {{ ui.empty("Henüz Wi-Fi kartı yok. Misafirler şifre sormadan, QR'ı okutup bağlansın.", "📶") }}
+{% endif %}

@@ -1,0 +1,71 @@
+{% import "_macros.html" as ui %}
+{# Kısa linkler sekmesi: links, form, base_url, short_url, domain, is_expired #}
+<div class="card">
+  <details class="add" {% if not links or form.target %}open{% endif %}>
+    <summary>＋ Yeni kısa link</summary>
+    <form method="post" action="{{ url_for('shortlinks.create') }}">
+      {{ ui.csrf() }}
+      {{ ui.field("Hedef adres", "target", form.target, required=True, placeholder="https://ornek.com/cok/uzun/bir/adres",
+                  attrs='maxlength="2010" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false"') }}
+      <div class="form-row">
+        {{ ui.field("Kod", "code", form.code, placeholder="Boşsa rastgele (ör. k7m2xq)",
+                    attrs='maxlength="60" autocapitalize="off" autocomplete="off" spellcheck="false"',
+                    hint=base_url ~ "kod · " ~ code_min ~ "-" ~ code_max ~ " karakter: küçük harf (a-z), rakam, tire; "
+                         ~ "Türkçe harfler dönüştürülür (ş → s)") }}
+        {{ ui.field("Başlık", "title", form.title, placeholder="ör. Yaz kampanyası afişi", attrs='maxlength="120"') }}
+      </div>
+      <div class="form-row">
+        {{ ui.field("Son kullanma tarihi", "expires_at", form.expires_at, type="date",
+                    hint="İsteğe bağlı; o günün sonuna kadar açılır, sonra “bulunamadı” der") }}
+      </div>
+      <button class="btn primary">✂️ Kısalt</button>
+    </form>
+  </details>
+</div>
+
+{% if links %}
+  <div class="card">
+    <ul class="rows sl-rows">
+      {% for l in links %}
+        {% set expired = is_expired(l) %}
+        <li>
+          <span class="ico">🔗</span>
+          <div class="grow">
+            <div class="title">
+              <a href="{{ url_for('shortlinks.detail', link_id=l.id) }}">{{ l.title or domain(l.target) }}</a>
+              {% if not l.active %}<span class="badge">Pasif</span>{% endif %}
+              {% if expired %}<span class="badge overdue">Süresi doldu</span>{% endif %}
+            </div>
+            <div class="sl-short">
+              <span class="sl-url" id="sl-url-{{ l.id }}">{{ short_url(l.code) }}</span>
+              <button type="button" class="btn sm hidden" data-copy="sl-url-{{ l.id }}">📋 Kopyala</button>
+            </div>
+            <div class="meta">
+              <span>🎯 {{ domain(l.target) }}</span>
+              <span>👆 {{ l.clicks }} tıklanma</span>
+              {% if l.last_click_at %}<span>son {{ l.last_click_at | localdt }}</span>{% endif %}
+              {% if l.expires_at and not expired %}<span>⏳ son gün {{ l.expires_at | date_tr }}</span>{% endif %}
+            </div>
+          </div>
+          <div class="actions">
+            <form method="post" action="{{ url_for('shortlinks.toggle', link_id=l.id) }}" class="inline">
+              {{ ui.csrf() }}
+              <button class="btn sm icon" title="{{ 'Durdur' if l.active else 'Yeniden aç' }}"
+                      aria-label="{{ 'Durdur' if l.active else 'Yeniden aç' }}">{{ '⏸️' if l.active else '▶️' }}</button>
+            </form>
+            <a class="btn sm icon" href="{{ url_for('shortlinks.detail', link_id=l.id) }}" title="QR ve düzenle" aria-label="QR ve düzenle">✏️</a>
+            <form method="post" action="{{ url_for('shortlinks.delete', link_id=l.id) }}" class="inline"
+                  data-confirm="Kısa link silinsin mi? Kısa adres ve QR çalışmaz olur (çöp kutusundan geri getirilebilir).">
+              {{ ui.csrf() }}
+              <button class="btn sm icon danger" title="Sil" aria-label="Sil">🗑️</button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <p class="muted small center">Kısa adres girişsiz açılır ve hedefe yönlendirir. Pasif ya da süresi dolmuş link ile olmayan
+    link dışarıdan aynı “bulunamadı” sayfasını gösterir. Sonuna <code>/onizle</code> eklenirse önce hedef gösterilir.</p>
+{% else %}
+  {{ ui.empty("Henüz kısa link yok. Uzun bir adresi kısalt; afişe, kartvizite ya da mesaja koy.", "🔗") }}
+{% endif %}
