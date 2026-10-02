@@ -37,7 +37,9 @@ RETRY_MAX_PX = 1240         # not ekine sığmazsa ikinci deneme (~106 dpi, sayf
 RETRY_QUALITY = 45
 TELEGRAM_MAX_BYTES = 50 * 1024 * 1024
 FORMATS = {"JPEG", "MPO", "PNG", "WEBP", "GIF", "BMP", "TIFF", "AVIF"}
-MODES = {"color": "Renkli", "gray": "Gri", "doc": "Belge (yüksek kontrast)"}
+# Varsayılan orijinal renk: fotoğraf olduğu gibi kalır (siyah-beyaz baskı yazıcıda da seçilebilir)
+MODES = {"color": "Orijinal renk", "gray": "Gri", "doc": "Siyah-beyaz belge"}
+DEFAULT_MODE = "color"
 TARGETS = {"download": "⬇️ PDF indir", "note": "📝 Nota ekle", "transfer": "📤 Aktar'a koy",
            "telegram": "📲 Telegram'a gönder"}
 INBOX_DIR = "_tarama"
@@ -300,7 +302,7 @@ def make_pdf():
     uid = g.user["id"]
     uploaded = [f for f in request.files.getlist("files") if f and f.filename]
     title = form_str("title", 100) or default_title()
-    mode = form_choice("mode", MODES, "doc")
+    mode = form_choice("mode", MODES, DEFAULT_MODE)
     target = form_choice("target", TARGETS, "download")
     files, used = _sources(uid, uploaded)
     try:

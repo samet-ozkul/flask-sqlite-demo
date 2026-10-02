@@ -130,7 +130,7 @@ def upload_files():
 # ---------- Testler ----------
 def test_page_and_access():
     page = text(ADMIN.get("/tara/"))
-    assert 'capture="environment"' in page and 'accept="image/*" multiple' in page and "scanner.js?v=2" in page
+    assert 'capture="environment"' in page and 'accept="image/*" multiple' in page and "scanner.js?v=3" in page
     assert 'value="Tarama 01.10.2026 14-35"' in page
     assert "fotoğraflar kaydedilmez, sadece seçtiğin hedefe PDF gider" in page
     assert 'value="telegram"' not in page  # Telegram bağlı değil
@@ -213,8 +213,8 @@ def test_modes():
     assert space == "DeviceGray" and 175 < paper < 195 and 60 < ink < 85
     space, paper, ink = paper_and_text("doc")
     assert space == "DeviceGray" and paper > 240 and ink < 40, (paper, ink)  # kâğıt beyaz, yazı koyu
-    # Geçersiz mod -> belge (varsayılan)
-    assert pdf_pages(post(ADMIN, [("a.jpg", photo())], mode="xyz").data)[0]["space"] == "DeviceGray"
+    # Geçersiz mod -> varsayılan (orijinal renk)
+    assert pdf_pages(post(ADMIN, [("a.jpg", photo())], mode="xyz").data)[0]["space"] == "DeviceRGB"
     print("  modes OK")
 
 
