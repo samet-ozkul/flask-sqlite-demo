@@ -834,6 +834,23 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_wifi_cards_user ON wifi_cards(user_id);
     """,
+    # 32: haftalık değerlendirme (hafta pazartesisiyle anılır) ve pazar hatırlatma saati (NULL = kapalı)
+    """
+    CREATE TABLE weekly_reviews (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        week_start TEXT NOT NULL,                  -- 'YYYY-MM-DD', haftanın pazartesisi (yerel)
+        score INTEGER CHECK (score IS NULL OR score BETWEEN 1 AND 5),
+        went_well TEXT NOT NULL DEFAULT '',
+        hard TEXT NOT NULL DEFAULT '',
+        learned TEXT NOT NULL DEFAULT '',
+        priorities TEXT NOT NULL DEFAULT '[]',     -- gelecek haftanın öncelikleri, JSON: [{"text", "done"}], en fazla 3
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (user_id, week_start)
+    );
+    ALTER TABLE users ADD COLUMN weekly_prompt TEXT;
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

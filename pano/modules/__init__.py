@@ -26,6 +26,7 @@ MODULES = [
     ("documents", "documents.index", "Belgeler", "🪪", "Ev ve araç"),
     ("habits", "habits.index", "Alışkanlıklar", "🔥", "Kişisel"),
     ("journal", "journal.index", "Günlük", "📓", "Kişisel"),
+    ("weekly", "weekly.index", "Haftalık Değerlendirme", "🗓️", "Kişisel"),
     ("health", "health.index", "Sağlık", "🩺", "Kişisel"),
     ("recipes", "recipes.index", "Tarifler", "🍲", "Kişisel"),
     ("watchlist", "watchlist.index", "İzleme / Okuma", "🎬", "Kişisel"),
