@@ -63,7 +63,7 @@ HELP = """<b>Kişisel Pano komutları</b>
 📓 <code>/gunluk 🙂 bugün yürüyüşe çıktım</code> — günlüğe yaz (başa emoji koyarsan ruh hali olur)
 📋 <code>/liste</code> ya da <code>/liste market</code> — açık maddeler
 📤 <code>/aktar metin</code> — bilgisayarda açmak için aktarma kutusuna koy (dosya gönderirsen “📤 Aktar”)
-📄 <code>/tara</code> — sayfaların fotoğraflarını gönder, bitince “📄 PDF yap” (tek fotoğrafta “📄 Taramaya ekle”)
+📄 <code>/tara</code> — sayfaların fotoğraflarını gönder, bitince “📄 PDF yap” (orijinal renk; siyah-beyaz için <code>/tara siyah</code>)
 ⏱️ <code>/baslat web sitesi tasarım</code> — zaman sayacını başlat (baştaki kelimeler proje adıysa o projeye)
     <code>/durdur</code> — sayacı durdur · <code>/zaman</code> — çalışan sayaç ve bugünün toplamı
 ☀️ <code>/bugun</code> — günün özeti
@@ -892,7 +892,9 @@ def _transfer_file(user, chat_id, message_id, callback_id, pending):
 
 # ---------- Belge tarama: Telegram'dan sayfa ----------
 SCAN_MODE_TTL = 15 * 60  # /tara modu son sayfadan bu kadar sonra kendiliğinden kapanır
-SCAN_BUTTONS = [[("📄 PDF yap", "scn:pdf:doc"), ("🎨 Renkli PDF", "scn:pdf:color")], [("🗑️ Kutuyu boşalt", "scn:clr")]]
+SCAN_BUTTONS = [[("📄 PDF yap", "scn:pdf:color"), ("⚫ Siyah-beyaz", "scn:pdf:bw")], [("🗑️ Kutuyu boşalt", "scn:clr")]]
+# Düğmedeki görünüm -> scanner modu. "doc" eski mesajlardaki "📄 PDF yap" düğmesi: artık o da renkli
+SCAN_BUTTON_MODES = {"color": "color", "doc": "color", "bw": "doc", "gray": "gray"}
 
 
 def _scan_state(chat_id):
@@ -917,7 +919,8 @@ def _scan_text(count, mode_on, note=""):
     if note:
         lines.append(note)
     if mode_on:
-        lines.append("Sayfaların fotoğraflarını sırayla gönder (albüm de olur); bitince <b>📄 PDF yap</b>.")
+        lines.append("Sayfaların fotoğraflarını sırayla gönder (albüm de olur); bitince <b>📄 PDF yap</b> "
+                     "(orijinal renkli; siyah-beyaz istersen ⚫).")
     lines.append(f'Sırala/döndür ya da nota ekle: <a href="{esc(link("scanner.index"))}">Belge Tara →</a>')
     return "\n".join(lines)
 
@@ -971,8 +974,8 @@ def _scan_files(user, chat_id, message_id, callback_id, pending):
 def cmd_scan(user, chat_id, rest):
     from .modules.scanner import inbox_count, inbox_remove
     word = fold(rest)
-    if word in ("bitti", "bitir", "pdf", "tamam", "renkli", "gri"):
-        mode = {"renkli": "color", "gri": "gray"}.get(word, "doc")
+    if word in ("bitti", "bitir", "pdf", "tamam", "renkli", "gri", "siyah", "siyahbeyaz", "belge", "sb"):
+        mode = {"gri": "gray", "siyah": "doc", "siyahbeyaz": "doc", "belge": "doc", "sb": "doc"}.get(word, "color")
         scan_pdf(user, chat_id, mode)
         return
     if word in ("iptal", "bosalt", "temizle", "sil", "kapat"):
@@ -984,7 +987,7 @@ def cmd_scan(user, chat_id, rest):
     _scan_set(chat_id, _scan_show(chat_id, inbox_count(user["id"]), "📷 Tarama modu açıldı."))
 
 
-def scan_pdf(user, chat_id, mode="doc", message_id=None):
+def scan_pdf(user, chat_id, mode="color", message_id=None):
     """Kutudaki sayfalardan PDF yapar ve sohbete gönderir; başarılıysa kutu boşalır, mod kapanır."""
     from .modules.scanner import (MODES, TELEGRAM_MAX_BYTES, ScanError, build_pdf, close_files, default_title,
                                   inbox_files, inbox_items, inbox_remove, pdf_filename)
@@ -1000,7 +1003,7 @@ def scan_pdf(user, chat_id, mode="doc", message_id=None):
     title = default_title()
     files = inbox_files(rows)
     try:
-        pdf = build_pdf(files, [0] * len(files), mode if mode in MODES else "doc", title)
+        pdf = build_pdf(files, [0] * len(files), mode if mode in MODES else "color", title)
         if len(pdf) > TELEGRAM_MAX_BYTES:
             raise ScanError("PDF Telegram için çok büyük (en fazla 50 MB); web'deki Belge Tara'dan indir.")
         telegram.send_document(chat_id, pdf_filename(title), pdf, caption=f"📄 {title} · {len(rows)} sayfa",
@@ -1027,7 +1030,7 @@ def cb_scan(user, chat_id, message_id, callback_id, data):
     parts = data.split(":")
     if parts[1:2] == ["pdf"]:
         telegram.answer_callback(callback_id, "PDF hazırlanıyor...")
-        scan_pdf(user, chat_id, parts[2] if len(parts) > 2 else "doc", message_id)
+        scan_pdf(user, chat_id, SCAN_BUTTON_MODES.get(parts[2] if len(parts) > 2 else "", "color"), message_id)
     elif parts[1:2] == ["clr"]:
         n = inbox_remove(user["id"])
         _scan_end(chat_id)

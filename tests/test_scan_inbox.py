@@ -95,7 +95,7 @@ def test_prompt_and_album():
     press("ph:sc")
     assert count() == 1
     edit = last("editMessageText")
-    assert "Tarama kutusu: 1 sayfa" in edit["text"] and "scn:pdf:doc" in buttons(edit)
+    assert "Tarama kutusu: 1 sayfa" in edit["text"] and buttons(edit)[:2] == ["scn:pdf:color", "scn:pdf:bw"]
     # Albüm: üç fotoğraf tek soruda toplanır, seçim hepsine uygulanır
     before = len([1 for m, _p, _f in CALLS if m == "sendMessage"])
     for i in range(3):
@@ -122,7 +122,7 @@ def test_scan_mode_and_pdf():
     say({"document": {"file_id": "z", "file_name": "a.zip", "mime_type": "application/zip"}})
     assert buttons(last("sendMessage")) == ["ph:tr", "ph:x"]
     # PDF yap: belge olarak sohbete gelir, kutu boşalır, mod kapanır
-    press("scn:pdf:doc")
+    press("scn:pdf:color")
     doc = [f for m, _p, f in CALLS if m == "sendDocument"][-1]["document"]
     name, data, mime = doc
     assert name.startswith("Tarama ") and name.endswith(".pdf") and mime == "application/pdf"
@@ -174,6 +174,36 @@ def test_web_order():
     r = ADMIN.post("/tara/pdf", data={"order": f"i{mine},i99999", "target": "transfer"}, follow_redirects=True)
     assert "PDF aktarma kutusuna kondu (1 sayfa" in r.get_data(as_text=True)
     print("  web order OK")
+
+
+def colorspaces(data):
+    return set(re.findall(r"/ColorSpace\s*/(Device\w+)", data.decode("latin1")))
+
+
+def last_pdf():
+    return [f for m, _p, f in CALLS if m == "sendDocument"][-1]["document"][1]
+
+
+def test_colors():
+    # Varsayılan (📄 PDF yap ve /tara bitti) orijinal renk; siyah-beyaz sadece istenince
+    for action, expected in (("scn:pdf:color", {"DeviceRGB"}), ("scn:pdf:bw", {"DeviceGray"}),
+                             ("scn:pdf:doc", {"DeviceRGB"})):  # doc: eski mesajdaki "📄 PDF yap" düğmesi
+        photo("c-" + action, jpeg(300, 400, (200, 40, 40)))
+        press("ph:sc")
+        press(action)
+        assert colorspaces(last_pdf()) == expected, (action, colorspaces(last_pdf()))
+    for command, expected in (("/tara bitti", {"DeviceRGB"}), ("/tara siyah", {"DeviceGray"})):
+        photo("c-" + command, jpeg(300, 400, (40, 40, 200)))
+        press("ph:sc")
+        say({"text": command})
+        assert colorspaces(last_pdf()) == expected, (command, colorspaces(last_pdf()))
+    # Web: görünüm seçilmezse orijinal renk; sayfada da varsayılan seçili
+    assert 'value="color" checked' in ADMIN.text("/tara/")
+    r = ADMIN.post("/tara/pdf", data={"target": "download", "files": [(io.BytesIO(jpeg(300, 400, (30, 160, 60))), "y.jpg")]},
+                   content_type="multipart/form-data")
+    assert colorspaces(r.data) == {"DeviceRGB"}
+    r.close()
+    print("  colors OK")
 
 
 def rows_inbox():
@@ -240,4 +270,5 @@ if __name__ == "__main__":
     test_web_order()
     test_limits_and_cleanup()
     test_album_other_targets()
+    test_colors()
     print("OK")

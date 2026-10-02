@@ -30,7 +30,7 @@
   document.documentElement.classList.add("s-js");  // kutudaki sayfalar listede; karttaki küçük resimler gizlenir
 
   // ---------- Seçimi hatırla (görünüm, hedef) ----------
-  const KEY = "tara-secim";
+  const KEY = "tara-secim-v2";  // v2: varsayılan görünüm orijinal renk oldu; eski kayıtlı "belge" seçimi geçersiz
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
     for (const name of ["mode", "target"]) {

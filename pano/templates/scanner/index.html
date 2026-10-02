@@ -81,7 +81,7 @@
     <div class="field"><span>Görünüm</span>
       <div class="chips" role="radiogroup" aria-label="Görünüm">
         {% for value, label in modes.items() %}
-          <label><input type="radio" name="mode" value="{{ value }}" {% if value == 'doc' %}checked{% endif %}><span>{{ label }}</span></label>
+          <label><input type="radio" name="mode" value="{{ value }}" {% if value == 'color' %}checked{% endif %}><span>{{ label }}</span></label>
         {% endfor %}
       </div>
     </div>
@@ -105,10 +105,10 @@
     <li>Kâğıdı düz bir zemine koy (koyu renkli zemin kenarları belirginleştirir).</li>
     <li>İyi ışıkta çek: gün ışığı ya da tepeden lamba; telefonun gölgesi düşmesin, flaş parlaması olmasın.</li>
     <li>Kâğıdı kadraja tam sığdır, telefonu kâğıda paralel tut.</li>
-    <li>Yazılı sayfalarda “Belge” görünümü kâğıdı beyaz, yazıyı koyu yapar; fotoğraf ya da renkli belge için “Renkli” seç.</li>
+    <li>“Orijinal renk” fotoğrafı olduğu gibi bırakır. Yazılı sayfayı siyah-beyaz istiyorsan “Siyah-beyaz belge” kâğıdı beyaz, yazıyı koyu yapar.</li>
   </ul>
   {% if telegram_linked %}<p class="muted small">📲 Telegram'dan da tarayabilirsin: bota <code>/tara</code> yaz, sayfaların fotoğraflarını sırayla gönder, bitince “📄 PDF yap”a dokun. Sayfalar burada da görünür.</p>{% endif %}
   <p class="muted small">🔒 İşleme sunucuda yapılır; fotoğraflar kaydedilmez, sadece seçtiğin hedefe PDF gider (Telegram'dan gelen sayfalar PDF yapılana kadar en fazla 24 saat bekler).</p>
 </section>
-<script src="{{ url_for('static', filename='scanner.js') }}?v=2" defer></script>
+<script src="{{ url_for('static', filename='scanner.js') }}?v=3" defer></script>
 {% endblock %}
