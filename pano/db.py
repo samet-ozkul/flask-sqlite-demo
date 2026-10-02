@@ -834,6 +834,38 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_wifi_cards_user ON wifi_cards(user_id);
     """,
+    # 31: ev bakımı — periyodik işler ve yapılma geçmişi (reminded_for/on: son hatırlatmanın hangi tarih için
+    #     ve hangi gün gönderildiği; sıradaki tarih değişince hatırlatmalar yeniden kurulur)
+    """
+    CREATE TABLE home_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL DEFAULT '🔧',
+        category TEXT NOT NULL DEFAULT 'other',
+        interval_n INTEGER NOT NULL DEFAULT 1,
+        interval_unit TEXT NOT NULL DEFAULT 'month' CHECK (interval_unit IN ('day', 'week', 'month', 'year')),
+        next_due TEXT NOT NULL,                    -- 'YYYY-MM-DD'
+        remind_days INTEGER NOT NULL DEFAULT 3,    -- 0, 1, 3, 7, 14, 30 gün önce
+        notes TEXT NOT NULL DEFAULT '',
+        active INTEGER NOT NULL DEFAULT 1,
+        reminded_for TEXT,
+        reminded_on TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_home_tasks_user ON home_tasks(user_id, active, next_due);
+    CREATE TABLE home_task_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL REFERENCES home_tasks(id) ON DELETE CASCADE,
+        done_on TEXT NOT NULL,
+        cost REAL,
+        note TEXT NOT NULL DEFAULT '',
+        expense_id INTEGER,                        -- harcamaya eklendiyse (FK yok: çöpten geri getirme bozulmasın)
+        prev_due TEXT,                             -- kayıttan önceki sıradaki tarih ("geri al" buna döner)
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_home_task_logs ON home_task_logs(task_id, done_on);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

@@ -96,6 +96,12 @@ def upcoming(user_id, days=7, long_days=30):
         add(DOC_KINDS[r["kind"]][1], f"{r['name']} bitiyor", r["expires_on"], "documents.edit", detail=r["holder"],
             doc_id=r["id"])
 
+    # Ev bakımı: gecikenler ve kısa vadede (işin hatırlatma süresi daha uzunsa o kadar önceden) gelenler
+    from .modules.homecare import task_period
+    for r in query("SELECT * FROM home_tasks WHERE user_id = ? AND active = 1 AND next_due <= ?", (user_id, later)):
+        if (days_until(r["next_due"]) or 0) <= max(days, r["remind_days"]):
+            add(r["icon"], r["name"], r["next_due"], "homecare.detail", detail=task_period(r).lower(), task_id=r["id"])
+
     # Siparişler: beklenen teslim (gecikenler 30 gün görünür) ve iade son günü
     for r in query("SELECT * FROM orders WHERE user_id = ? AND status IN ('ordered', 'shipped')"
                    " AND expected_on BETWEEN ? AND ?", (user_id, (t - timedelta(days=30)).isoformat(), soon)):

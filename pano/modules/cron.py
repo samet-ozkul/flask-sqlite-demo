@@ -251,6 +251,20 @@ def todo_reminders(secret):
             except telegram.TelegramError as e:
                 result["errors"].append(f"belge {doc['id']}: {e}")
 
+    # Ev bakımı: X gün önce, günü gelince ve gecikmişse haftada bir (varsayılan saatten sonra)
+    from . import homecare
+    result["homecare_sent"] = 0
+    if now.strftime("%H:%M") >= todo.DEFAULT_DUE_TIME:
+        for kind, task, left in homecare.pending(now):
+            url = url_for("homecare.detail", task_id=task["id"], _external=True)
+            try:
+                telegram.send_message(task["chat_id"], homecare.message(kind, task, left, url, telegram.escape),
+                                      buttons=homecare.buttons(task["id"]) if with_buttons else None)
+                homecare.mark_sent(task, now.date())
+                result["homecare_sent"] += 1
+            except telegram.TelegramError as e:
+                result["errors"].append(f"ev bakımı {task['id']}: {e}")
+
     # Kişiler: görüşme vakti gelenlere dürtme (varsayılan saatten sonra, günde bir kontrol; her vade için bir kez)
     from . import contacts
     result["contacts_nudged"] = 0
