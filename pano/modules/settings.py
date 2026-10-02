@@ -4,7 +4,7 @@ import secrets
 from flask import Blueprint, flash, g, make_response, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
-from .. import ai, external, telegram, totp
+from .. import ai, external, quota, telegram, totp
 from ..auth import end_other_sessions, login_required, set_password
 from ..db import execute
 from ..utils import form_bool, form_choice, form_str, redirect_back
@@ -38,6 +38,7 @@ def index():
         ai_config=ai.config(),
         bot_username=telegram.bot_username() if g.user["telegram_link_code"] else None,
         layout=_layout(g.user),
+        storage=quota.summary(g.user["id"]),
     )
 
 

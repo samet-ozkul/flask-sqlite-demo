@@ -19,7 +19,7 @@
   <form method="post" action="{{ url_for('transfer.create') }}" enctype="multipart/form-data" id="t-form">
     {{ ui.csrf() }}
     {{ ui.textarea("Metin ya da link", "text", rows=3, placeholder="Yapıştır… (ör. bir adres, kod, uzun bir mesaj)") }}
-    <label class="field t-drop" id="t-drop"><span>📎 Dosyalar <span class="muted small">(her biri en fazla {{ max_file_mb }} MB, bir seferde 10 dosya)</span></span>
+    <label class="field t-drop" id="t-drop"><span>📎 Dosyalar <span class="muted small">{% if max_file_mb %}(her biri en fazla {{ max_file_mb }} MB, bir seferde 10 dosya){% else %}(hesabında dosya yükleme kapalı){% endif %}</span></span>
       <input type="file" name="files" multiple data-max-mb="{{ max_file_mb }}">
     </label>
     <p class="muted small" id="t-files-info"></p>

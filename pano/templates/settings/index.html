@@ -188,6 +188,23 @@
   </form>
 </section>
 
+<section class="card" id="depolama">
+  <h2>💾 Depolama</h2>
+  {% set u = storage.usage %}
+  <p><b>{{ u.total | size }}</b>{% if storage.quota_mb is not none %} / {{ storage.quota_mb }} MB kullanılıyor (%{{ storage.percent }}){% else %} kullanılıyor{% endif %}</p>
+  {% if storage.quota_mb is not none %}
+    <div class="bars"><div class="bar-row"><span class="bar-label">Alan</span>
+      <span class="bar-track"><span class="bar-fill" style="width: {{ storage.percent }}%"></span></span>
+      <span class="bar-value">%{{ storage.percent }}</span></div></div>
+  {% endif %}
+  <p class="muted small">Ekler {{ u.attachments | size }} · çöp kutusu {{ u.trash | size }} · Aktar {{ u.transfer | size }} ·
+    tarama kutusu {{ u.scan | size }} · profil fotoğrafı {{ u.profile | size }}</p>
+  <p class="muted small">{% if storage.upload_max_mb is none %}Dosya başına yönetici sınırı yok (modüllerin kendi sınırları geçerli).
+    {% elif storage.upload_max_mb == 0 %}🚫 Hesabında dosya yükleme kapalı.
+    {% else %}Tek dosya en fazla {{ storage.upload_max_mb }} MB olabilir.{% endif %}
+    {% if storage.quota_mb is not none %} Yer açmak için eski ekleri sil ya da <a href="{{ url_for('trashbin.index') }}">çöp kutusunu</a> boşalt.{% endif %}</p>
+</section>
+
 <section class="card" id="oturumlar">
   <h2>📱 Oturumlar</h2>
   <p class="muted small">Telefonda, iş bilgisayarında ya da başka bir yerde açık kalan oturumları kapatır. Bu cihazda açık kalırsın;

@@ -99,6 +99,12 @@ def _check_capacity(user_id, extra_bytes):
         raise TransferError(f"Aynı anda en fazla {ITEM_LIMIT} kayıt olabilir; eskileri sil.")
     if row["s"] + extra_bytes > MAX_TOTAL_MB * 1024 * 1024:
         raise TransferError(f"Aktarma kutusu dolu (en fazla {MAX_TOTAL_MB} MB). Eski dosyaları sil ya da süresinin dolmasını bekle.")
+    if extra_bytes:
+        from .. import quota
+        try:
+            quota.check(user_id, extra_bytes)
+        except quota.QuotaError as e:
+            raise TransferError(str(e))
     if extra_bytes and usage()["used"] + extra_bytes > quota_bytes():
         raise TransferError("Sunucudaki depolama alanı dolu; dosya kaydedilemedi.")
 
@@ -161,7 +167,10 @@ def _items(user_id):
 def _page_data():
     uid = g.user["id"]
     items = _items(uid)
-    return {"items": items, "total": sum(i["size"] for i in items), "max_file_mb": MAX_FILE_MB,
+    from .. import quota
+    max_file = quota.max_file_bytes(uid, MAX_FILE_MB * 1024 * 1024)
+    return {"items": items, "total": sum(i["size"] for i in items),
+            "max_file_mb": round(max_file / (1024 * 1024), 1) if max_file % (1024 * 1024) else max_file // (1024 * 1024),
             "max_total_mb": MAX_TOTAL_MB, "durations": DURATIONS, "default_minutes": DEFAULT_MINUTES,
             "telegram_linked": bool(g.user["telegram_chat_id"]) and telegram.enabled(), "fmt_size": fmt_size}
 

@@ -115,9 +115,25 @@ def process_upload(file_storage):
     return _encode_jpeg(img, IMAGE_MAX_PX), _encode_jpeg(img, THUMB_MAX_PX), "image/jpeg"
 
 
+def _stream_size(file_storage):
+    stream = file_storage.stream
+    try:
+        pos = stream.tell()
+        stream.seek(0, os.SEEK_END)
+        size = stream.tell()
+        stream.seek(pos)
+        return size
+    except (AttributeError, OSError, ValueError):
+        return 0
+
+
 def save_attachment(file_storage, user_id, entity, entity_id):
+    from . import quota
+    # Yöneticinin dosya sınırı yüklenen ham dosyaya, alan sınırı diske yazılacak (küçültülmüş) boyuta bakar
+    quota.check_file(user_id, _stream_size(file_storage), file_storage.filename or "Dosya")
     main, thumb, mime = process_upload(file_storage)
     new_size = len(main) + len(thumb or b"")
+    quota.check_space(user_id, new_size)
     if usage()["used"] + new_size > quota_bytes():
         raise ValueError("Depolama kotası doldu. Eski ekleri silin veya yönetim sayfasından temizlik yapın.")
     ext = ".pdf" if mime == "application/pdf" else ".jpg"
