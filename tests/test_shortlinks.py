@@ -370,7 +370,7 @@ def test_free_qr():
     r.close()
     r = ADMIN.post("/kisa-link/qr.png", data={"kind": "url", "data": "javascript:1"}, follow_redirects=True)
     assert "Web adresi geçersiz" in text(r)
-    assert RAW.post("/kisa-link/qr", data={"kind": "text", "data": "x"}).status_code == 302   # girişsiz -> giriş
+    assert RAW.post("/kisa-link/qr", data={"kind": "text", "data": "x"}).status_code == 400   # girişsiz, anahtarsız
     print("  free qr OK")
 
 
