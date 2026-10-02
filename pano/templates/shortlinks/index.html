@@ -9,6 +9,13 @@
   .sl-rows > li { align-items: flex-start; }
   .sl-rows .actions { padding-top: 2px; }
   .sl-rows .badge { vertical-align: 1px; }
+  .sl-rows .grow { min-width: 0; }
+  /* Telefonda düğmeler alta: kısa adres tek satırda kalsın */
+  @media (max-width: 600px) {
+    .sl-rows > li { flex-wrap: wrap; }
+    .sl-rows .grow { flex: 1 1 calc(100% - 40px); }
+    .sl-rows .actions { flex-basis: 100%; display: flex; gap: 6px; padding: 0 0 0 34px; }
+  }
   .qr-box svg { width: min(260px, 100%); height: auto; aspect-ratio: 1; display: block; margin: 0 auto; border-radius: 8px; }
   .qr-data { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 8em; overflow: auto; }
   .wifi-pass > summary { cursor: pointer; color: var(--muted); font-size: .85rem; letter-spacing: .08em; width: fit-content; }
