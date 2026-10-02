@@ -37,6 +37,7 @@ MODULES = [
     ("kanban", "kanban.index", "Kanban", "🗂️", "Araçlar"),
     ("profile", "profile.edit", "Profil Sayfası", "🌐", "Araçlar"),
     ("scanner", "scanner.index", "Belge Tara", "📄", "Araçlar"),
+    ("emergency", "emergency.index", "Acil Durum Kartı", "🆘", "Araçlar"),
     ("yearreview", "yearreview.index", "Yıl Özeti", "📊", "Araçlar"),
 ]
 
