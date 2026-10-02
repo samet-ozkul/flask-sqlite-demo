@@ -194,7 +194,7 @@ def handle_callback(cq, chat_id, message_id):
     prefix = data.split(":", 1)[0]
     handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
                 "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood, "ct": cb_contact, "ctz": cb_contact,
-                "tt": cb_timer, "loc": cb_location, "scn": cb_scan}
+                "tt": cb_timer, "loc": cb_location, "scn": cb_scan, "hm": cb_home}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -373,6 +373,37 @@ def cb_contact(user, chat_id, message_id, callback_id, data):
     url = link("contacts.detail", contact_id=contact["id"])
     try:
         telegram.edit_message(chat_id, message_id, f'{text}\n<a href="{esc(url)}">Kişi sayfası →</a>')
+    except telegram.TelegramError:
+        pass
+
+
+# ---------- Ev bakımı ----------
+def cb_home(user, chat_id, message_id, callback_id, data):
+    """Ev bakımı hatırlatması: hm:done:<id> -> bugün yapıldı (sıradaki tarih yazılır), hm:snz:<id> -> 1 hafta ertele."""
+    from .modules import homecare
+    _prefix, action, raw_id = (data.split(":") + ["", ""])[:3]
+    task = query_one("SELECT * FROM home_tasks WHERE id = ? AND user_id = ?",
+                     (int(raw_id) if raw_id.isdigit() else 0, user["id"]))
+    if task is None or action not in ("done", "snz"):
+        telegram.answer_callback(callback_id, "İş bulunamadı, silinmiş olabilir.")
+        return
+    name = f"{task['icon']} <b>{esc(task['name'])}</b>"
+    if action == "done":
+        day = today_str()
+        if homecare.done_on_day(task["id"], day):  # çift dokunuş: ikinci kez kaydetme
+            telegram.answer_callback(callback_id, "Bugün zaten kaydedilmiş.")
+            next_due = task["next_due"]
+        else:
+            next_due = homecare.complete(task, day)["next_due"]
+            telegram.answer_callback(callback_id, "✅ Kaydedildi")
+        text = f"✅ {name} yapıldı. Sıradaki: {fmt_date(next_due, True)}."
+    else:
+        new_due = homecare.snooze(task)
+        telegram.answer_callback(callback_id, "⏰ 1 hafta ertelendi")
+        text = f"⏰ {name} {fmt_date(new_due, True)} tarihine ertelendi."
+    url = link("homecare.detail", task_id=task["id"])
+    try:
+        telegram.edit_message(chat_id, message_id, f'{text}\n<a href="{esc(url)}">Ev Bakımı →</a>')
     except telegram.TelegramError:
         pass
 
