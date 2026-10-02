@@ -59,6 +59,12 @@ def build_daily_message(user, site_url):
         if user["weather_alerts"]:
             lines += [f"⚠️ {esc(a)}" for a in weather_alerts.alerts(d0)]
 
+    # Pazartesi: geçen hafta değerlendirmede yazılan "gelecek haftanın öncelikleri"
+    from .weekly import daily_line
+    focus = daily_line(user["id"], esc)
+    if focus:
+        lines += ["", focus]
+
     items = upcoming(user["id"], days=3, long_days=7)
     if items:
         lines += ["", "<b>📌 Yaklaşanlar</b>"]
@@ -318,6 +324,21 @@ def todo_reminders(secret):
             result["journal_asked"] += 1
         except telegram.TelegramError as e:
             result["errors"].append(f"günlük {user['username']}: {e}")
+
+    # Haftalık değerlendirme: pazar günü seçilen saatten sonra, haftaya puan verilmediyse bir kez
+    from . import weekly
+    result["weekly_asked"] = 0
+    for user, start in weekly.pending(now):
+        try:
+            telegram.send_message(user["telegram_chat_id"],
+                                  weekly.prompt_message(user["id"], start, now,
+                                                        url_for("weekly.index", hafta=start.isoformat(), _external=True),
+                                                        telegram.escape, interactive=with_buttons),
+                                  buttons=weekly.score_buttons(start) if with_buttons else None)
+            weekly.mark_asked(user["id"], start)
+            result["weekly_asked"] += 1
+        except Exception as e:  # bir kullanıcının hatası (Telegram ya da verisi) diğerlerini durdurmasın
+            result["errors"].append(f"haftalık {user['username']}: {e}")
 
     # Zaman takibi: 10 saattir çalışan (unutulmuş olabilecek) sayaç için bir kez uyarı
     from .timetrack import long_running, mark_warned, stop_buttons, warn_message

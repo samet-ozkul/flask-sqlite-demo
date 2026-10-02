@@ -92,11 +92,16 @@ def _offset():
     return f"{int(now_local().utcoffset().total_seconds()):+d} seconds"
 
 
+def range_params(user_id, first, nxt):
+    """Yerel [first, nxt) gün aralığının sorgu parametreleri: gün sınırları (:a, :b) ve aynı anların UTC karşılıkları
+    (:ua, :ub). Haftalık değerlendirme de bölüm sorgularını bununla haftalık aralıkta çalıştırır."""
+    return {"u": user_id, "y": str(first.year), "a": first.isoformat(), "b": nxt.isoformat(),
+            "ua": _utc(first), "ub": _utc(nxt), "off": _offset()}
+
+
 def _params(user_id, year):
     """Sorgu parametreleri: yerel yıl sınırları (:a, :b) ve aynı anların UTC karşılıkları (:ua, :ub)."""
-    first, nxt = date(year, 1, 1), date(year + 1, 1, 1)
-    return {"u": user_id, "y": str(year), "a": first.isoformat(), "b": nxt.isoformat(),
-            "ua": _utc(first), "ub": _utc(nxt), "off": _offset()}
+    return range_params(user_id, date(year, 1, 1), date(year + 1, 1, 1))
 
 
 def _activity_sql(ranged):

@@ -7,7 +7,7 @@ eşleştirme Python'da yapılır; kişisel veride tablo başına son 1000 kayda 
 from flask import url_for
 
 from .db import query
-from .utils import fmt_date, fmt_money, fold
+from .utils import fmt_date, fmt_money, fold, parse_date
 
 ROW_LIMIT = 1000
 
@@ -39,6 +39,17 @@ def _map_url(r):
     if r["kind"] == "city":
         return url_for("places.city", city_id=r["id"])
     return url_for("places.edit", place_id=r["id"])
+
+
+def _week_title(r):
+    from .modules.weekly import SCORES, week_label
+    return f"{week_label(parse_date(r['week_start']))} haftası" + (f" {SCORES[r['score']][0]}" if r["score"] else "")
+
+
+def _week_detail(r):
+    from .modules.weekly import parse_priorities
+    priorities = ", ".join(p["text"] for p in parse_priorities(r["priorities"]))
+    return " · ".join(x for x in (r["went_well"], r["hard"], r["learned"], priorities) if x)
 
 
 def _sources(user_id):
@@ -125,6 +136,10 @@ def _sources(user_id):
         ("Günlük", "📓", "SELECT * FROM journal WHERE user_id = ? ORDER BY date DESC LIMIT ?", (user_id,),
          ("text",), lambda r: fmt_date(r["date"], True) + (" " + _mood(r["mood"]) if r["mood"] else ""),
          lambda r: r["text"], lambda r: url_for("journal.index", ay=r["date"][:7], gun=r["date"])),
+        # Öncelikler JSON metniyle aranır (ensure_ascii=False: Türkçe harfler olduğu gibi)
+        ("Haftalık Değerlendirme", "🗓️", "SELECT * FROM weekly_reviews WHERE user_id = ? ORDER BY week_start DESC LIMIT ?",
+         (user_id,), ("went_well", "hard", "learned", "priorities"), _week_title, _week_detail,
+         lambda r: url_for("weekly.index", hafta=r["week_start"])),
         ("Önemli Günler", "🎂", "SELECT * FROM special_days WHERE user_id = ? LIMIT ?", (user_id,),
          ("name", "note"), lambda r: r["name"], lambda r: f"{r['day']:02d}.{r['month']:02d}",
          lambda r: url_for("specialdays.edit", day_id=r["id"])),

@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Haftalık Değerlendirme{% endblock %}
+{% block head %}
+<style>
+  .wk-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .wk-nav > div { text-align: center; min-width: 0; }
+  .wk-nav h2 { margin: 0 0 2px; font-size: 1.15rem; overflow-wrap: anywhere; }
+  .wk-nav .ghost { visibility: hidden; }
+  .wk-num .value { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; flex-shrink: 0; }
+  .wk-num .value .badge { margin-top: 3px; }
+  .mood-pick { display: flex; gap: 6px; justify-content: space-between; }
+  .mood-pick label { flex: 1; text-align: center; cursor: pointer; min-width: 0; }
+  .mood-pick input { display: none; }
+  .mood-pick span { display: block; font-size: 1.8rem; padding: 6px 0; border-radius: 12px; border: 2px solid transparent; }
+  .mood-pick input:checked + span { border-color: var(--primary); background: var(--primary-soft); }
+  .mood-pick small { display: block; font-size: .68rem; color: var(--muted); }
+  .wk-pr-in { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .wk-pr-in b { width: 1.2em; text-align: right; color: var(--muted); flex-shrink: 0; }
+  .wk-prio { list-style: none; margin: 0 0 10px; padding: 0; }
+  .wk-prio label { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border);
+                   cursor: pointer; overflow-wrap: anywhere; }
+  .wk-prio li:last-child label { border-bottom: 0; }
+  .wk-prio input { width: 20px; height: 20px; flex-shrink: 0; }
+  .wk-prio input:checked + span { text-decoration: line-through; color: var(--muted); }
+  /* Puan grafiği: son 12 hafta, sütun yüksekliği puanla */
+  .wk-chart { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; margin-bottom: 12px; }
+  .wk-chart a { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 0;
+                height: 142px; color: var(--muted); }
+  .wk-chart a:hover { text-decoration: none; color: var(--text); }
+  .wk-chart .e { font-size: .95rem; line-height: 1.4; }
+  .wk-chart .bar { display: block; width: 100%; max-width: 28px; border-radius: 6px 6px 2px 2px; background: var(--primary); opacity: .75; }
+  .wk-chart .bar.none { height: 4px; background: var(--surface-2); opacity: 1; }
+  .wk-chart a.current .bar { opacity: 1; }
+  .wk-chart a.on .bar { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .wk-chart small { font-size: .66rem; line-height: 1.25; white-space: nowrap; }
+  .wk-chart a.current small:first-of-type { color: var(--primary); font-weight: 700; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("🗓️ Haftalık Değerlendirme", "Haftanın sayıları, kısa bir değerlendirme ve gelecek haftanın 3 önceliği") }}
+
+<div class="wk-nav">
+  <a class="btn sm" href="{{ url_for('weekly.index', hafta=prev.isoformat()) }}">‹ Önceki</a>
+  <div>
+    <h2>{{ label }}</h2>
+    {% if status %}<span class="badge {{ 'soon' if review_day }}">{{ status }}</span>{% endif %}
+  </div>
+  {% if nxt %}<a class="btn sm" href="{{ url_for('weekly.index', hafta=nxt.isoformat()) }}">Sonraki ›</a>
+  {% else %}<span class="btn sm ghost" aria-hidden="true">Sonraki ›</span>{% endif %}
+</div>
+
+{% if missed %}
+  <div class="card">🗓️ Geçen haftayı ({{ prev_label }}) değerlendirmedin.
+    <a href="{{ url_for('weekly.index', hafta=prev.isoformat()) }}#degerlendirme">Şimdi doldur →</a></div>
+{% endif %}
+
+<section class="card">
+  <h2>📊 Haftanın sayıları</h2>
+  {% if n.empty %}
+    {{ ui.empty("Bu hafta için kayıt yok. Harcama, alışkanlık, günlük, zaman takibi… ekledikçe burada toplanır.", "📊") }}
+  {% else %}
+  <ul class="rows wk-num">
+    {% set e = n.expenses %}
+    {% if e %}
+      <li><span class="ico">💸</span>
+        <a class="grow" href="{{ url_for('expenses.index', ay=start.strftime('%Y-%m')) }}"><div class="title">Harcama</div>
+          <div class="meta"><span>{{ e.count }} harcama</span><span>en çok {{ category_icon(e.top[0]) }} {{ e.top[0] }} · {{ e.top[1] | money }} (%{{ e.top_pct }})</span>
+            {% if e.change is not none %}<span>{{ e.cmp_label }}: {{ e.prev | money }}</span>{% endif %}</div></a>
+        <span class="value">{{ e.total | money }}{% if e.change is not none %}<br><span class="badge {{ 'overdue' if e.change > 0 else 'good' }}">{{ arrow(e.change) }} %{{ e.change_pct }}</span>{% endif %}</span></li>
+    {% endif %}
+    {% set h = n.habits %}
+    {% if h %}
+      <li><span class="ico">🔥</span>
+        <a class="grow" href="{{ url_for('habits.index') }}"><div class="title">Alışkanlıklar</div>
+          <div class="meta">{% for s in h.habits %}<span>{{ s.icon }} {{ s.name }} {{ s.done }}/{{ s.expected }}</span>{% endfor %}</div></a>
+        <span class="value">%{{ h.rate }}<br><span class="muted small">{{ h.done }}/{{ h.expected }} gün</span></span></li>
+    {% endif %}
+    {% if n.tasks %}
+      <li><span class="ico">✅</span>
+        <a class="grow" href="{{ url_for('lists.index') }}"><div class="title">Tamamlanan görev</div>
+          {% if n.tasks.shopping %}<div class="meta"><span>🛒 {{ n.tasks.shopping }} alışveriş maddesi alındı</span></div>{% endif %}</a>
+        <span class="value">{{ n.tasks.todo }}</span></li>
+    {% endif %}
+    {% set j = n.journal %}
+    {% if j %}
+      <li><span class="ico">📓</span>
+        <a class="grow" href="{{ url_for('journal.index', ay=start.strftime('%Y-%m')) }}"><div class="title">Günlük</div>
+          {% if j.avg %}<div class="meta"><span>ortalama ruh hali {{ mood_emoji(j.avg) }} {{ j.avg | num(1) }} / 5</span></div>{% endif %}</a>
+        <span class="value">{{ j.days }} gün</span></li>
+    {% endif %}
+    {% set tm = n.time %}
+    {% if tm %}
+      <li><span class="ico">⏱️</span>
+        <a class="grow" href="{{ url_for('timetrack.report', aralik='ozel', bas=start.isoformat(), bit=end.isoformat()) }}"><div class="title">Zaman takibi</div>
+          <div class="meta"><span>{{ tm.count }} kayıt</span>{% if tm.top %}<span>en çok {{ tm.top.icon }} {{ tm.top.name }} · {{ duration(tm.top.seconds) }}</span>{% endif %}</div></a>
+        <span class="value">{{ duration(tm.total) }}</span></li>
+    {% endif %}
+    {% set w = n.watch %}
+    {% if w %}
+      <li><span class="ico">🎬</span>
+        <a class="grow" href="{{ url_for('watchlist.index') }}"><div class="title">Bitirilen {{ w.label }}</div>
+          <div class="meta">{% for icon, title in w.titles %}<span>{{ icon }} {{ title }}</span>{% endfor %}</div></a>
+        <span class="value">{{ w.total }}</span></li>
+    {% endif %}
+    {% if n.cards %}
+      <li><span class="ico">🗂️</span>
+        <a class="grow" href="{{ url_for('kanban.index') }}"><div class="title">Biten kanban kartı</div></a>
+        <span class="value">{{ n.cards }}</span></li>
+    {% endif %}
+    {% if n.bills %}
+      <li><span class="ico">🧾</span>
+        <a class="grow" href="{{ url_for('bills.index', sekme='odenen') }}"><div class="title">Ödenen fatura</div>
+          <div class="meta"><span>{{ n.bills.total | money }}</span></div></a>
+        <span class="value">{{ n.bills.count }}</span></li>
+    {% endif %}
+  </ul>
+  {% endif %}
+</section>
+
+{% if coming is not none %}
+<section class="card">
+  <h2>📅 Önümüzdeki 7 gün</h2>
+  {% if coming %}
+    <ul class="rows">
+      {% for it in coming %}
+        <li><span class="ico">{{ it.icon }}</span>
+          <a class="grow" href="{{ it.url }}"><div class="title">{{ it.title }}</div>{% if it.detail %}<div class="meta">{{ it.detail }}</div>{% endif %}</a>
+          <span class="badge {{ it.date | urgency }}">{{ it.date | rel_days }}</span></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted small">Önümüzdeki 7 günde yaklaşan ödeme, randevu ya da son tarih yok.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if last and last.priorities %}
+<section class="card">
+  <h2>📌 Bu haftanın öncelikleri <span class="pill-count">{{ last.rate[0] }}/{{ last.rate[1] }} · %{{ last.rate[2] }}</span></h2>
+  <p class="muted small">Geçen hafta ({{ prev_label }}) yazdıkların. Yapıldı mı?</p>
+  <form method="post" action="{{ url_for('weekly.priorities_done') }}">
+    {{ ui.csrf() }}<input type="hidden" name="hafta" value="{{ start.isoformat() }}">
+    <ul class="wk-prio">
+      {% for p in last.priorities %}
+        <li><label><input type="checkbox" name="done" value="{{ loop.index0 }}" data-autosubmit {% if p.done %}checked{% endif %}><span>{{ p.text }}</span></label></li>
+      {% endfor %}
+    </ul>
+    <button class="btn sm">Kaydet</button>
+  </form>
+</section>
+{% endif %}
+
+<section class="card" id="degerlendirme">
+  <h2>✍️ Değerlendirme</h2>
+  <form method="post" action="{{ url_for('weekly.save') }}" id="wk-form">
+    {{ ui.csrf() }}<input type="hidden" name="hafta" value="{{ start.isoformat() }}">
+    <div class="field"><span>Haftanın puanı</span>
+      <div class="mood-pick">
+        {% for s, (emoji, text) in scores.items() %}
+          <label><input type="radio" name="score" value="{{ s }}" {% if review and review.score == s %}checked{% endif %}><span>{{ emoji }}</span><small>{{ text }}</small></label>
+        {% endfor %}
+      </div>
+    </div>
+    {% for key, question in questions.items() %}
+      {{ ui.textarea(question, key, review.row[key] if review else "", rows=3) }}
+    {% endfor %}
+    <div class="field"><span>🎯 Gelecek haftanın 3 önceliği</span>
+      {% for p in priorities %}
+        <div class="wk-pr-in"><b>{{ loop.index }}.</b><input type="text" name="priority" value="{{ p }}" maxlength="200" aria-label="{{ loop.index }}. öncelik"></div>
+      {% endfor %}
+      <small class="muted">Gelecek haftanın sayfasında “yapıldı mı?” diye işaretlenir, pazartesi günlük özetinde de yazar.</small>
+    </div>
+  </form>
+  {# Sil ayrı bir form: iç içe form olmasın diye Kaydet düğmesi forma form="wk-form" ile bağlı #}
+  <div class="row-flex">
+    <button class="btn primary" form="wk-form">Kaydet</button>
+    {% if review %}{{ ui.delete_button(url_for('weekly.delete', day=start.isoformat()), "Sil", "Bu haftanın değerlendirmesi silinsin mi? (çöp kutusuna gider)") }}{% endif %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>📈 Son {{ chart | length }} hafta</h2>
+  <div class="wk-chart">
+    {% for c in chart %}
+      <a href="{{ url_for('weekly.index', hafta=c.start.isoformat()) }}" title="{{ c.title }}" class="{{ 'current' if c.current }} {{ 'on' if c.start == start }}">
+        <span class="e">{{ c.emoji }}</span>
+        <span class="bar {{ 'none' if not c.score }}"{% if c.score %} style="height: {{ c.score * 18 }}px"{% endif %}></span>
+        <small>{{ c.day }}</small><small>{% if c.month %}{{ c.month }}{% else %}&nbsp;{% endif %}</small>
+      </a>
+    {% endfor %}
+  </div>
+  {% if history %}
+    <ul class="rows">
+      {% for r in history %}
+        <li><span class="ico">{{ r.emoji or '🗓️' }}</span>
+          <a class="grow" href="{{ url_for('weekly.index', hafta=r.row.week_start) }}"><div class="title">{{ r.label }}</div>
+            <div class="meta">
+              {% if r.rate and r.start < current %}<span>🎯 öncelikler {{ r.rate[0] }}/{{ r.rate[1] }} (%{{ r.rate[2] }})</span>
+              {% elif r.rate %}<span>🎯 {{ r.rate[1] }} öncelik</span>{% endif %}
+              {% if r.row.went_well %}<span>{{ r.row.went_well | truncate(90) }}</span>{% endif %}
+            </div></a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted small">Henüz değerlendirme yok. Her pazar birkaç dakika: puan, iyi giden, zorlayan ve gelecek haftanın 3 önceliği.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>🔔 Pazar hatırlatması</h2>
+  <form method="post" action="{{ url_for('weekly.reminder') }}" class="row-flex">
+    {{ ui.csrf() }}
+    {{ ui.checkbox("Her pazar Telegram'dan hatırlat", "on", reminder) }}
+    <input type="time" name="time" value="{{ reminder or default_prompt }}" style="max-width: 140px">
+    <button class="btn sm">Kaydet</button>
+  </form>
+  <p class="muted small">Pazar günü seçtiğin saatten sonra haftanın kısa sayıları ve puan butonları gelir (haftayı puanladıysan gelmez).
+    Pazartesi günlük özetinde bu haftanın öncelikleri yazar.{% if not telegram_linked %} <a href="{{ url_for('settings.index') }}#telegram">Telegram'ı bağla →</a>{% endif %}</p>
+</section>
+{% endblock %}
