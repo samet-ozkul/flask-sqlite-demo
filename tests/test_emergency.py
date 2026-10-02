@@ -186,6 +186,10 @@ def test_public_page():
     assert "Bu senin kartın · 👁️ 2 görüntülenme" in ADMIN.text(f"/acil/{token()}") and card()["views"] == 2
     RAW.head(f"/acil/{token()}")
     assert card()["views"] == 2
+    # Link önizlemesi (WhatsApp, Telegram...) sayılmaz; sayfa yine açılır
+    for ua in ("WhatsApp/2.23.20.0 A", "TelegramBot (like TwitterBot)", "facebookexternalhit/1.1"):
+        assert RAW.get(f"/acil/{token()}", headers={"User-Agent": ua}).status_code == 200
+    assert card()["views"] == 2
     admin_page = ADMIN.text("/acil-durum/")
     assert "Yayında" in admin_page and "👁️ 2 görüntülenme" in admin_page and "son 02.10.2026 14:30" in admin_page
     # Boş alanlar hiç görünmez

@@ -62,7 +62,7 @@
         {% if d.blood or c.allergies %}
           <div class="mid">
             {% if d.blood %}<div class="blood"><span class="lbl">Kan · Blood</span><b>{{ d.blood }}</b></div>{% endif %}
-            {% if c.allergies %}<div class="allergy"><span class="lbl">⚠️ Alerjiler · Allergies</span><div class="clamp">{{ c.allergies }}</div></div>{% endif %}
+            {% if c.allergies %}<div class="allergy"><span class="lbl">⚠️ Alerjiler · Allergies</span><div class="clamp">{{ c.allergies.splitlines() | map("trim") | select | join(", ") }}</div></div>{% endif %}
           </div>
         {% endif %}
         {% if d.contacts %}

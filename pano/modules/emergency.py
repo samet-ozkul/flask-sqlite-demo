@@ -5,7 +5,7 @@
   eski bağlantı, QR, duvar kâğıdı ve cüzdan kartı açılmaz. Kapalı kart ile olmayan kart dışarıdan aynı 404;
   sahibi kapalıyken de önizler, ziyareti sayılmaz
 - Sayfada sadece emergency_cards satırındaki alanlar görünür; kullanıcı adı dahil panodaki başka hiçbir veri okunmaz
-- Başkası açınca sayaç artar; Telegram bağlıysa en fazla 30 dakikada bir "kartın görüntülendi" bildirimi
+- Başkası açınca sayaç artar (link önizleme robotları sayılmaz); Telegram bağlıysa en fazla 30 dakikada bir "kartın görüntülendi" bildirimi
 - Kilit ekranı duvar kâğıdı (1080×2340 PNG, Pillow + segno) ve yazdırılabilir cüzdan kartı (85,6 × 54 mm, ön + arka)
 - İlaçlar Sağlık modülündeki aktif ilaçlardan, acil kişiler Kişiler'den doldurulabilir (kaydetmeden önce kontrol edilir)
 """
@@ -26,7 +26,7 @@ from .. import todo_reminders as todo
 from ..auth import login_required
 from ..db import get_db, query, query_one
 from ..totp import qr_svg
-from ..utils import form_bool, form_choice, form_str, parse_date, today
+from ..utils import form_bool, form_choice, form_str, is_link_preview, parse_date, today
 from .profile import PHONE_RE, tel_number
 
 # Yönetim /acil-durum altında, herkese açık sayfa /acil/ altında: tek blueprint iki ayrı kökte
@@ -357,7 +357,7 @@ def build_wallpaper(c, url):
         lines("KAN GRUBU · BLOOD TYPE", 34, WALL_MUTED)
         lines(d["blood"] + (f"  ({d['blood_intl']})" if d["blood_intl"] else ""), 84, "#f87171", bold=True, gap=1.15)
         y += 14
-    allergy = (c["allergies"].strip().splitlines() or [""])[0]
+    allergy = ", ".join(line.strip() for line in c["allergies"].splitlines() if line.strip())  # 2 satıra sığdırılır
     if allergy:
         lines("ALERJİ · ALLERGY", 34, WALL_WARN, bold=True)   # ⚠ gibi simgeler Arial'de yok: düz metin
         lines(allergy, 46, WALL_WARN, max_lines=2)
@@ -437,7 +437,8 @@ def _record_view(c):
 def public(token):
     c = _visible_or_404(token)
     owner = _is_owner(c)
-    if not owner and request.method == "GET":
+    # WhatsApp/Telegram gibi uygulamaların link önizlemesi görüntülenme sayılmaz, bildirim de göndermez
+    if not owner and request.method == "GET" and not is_link_preview(request.user_agent.string):
         _record_view(c)
     resp = make_response(render_template("emergency/public.html", c=c, d=display(c), owner=owner))
     resp.headers["Cache-Control"] = "no-store"
