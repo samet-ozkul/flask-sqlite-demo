@@ -198,7 +198,8 @@ def handle_callback(cq, chat_id, message_id):
     prefix = data.split(":", 1)[0]
     handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
                 "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood, "ct": cb_contact, "ctz": cb_contact,
-                "tt": cb_timer, "loc": cb_location, "scn": cb_scan, "hm": cb_home, "wk": cb_weekly_score}
+                "tt": cb_timer, "loc": cb_location, "scn": cb_scan, "hm": cb_home, "wk": cb_weekly_score,
+                "bk": cb_booking}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -1175,6 +1176,27 @@ def cb_timer(user, chat_id, message_id, callback_id, data):
     try:
         telegram.edit_message(chat_id, message_id, tt.stopped_message(stopped, link("timetrack.edit", entry_id=stopped["id"]),
                                                                       esc))
+    except telegram.TelegramError:
+        pass
+
+
+# ---------- Randevu sayfası ----------
+def cb_booking(user, chat_id, message_id, callback_id, data):
+    """Randevu talebi butonları: bk:ok:<id> onayla, bk:no:<id> reddet (sadece randevunun sahibi)."""
+    from .modules import booking
+    _prefix, action, raw = (data.split(":") + ["", ""])[:3]
+    b = query_one("SELECT * FROM bookings WHERE id = ? AND user_id = ?", (int(raw), user["id"])) \
+        if raw.isdigit() and action in ("ok", "no") else None
+    if b is None:
+        telegram.answer_callback(callback_id, "Randevu bulunamadı.")
+        return
+    _ok, message = booking.decide(b, "confirm" if action == "ok" else "reject")
+    telegram.answer_callback(callback_id, message)
+    b = query_one("SELECT * FROM bookings WHERE id = ?", (b["id"],))
+    # Mesaj son durumu gösterir; hâlâ bekliyorsa (ör. saat geçtiği için onaylanamadıysa) butonlar kalır
+    try:
+        telegram.edit_message(chat_id, message_id, booking.owner_message(b, link("booking.index"), esc, booking.status_head(b)),
+                              buttons=booking.decision_buttons(b["id"]) if b["status"] == "pending" else None)
     except telegram.TelegramError:
         pass
 

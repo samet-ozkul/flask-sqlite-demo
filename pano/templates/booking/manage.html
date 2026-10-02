@@ -1,0 +1,59 @@
+{% extends "booking/_public_layout.html" %}
+{# Ziyaretçinin randevu bağlantısı (/r/i/<anahtar>): durum, takvime ekle, iptal. Adres/link/numara sadece onaylıysa. #}
+{% block title %}Randevun · {{ b.status_label }}{% endblock %}
+{% block main %}
+  {% if new %}
+    <div class="notice" role="status">
+      {% if b.status == 'confirmed' %}<b>✅ Randevun alındı.</b>{% else %}<b>📨 Randevu talebin alındı.</b>
+        Onaylanınca bu sayfada “Onaylandı” yazar.{% endif %}
+    </div>
+  {% endif %}
+  {% if page and page.title %}<p class="muted small">{{ page.title }}</p>{% endif %}
+  <h1>{{ b.type_name or "Randevu" }}</h1>
+  <span class="status {{ b.status }}">{{ b.status_icon }} {{ b.status_label }}</span>
+  {% if b.status == 'cancelled' %}
+    <p class="muted small">{{ "Randevuyu sen iptal ettin." if b.cancelled_by == 'visitor' else "Randevu iptal edildi." }}</p>
+  {% elif b.status == 'rejected' %}
+    <p class="muted small">Bu saat için randevu verilemedi.</p>
+  {% endif %}
+
+  <div class="summary">
+    <div>🗓️ <b>{{ b.when }}</b></div>
+    <div>{{ b.loc_icon }} {{ b.loc_public }}</div>
+    {% if b.status == 'confirmed' %}
+      {% if b.location_kind == 'in_person' and b.location_detail %}<div>📍 {{ b.location_detail }}</div>
+      {% elif b.detail_tel %}<div>📞 Aranacak numara: <a href="{{ b.detail_tel }}">{{ b.location_detail }}</a></div>
+      {% elif b.detail_link %}<div>💻 <a href="{{ b.detail_link }}" target="_blank" rel="noopener noreferrer">Görüşme linki</a>
+        <span class="muted small">{{ b.detail_link }}</span></div>
+      {% elif b.location_kind == 'callback' %}<div>📲 Görüşme saatinde {{ b.contact }} numarasından aranacaksın.</div>
+      {% endif %}
+    {% elif b.status == 'pending' and b.location_detail %}
+      <div class="muted small">{{ "Adres" if b.location_kind == 'in_person' else ("Aranacak numara" if b.location_kind == 'phone'
+        else "Görüşme linki") }} randevu onaylanınca burada görünür.</div>
+    {% endif %}
+    <div>👤 {{ b.name }} · {{ b.contact }}</div>
+    {% if b.note %}<div class="desc muted">📝 {{ b.note }}</div>{% endif %}
+    <div class="muted small">🕒 {{ tz_note }}</div>
+  </div>
+
+  {% if b.status == 'confirmed' and can_cancel %}
+    <a class="btn" href="{{ url_for('booking.ics', token=b.manage_token) }}">📅 Takvimime ekle</a>
+  {% endif %}
+
+  {% if b.status in ('pending', 'confirmed') %}
+    <div class="save">🔖 <b>Bu sayfanın adresini kaydet</b> (yer imi ya da ekran görüntüsü): randevunun durumunu buradan
+      görür, gerekirse iptal edersin. E-posta ya da mesaj gönderilmez.
+      <code>{{ url }}</code></div>
+  {% endif %}
+
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+  {% if can_cancel %}
+    <form method="post" action="{{ url_for('booking.visitor_cancel', token=b.manage_token) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <label class="check"><input type="checkbox" name="confirm" value="1" required> Evet, randevuyu iptal etmek istiyorum</label>
+      <button class="btn danger">Randevuyu iptal et</button>
+    </form>
+  {% elif b.status in ('rejected', 'cancelled') and page and page.enabled %}
+    <a class="btn light" href="{{ url_for('booking.public', slug=page.slug) }}">Yeni bir saat seç</a>
+  {% endif %}
+{% endblock %}

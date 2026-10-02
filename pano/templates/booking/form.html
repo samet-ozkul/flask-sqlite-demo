@@ -1,0 +1,39 @@
+{% extends "booking/_public_layout.html" %}
+{# Randevu formu: ad, telefon ya da e-posta, not + görünmeyen bal tuzağı alanı. Saat gönderimde yeniden kontrol edilir. #}
+{% block title %}{{ btype.name }} · {{ page.title or "Randevu al" }}{% endblock %}
+{% block main %}
+  {% set loc = locations[btype.location_kind] %}
+  {% set callback = btype.location_kind == 'callback' %}
+  <a class="back" href="{{ url_for('booking.slots', slug=page.slug, type_id=btype.id) }}">← Başka saat seç</a>
+  <h1>{{ btype.name }}</h1>
+  <div class="summary">
+    <div>🗓️ <b>{{ when }}</b></div>
+    <div class="muted">⏱️ {{ btype.duration_min }} dk · {{ loc[0] }} {{ loc[3] }}</div>
+    <div class="muted small">🕒 {{ tz_note }}</div>
+  </div>
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+  {% if taken %}
+    <a class="btn" href="{{ url_for('booking.slots', slug=page.slug, type_id=btype.id) }}">Boş saatleri gör</a>
+  {% else %}
+    <form method="post" action="{{ url_for('booking.request_form', slug=page.slug, type_id=btype.id) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="t" value="{{ slot }}">
+      <label>Adın soyadın
+        <input name="name" value="{{ form.name }}" maxlength="80" required autocomplete="name"></label>
+      <label>{{ "Telefon numaran" if callback else "Telefon ya da e-posta" }}
+        <input name="contact" value="{{ form.contact }}" maxlength="120" required
+               {% if callback %}type="tel" autocomplete="tel"{% else %}autocomplete="on"{% endif %}
+               placeholder="{{ '0532 123 45 67' if callback else '0532 123 45 67 ya da ad@ornek.com' }}">
+        <span class="hint">{{ "Görüşme saatinde seni bu numaradan arayacağım." if callback
+                              else "Gerekirse sana bu bilgiyle ulaşılır." }}</span></label>
+      <label>Not <span class="hint">İsteğe bağlı: görüşmek istediğin konu (en fazla 500 karakter)</span>
+        <textarea name="note" maxlength="500" rows="3">{{ form.note }}</textarea></label>
+      <div class="hp" aria-hidden="true">
+        <label>Web sitesi (boş bırak) <input name="website" tabindex="-1" autocomplete="off"></label>
+      </div>
+      <button class="btn">{{ "📨 Randevu iste" if page.needs_approval else "✅ Randevuyu al" }}</button>
+      <p class="muted small">{% if page.needs_approval %}Talebin onaylanınca kesinleşir; durumunu bir sonraki sayfadaki
+        bağlantıdan görürsün.{% else %}Randevun hemen kesinleşir.{% endif %} Bilgilerin sadece bu randevu için kullanılır.</p>
+    </form>
+  {% endif %}
+{% endblock %}

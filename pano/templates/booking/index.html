@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Randevu Sayfası{% endblock %}
+{% block head %}
+<style>
+  .bk-top { display: grid; gap: 14px; align-items: center; grid-template-columns: 1fr; }
+  @media (min-width: 560px) { .bk-top { grid-template-columns: 180px 1fr; } }
+  .qr-box svg { width: min(180px, 100%); height: auto; aspect-ratio: 1; border-radius: 8px; display: block; margin: 0 auto; }
+  .bk-short { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 2px 0; }
+  .bk-url { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .86rem; color: var(--primary);
+            overflow-wrap: anywhere; user-select: all; }
+  .bk-stats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 10px; }
+  .bk-top .flash { margin: 10px 0 0; }
+  .bk-rows > li { align-items: flex-start; }
+  .bk-rows .actions { padding-top: 2px; }
+  .bk-note { white-space: pre-line; overflow-wrap: anywhere; font-size: .9rem; margin-top: 4px; }
+  .bk-rows details > summary { cursor: pointer; width: fit-content; margin-top: 4px; }
+  .bk-rows details form { margin-top: 10px; }
+  /* Telefonda düğmeler alta */
+  @media (max-width: 600px) {
+    .bk-rows > li { flex-wrap: wrap; }
+    .bk-rows .grow { flex: 1 1 calc(100% - 40px); }
+    .bk-rows .actions { flex-basis: 100%; display: flex; gap: 6px; flex-wrap: wrap; padding: 0 0 0 38px; }
+  }
+  .bk-day { display: grid; gap: 4px 12px; grid-template-columns: 1fr; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .bk-day:last-child { border-bottom: 0; }
+  .bk-day .check { margin: 0; font-weight: 600; }
+  .bk-ranges { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  .bk-range { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; }
+  .bk-range input { width: 7.4em; padding: 6px 8px; }
+  .bk-day:has(input[type=checkbox]:not(:checked)) .bk-ranges { opacity: .45; }
+  @media (min-width: 640px) { .bk-day { grid-template-columns: 130px 1fr; align-items: center; } }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("📅 Randevu Sayfası", "Müsait saatlerini belirle; başkaları linkinden boş bir saat seçip randevu istesin") %}
+  {% if page %}<a class="btn" href="{{ url }}" target="_blank" rel="noopener">👁️ Önizle</a>{% endif %}
+{% endcall %}
+
+{% if page %}
+  <section class="card">
+    <div class="bk-top">
+      <div class="qr-box">{{ qr | safe }}</div>
+      <div>
+        <h2 style="margin-bottom: 4px">Sayfan</h2>
+        <div class="bk-short">
+          <span class="bk-url" id="bk-url">{{ url }}</span>
+          <button type="button" class="btn sm hidden" data-copy="bk-url">📋 Kopyala</button>
+        </div>
+        <div class="bk-stats">
+          {% if page.enabled %}<span class="badge good">Yayında</span>{% else %}<span class="badge">Kapalı</span>{% endif %}
+          <span class="muted small">{{ "✋ Talepler onayınla kesinleşir" if page.needs_approval else "⚡ Talepler hemen kesinleşir" }}</span>
+        </div>
+        <a class="btn sm primary" href="{{ url_for('booking.qr_png') }}">⬇️ QR'ı PNG indir</a>
+        {% if not types %}
+          <p class="flash warning">Henüz görüşme türü yok: ziyaretçiler saat seçemez.
+            <a href="{{ url_for('booking.index', tab='turler') }}">🗂️ Görüşme türü ekle →</a></p>
+        {% elif not has_hours %}
+          <p class="flash warning">Haftalık müsaitlikte açık gün yok: sayfada boş saat görünmez.</p>
+        {% endif %}
+        {% if not page.enabled %}
+          <p class="muted small">Sayfa kapalıyken başkaları “bulunamadı” görür; önizlemeyi sadece sen görürsün.</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<nav class="tabs" aria-label="Bölümler">
+  {% for key, label in tabs.items() %}
+    <a href="{{ url_for('booking.index', tab=key) }}" class="{{ 'active' if tab == key }}" {% if tab == key %}aria-current="page"{% endif %}>
+      {{ label }}{% if counts.get(key) %} <span class="pill-count">{{ counts[key] }}</span>{% endif %}
+    </a>
+  {% endfor %}
+</nav>
+
+{% macro booking_row(b, kind) -%}
+  <li>
+    <span class="ico">{{ b.status_icon }}</span>
+    <div class="grow">
+      <div class="title">{{ b.name }} <span class="muted small">· {{ b.type_name }}</span>
+        {% if kind == 'past' %}<span class="badge">{{ "Yanıtlanmadı" if b.status == 'pending' else ("Tamamlandı" if b.status == 'confirmed' else b.status_label) }}</span>{% endif %}
+      </div>
+      <div class="meta">
+        <span>🗓️ {{ b.when }}</span>
+        <span>{{ b.loc_icon }} {{ b.loc_label }}</span>
+        <a href="{{ b.contact_href }}">{{ b.contact_icon }} {{ b.contact }}</a>
+        {% if b.event_id %}<a href="{{ url_for('events.edit', event_id=b.event_id) }}">📅 Takvimde</a>{% endif %}
+        {% if b.status == 'cancelled' %}<span>{{ "ziyaretçi iptal etti" if b.cancelled_by == 'visitor' else "sen iptal ettin" }}</span>{% endif %}
+      </div>
+      {% if b.note %}<div class="bk-note">📝 {{ b.note }}</div>{% endif %}
+    </div>
+    {% if kind == 'pending' %}
+      <div class="actions">
+        {{ ui.post_button(url_for('booking.decide_web', booking_id=b.id, action='onayla'), "✅ Onayla", "ok") }}
+        {{ ui.post_button(url_for('booking.decide_web', booking_id=b.id, action='reddet'), "❌ Reddet", "danger") }}
+      </div>
+    {% elif kind == 'upcoming' %}
+      <div class="actions">
+        <form method="post" action="{{ url_for('booking.decide_web', booking_id=b.id, action='iptal') }}" class="inline"
+              data-confirm="Randevu iptal edilsin mi? Takvimindeki etkinlik de silinir; ziyaretçi bağlantısında “İptal edildi” görür.">
+          {{ ui.csrf() }}
+          <button class="btn sm danger">İptal et</button>
+        </form>
+      </div>
+    {% endif %}
+  </li>
+{%- endmacro %}
+
+{% macro type_fields(t) -%}
+  {{ ui.field("Ad", "name", t.name, required=True, attrs='maxlength="60"', placeholder="ör. Tanışma görüşmesi") }}
+  <div class="form-row three">
+    <label class="field"><span>Süre</span>
+      <select name="duration_min">{% for d in durations %}<option value="{{ d }}" {% if d|string == t.duration_min|string %}selected{% endif %}>{{ d }} dk</option>{% endfor %}</select></label>
+    <label class="field"><span>Yer</span>
+      <select name="location_kind">{% for key, loc in locations.items() %}<option value="{{ key }}" {% if key == t.location_kind %}selected{% endif %}>{{ loc[0] }} {{ loc[1] }}</option>{% endfor %}</select></label>
+    <label class="field"><span>Aradaki boşluk</span>
+      <select name="buffer_min">{% for m in buffers %}<option value="{{ m }}" {% if m|string == t.buffer_min|string %}selected{% endif %}>{{ m ~ " dk" if m else "Yok" }}</option>{% endfor %}</select>
+      <small class="muted">Öncesinde ve sonrasında boş kalır</small></label>
+  </div>
+  <div data-show-for="location_kind=in_person,phone,online">
+    {{ ui.field("Adres / aranacak numara / görüşme linki", "location_detail", t.location_detail, attrs='maxlength="200"',
+                hint="Yüz yüze: adres · Telefon: ziyaretçinin arayacağı numara · Online: https:// link (boşsa linki sen iletirsin). "
+                     ~ "Sadece onaylanan randevuda ziyaretçiye gösterilir.") }}
+  </div>
+{%- endmacro %}
+
+{% if tab == 'randevular' %}
+  {% if not telegram_ready %}
+    <p class="muted small">💬 Telegram'ı bağlarsan (Ayarlar) yeni talepler anında gelir ve butonla onaylarsın.</p>
+  {% endif %}
+  <div class="card">
+    <h2>⏳ Bekleyen {% if pending %}<span class="pill-count">{{ pending | length }}</span>{% endif %}</h2>
+    {% if pending %}
+      <ul class="rows bk-rows">{% for b in pending %}{{ booking_row(b, 'pending') }}{% endfor %}</ul>
+    {% else %}
+      <p class="muted small">Onay bekleyen talep yok.</p>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h2>📅 Yaklaşan</h2>
+    {% if upcoming %}
+      <ul class="rows bk-rows">{% for b in upcoming %}{{ booking_row(b, 'upcoming') }}{% endfor %}</ul>
+      <p class="muted small">Onaylanan randevular takvimine özel etkinlik olarak eklenir; 1 saat önce Telegram'dan hatırlatılır.</p>
+    {% else %}
+      {{ ui.empty("Yaklaşan randevu yok. Sayfanın linkini ya da QR'ı paylaş.", "📅") }}
+    {% endif %}
+  </div>
+  {% if past %}
+    <details class="card">
+      <summary><b>🗂️ Geçmiş</b> <span class="pill-count">{{ past | length }}</span></summary>
+      <ul class="rows bk-rows">{% for b in past %}{{ booking_row(b, 'past') }}{% endfor %}</ul>
+    </details>
+  {% endif %}
+
+{% elif tab == 'ayarlar' %}
+  <form method="post" action="{{ url_for('booking.save_settings') }}">
+    {{ ui.csrf() }}
+    <section class="card">
+      <h2>Adres ve görünürlük</h2>
+      {{ ui.checkbox("📅 Sayfa yayında: adresi bilen herkes boş saatlerini görüp randevu isteyebilir", "enabled", form.enabled) }}
+      {{ ui.field("Adres", "slug", form.slug, required=True,
+                  attrs='maxlength="40" autocapitalize="off" autocomplete="off" spellcheck="false"',
+                  hint="3-30 karakter: küçük harf (a-z), rakam ve tire. Türkçe harfler dönüştürülür (ş → s). "
+                       ~ "Değiştirirsen eski adres ve QR artık açılmaz.") }}
+      <p class="muted small bk-url" style="margin-top: -6px">{{ base_url }}<b>{{ form.slug }}</b></p>
+      {{ ui.field("Başlık", "title", form.title, attrs='maxlength="80"', placeholder="ör. Samet Özkul ile görüşme") }}
+      {{ ui.textarea("Açıklama", "description", form.description, rows=3,
+                     placeholder="Sayfada başlığın altında görünür (en fazla 500 karakter)") }}
+    </section>
+
+    <section class="card">
+      <h2>Kurallar</h2>
+      <div class="form-row three">
+        {{ ui.field("En az kaç saat önceden", "min_notice_hours", form.min_notice_hours, type="number",
+                    attrs='min="0" max="' ~ notice_max ~ '" inputmode="numeric"', hint="Şu andan bu kadar saat sonrasına kadar randevu alınamaz") }}
+        {{ ui.field("Kaç gün ileriye kadar", "horizon_days", form.horizon_days, type="number",
+                    attrs='min="1" max="' ~ horizon_max ~ '" inputmode="numeric"', hint="Bugün dahil, en fazla " ~ horizon_max) }}
+        <label class="field"><span>Saatler kaç dakikada bir</span>
+          <select name="slot_step">{% for s in steps %}<option value="{{ s }}" {% if s|string == form.slot_step|string %}selected{% endif %}>{{ s }} dk</option>{% endfor %}</select>
+          <small class="muted">ör. 30 dk → 09:00, 09:30, 10:00…</small></label>
+      </div>
+      {{ ui.checkbox("✋ Randevular onayımdan geçsin (kapalıysa talep hemen kesinleşir ve takvimine eklenir)", "needs_approval", form.needs_approval) }}
+      {{ ui.checkbox("🗓️ Takvimimdeki saatli kayıtlar dolu sayılsın (etkinlik, sağlık randevusu, saatli yapılacak…; her biri 1 saat; tüm gün kayıtları sayılmaz)",
+                     "busy_from_calendar", form.busy_from_calendar) }}
+    </section>
+
+    <section class="card">
+      <h2>Haftalık müsaitlik</h2>
+      <p class="muted small" style="margin-top: 0">Açık her gün için bir ya da iki saat aralığı (ör. 09:00–12:00 ve 13:00–17:00).
+        Saatler Türkiye saatidir; ikinci aralık isteğe bağlı.</p>
+      <div>
+        {% for r in form.rows %}
+          <div class="bk-day">
+            <label class="check"><input type="checkbox" name="open_{{ r.day }}" value="1" {% if r.open %}checked{% endif %}> {{ r.name }}</label>
+            <div class="bk-ranges">
+              <span class="bk-range">
+                <input type="time" name="s1_{{ r.day }}" value="{{ r.s1 }}" aria-label="{{ r.name }} 1. aralık başlangıç"> –
+                <input type="time" name="e1_{{ r.day }}" value="{{ r.e1 }}" aria-label="{{ r.name }} 1. aralık bitiş">
+              </span>
+              <span class="bk-range">
+                <span class="muted small">ve</span>
+                <input type="time" name="s2_{{ r.day }}" value="{{ r.s2 }}" aria-label="{{ r.name }} 2. aralık başlangıç"> –
+                <input type="time" name="e2_{{ r.day }}" value="{{ r.e2 }}" aria-label="{{ r.name }} 2. aralık bitiş">
+              </span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+    <button class="btn primary block">Kaydet</button>
+  </form>
+
+  <section class="card" id="kapali" style="margin-top: 16px">
+    <h2>🚫 Kapalı günler <span class="muted small">tatil, izin</span></h2>
+    {% if blocks %}
+      <ul class="rows">
+        {% for k in blocks %}
+          <li>
+            <span class="ico">🚫</span>
+            <div class="grow">
+              <div class="title">{{ k.start_date | date_tr(True) }}{% if k.end_date != k.start_date %} – {{ k.end_date | date_tr(True) }}{% endif %}</div>
+              {% if k.note %}<div class="meta">{{ k.note }}</div>{% endif %}
+            </div>
+            {{ ui.delete_button(url_for('booking.block_delete', block_id=k.id), "Kaldır", "Kapalı gün kaldırılsın mı? O günler yeniden randevuya açılır.") }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted small">Kapalı gün yok.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('booking.block_add') }}">
+      {{ ui.csrf() }}
+      <div class="form-row three">
+        {{ ui.field("Başlangıç", "start_date", block_form.start_date, type="date", required=True, attrs='min="' ~ today ~ '"') }}
+        {{ ui.field("Bitiş", "end_date", block_form.end_date, type="date", hint="Tek gün için boş bırak") }}
+        {{ ui.field("Not", "note", block_form.note, attrs='maxlength="60"', placeholder="ör. Yıllık izin") }}
+      </div>
+      <button class="btn">＋ Kapat</button>
+    </form>
+  </section>
+
+{% else %}
+  <div class="card">
+    {% if types %}
+      <ul class="rows bk-rows">
+        {% for t in types %}
+          {% set loc = locations[t.location_kind] %}
+          {% set open_edit = editing and editing.id == t.id %}
+          <li>
+            <span class="ico">{{ loc[0] }}</span>
+            <div class="grow">
+              <div class="title">{{ t.name }} {% if not t.active %}<span class="badge">Sayfada gizli</span>{% endif %}</div>
+              <div class="meta">
+                <span>⏱️ {{ t.duration_min }} dk</span>
+                <span>{{ loc[1] }}</span>
+                {% if t.location_detail %}<span>{{ t.location_detail }}</span>{% endif %}
+                {% if t.buffer_min %}<span>↔️ {{ t.buffer_min }} dk boşluk</span>{% endif %}
+              </div>
+              <details {% if open_edit %}open{% endif %}>
+                <summary class="muted small">✏️ Düzenle</summary>
+                <form method="post" action="{{ url_for('booking.type_edit', type_id=t.id) }}">
+                  {{ ui.csrf() }}
+                  {{ type_fields(editing if open_edit else t) }}
+                  <button class="btn primary sm">Kaydet</button>
+                </form>
+              </details>
+            </div>
+            <div class="actions">
+              <form method="post" action="{{ url_for('booking.type_toggle', type_id=t.id) }}" class="inline">
+                {{ ui.csrf() }}
+                <button class="btn sm icon" title="{{ 'Sayfada gizle' if t.active else 'Sayfada göster' }}"
+                        aria-label="{{ 'Sayfada gizle' if t.active else 'Sayfada göster' }}">{{ '⏸️' if t.active else '▶️' }}</button>
+              </form>
+              <form method="post" action="{{ url_for('booking.type_delete', type_id=t.id) }}" class="inline"
+                    data-confirm="Görüşme türü silinsin mi? Alınmış randevular durur (çöp kutusundan geri getirilebilir).">
+                {{ ui.csrf() }}
+                <button class="btn sm icon danger" title="Sil" aria-label="Sil">🗑️</button>
+              </form>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      {{ ui.empty("Henüz görüşme türü yok. Ziyaretçi önce bir tür seçer (ör. 30 dk tanışma görüşmesi), sonra saat.", "🗂️") }}
+    {% endif %}
+  </div>
+  {% if types | length < max_types %}
+    <div class="card">
+      <details class="add" {% if not types or new_type.name %}open{% endif %}>
+        <summary>＋ Yeni görüşme türü</summary>
+        <form method="post" action="{{ url_for('booking.type_create') }}">
+          {{ ui.csrf() }}
+          {{ type_fields(new_type) }}
+          <button class="btn primary">Ekle</button>
+        </form>
+      </details>
+    </div>
+  {% else %}
+    <p class="muted small center">En fazla {{ max_types }} görüşme türü eklenebilir.</p>
+  {% endif %}
+{% endif %}
+<script src="{{ url_for('static', filename='booking.js') }}?v=1" defer></script>
+{% endblock %}
