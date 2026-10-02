@@ -1,0 +1,115 @@
+<!doctype html>
+{# Herkese açık acil durum kartı: base.html kullanılmaz (menü, kullanıcı bilgisi, CSRF, betik yok). Sadece c'deki alanlar.
+   Etiketler iki dilli: yurt dışında da okunsun. Boş alan hiç gösterilmez. #}
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ACİL DURUM · EMERGENCY{% if c.full_name %} · {{ c.full_name }}{% endif %}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+  <style>
+    :root {
+      --bg: #f5f6fa; --card: #ffffff; --text: #1c1e26; --muted: #5f6475; --border: #e3e5ec;
+      --red: #c62828; --on-red: #ffffff; --red-soft: #fdecec;
+      --warn: #8a4600; --warn-bg: #fff4e0; --warn-line: #f59e0b;
+      --call: #15803d; --on-call: #ffffff;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f1117; --card: #181b24; --text: #e8e9ee; --muted: #a3a8b8; --border: #2a2e3a;
+              --red: #b91c1c; --on-red: #ffffff; --red-soft: #3a1c1f;
+              --warn: #fcd34d; --warn-bg: #3a2d12; --warn-line: #f59e0b;
+              --call: #15803d; --on-call: #ffffff; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 0 0 max(16px, env(safe-area-inset-bottom));
+           font: 18px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    .owner { max-width: 560px; margin: 10px auto 0; padding: 8px 12px; border-radius: 10px; font-size: .85rem;
+             background: var(--card); border: 1px dashed var(--border); color: var(--muted); text-align: center; }
+    .owner a { color: var(--text); }
+    .sos { background: var(--red); color: var(--on-red); text-align: center; font-weight: 800; letter-spacing: .04em;
+           font-size: 1.5rem; line-height: 1.2; padding: max(16px, env(safe-area-inset-top)) 16px 16px; }
+    .sos span { white-space: nowrap; }
+    .sos small { display: block; margin-top: 4px; font-size: .9rem; font-weight: 600; letter-spacing: .02em; opacity: .92; }
+    main { max-width: 560px; margin: 0 auto; padding: 18px 16px 0; }
+    h1 { font-size: 1.9rem; line-height: 1.2; margin: 0; text-align: center; overflow-wrap: anywhere; }
+    .sub { text-align: center; color: var(--muted); margin: 4px 0 0; font-size: 1.05rem; }
+    .blood { margin: 18px auto 0; max-width: 260px; text-align: center; border: 3px solid var(--red); border-radius: 18px;
+             background: var(--red-soft); padding: 10px 12px 12px; }
+    .blood .lbl { font-size: .9rem; color: var(--muted); font-weight: 600; }
+    .blood b { display: block; font-size: 2.9rem; line-height: 1.1; color: var(--red); }
+    .blood .intl { font-size: .95rem; color: var(--muted); }
+    section { margin-top: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+    section h2 { font-size: .9rem; margin: 0 0 4px; color: var(--muted); font-weight: 700; text-transform: none; }
+    section p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; font-size: 1.1rem; }
+    .alert { background: var(--warn-bg); border: 2px solid var(--warn-line); }
+    .alert h2, .alert p { color: var(--warn); }
+    .alert p { font-weight: 700; font-size: 1.2rem; }
+    .contacts { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+    .contacts li { display: flex; flex-direction: column; gap: 6px; }
+    .who { overflow-wrap: anywhere; }
+    .who span { color: var(--muted); }
+    .who .num { display: block; font-size: .95rem; font-variant-numeric: tabular-nums; }
+    .call { display: block; text-align: center; padding: 15px 12px; border-radius: 14px; background: var(--call);
+            color: var(--on-call); font-weight: 800; font-size: 1.2rem; text-decoration: none; }
+    .call:hover { filter: brightness(1.08); }
+    .empty { text-align: center; color: var(--muted); margin-top: 20px; }
+    footer { max-width: 560px; margin: 18px auto 0; padding: 0 16px; text-align: center; font-size: .8rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  {% if owner %}
+    <div class="owner">{% if c.enabled %}Bu senin kartın · 👁️ {{ c.views }} görüntülenme{% else %}🔒 Kart kapalı: şu an sadece sen görüyorsun{% endif %}
+      · <a href="{{ url_for('emergency.index') }}">✏️ Düzenle</a></div>
+  {% endif %}
+  <header class="sos">🆘 ACİL DURUM <span>/ EMERGENCY</span><small>Tıbbi bilgiler · Medical information</small></header>
+  <main>
+    {% if c.full_name %}<h1>{{ c.full_name }}</h1>{% endif %}
+    {% if d.age is not none %}<p class="sub">{{ d.age }} yaş · Age {{ d.age }} · {{ d.birth }}</p>{% endif %}
+
+    {% if d.blood %}
+      <div class="blood"><div class="lbl">Kan grubu · Blood type</div><b>{{ d.blood }}</b>{% if d.blood_intl %}<div class="intl">{{ d.blood_intl }}</div>{% endif %}</div>
+    {% endif %}
+
+    {% if c.allergies %}
+      <section class="alert"><h2>⚠️ Alerjiler · Allergies</h2><p>{{ c.allergies }}</p></section>
+    {% endif %}
+    {% if c.conditions %}
+      <section><h2>🩺 Kronik hastalıklar · Medical conditions</h2><p>{{ c.conditions }}</p></section>
+    {% endif %}
+    {% if c.medications %}
+      <section><h2>💊 Kullandığı ilaçlar · Medications</h2><p>{{ c.medications }}</p></section>
+    {% endif %}
+    {% if d.organ %}
+      <section><h2>Organ bağışı · Organ donor</h2><p>{{ d.organ }}</p></section>
+    {% endif %}
+    {% if c.notes %}
+      <section><h2>📝 Notlar · Notes</h2><p>{{ c.notes }}</p></section>
+    {% endif %}
+
+    {% if d.contacts %}
+      <section>
+        <h2>📞 Acil durumda arayın · Emergency contacts</h2>
+        <ul class="contacts">
+          {% for k in d.contacts %}
+            <li>
+              <div class="who"><b>{{ k.name or k.relation }}</b>{% if k.name and k.relation %} <span>({{ k.relation }})</span>{% endif %}
+                <span class="num">{{ k.phone }}</span></div>
+              <a class="call" href="tel:{{ k.tel }}">📞 Ara · Call</a>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if not (c.full_name or d.age is not none or d.blood or c.allergies or c.conditions or c.medications or d.organ
+               or c.notes or d.contacts) %}
+      <p class="empty">Bu kartta henüz bilgi yok. · No information on this card yet.</p>
+    {% endif %}
+  </main>
+  <footer>Son güncelleme · Last updated: {{ c.updated_at | localdt('%d.%m.%Y') }}</footer>
+</body>
+</html>

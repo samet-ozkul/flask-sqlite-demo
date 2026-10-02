@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Cüzdan Kartı · Acil Durum{% endblock %}
+{% block head %}
+<style>
+  /* Basılı kart temadan bağımsız: beyaz zemin, koyu yazı, kırmızı şerit (koyu temada da kâğıttaki gibi görünür) */
+  .em-sheet { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+  .em-card { --c-red: #c62828; --c-text: #111111; --c-muted: #555555; --c-warn: #9a4b00;
+             width: 85.6mm; height: 54mm; flex: none; overflow: hidden; display: flex; flex-direction: column;
+             background: #ffffff; color: var(--c-text); border: .3mm dashed #9a9a9a; border-radius: 3mm;
+             font: 7pt/1.25 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+             -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .em-card header { background: var(--c-red); color: #ffffff; font-weight: 800; font-size: 9pt; letter-spacing: .03em;
+                    padding: 1.6mm 3mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .em-card .body { flex: 1; min-height: 0; padding: 2mm 3mm; display: flex; flex-direction: column; gap: 1.4mm; }
+  .em-card .name { font-size: 11pt; font-weight: 800; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .em-card .name small { font-size: 7pt; font-weight: 600; color: var(--c-muted); }
+  .em-card .mid { display: flex; gap: 2.4mm; align-items: flex-start; min-height: 0; }
+  .em-card .blood { flex: none; width: 19mm; text-align: center; border: .5mm solid var(--c-red); border-radius: 2mm; padding: .8mm .5mm; }
+  .em-card .blood b { display: block; font-size: 12pt; line-height: 1.1; color: var(--c-red); white-space: nowrap; }
+  .em-card .lbl { display: block; font-size: 5.5pt; font-weight: 700; color: var(--c-muted); text-transform: uppercase; letter-spacing: .02em; }
+  .em-card .allergy { flex: 1; min-width: 0; color: var(--c-warn); }
+  .em-card .allergy .lbl { color: var(--c-warn); }
+  .em-card .clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; }
+  .em-card .allergy .clamp { font-weight: 700; }
+  .em-card .ice { margin-top: auto; }
+  .em-card .ice div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .em-card .ice b { font-variant-numeric: tabular-nums; }
+  .em-card.back { align-items: center; justify-content: center; gap: 1.6mm; text-align: center; padding: 2mm; }
+  .em-card.back svg { width: 36mm; height: 36mm; display: block; }
+  .em-card.back .scan { font-size: 8pt; font-weight: 800; }
+  .em-card.back .scan small { display: block; font-size: 6.5pt; font-weight: 600; color: var(--c-muted); }
+  @media print {
+    @page { margin: 12mm; }
+    body { background: #ffffff; padding: 0; }
+    body > :not(main), main > :not(.em-print) { display: none !important; }
+    main.container { padding: 0; margin: 0; max-width: none; }
+    .em-sheet { gap: 0; justify-content: flex-start; }   /* iki yüz bitişik: ortadaki çizgiden katlanır */
+    .em-card { break-inside: avoid; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🪪 Cüzdan kartı", "Kredi kartı boyutunda (85,6 × 54 mm) acil durum kartı", back=url_for('emergency.index')) %}
+  <button type="button" class="btn primary hidden" id="em-print">🖨️ Yazdır</button>
+{% endcall %}
+
+{% if not c.enabled %}
+  <p class="flash warning">Kart yayında değil: arka yüzdeki QR okutulunca “bulunamadı” görünür.
+    <a href="{{ url_for('emergency.index') }}">Acil Durum Kartı</a> sayfasında “Kart yayında”yı işaretle.</p>
+{% endif %}
+<p class="muted small">Yazdırırken ölçek <b>%100 / Gerçek boyut</b> seçili olsun. Ön ve arka yüz yan yana basılır: dış çizgiden kes,
+  ortadaki çizgiden katla (istersen yapıştır ya da lamine et) ve cüzdanına, kimliğinin yanına koy. Bilgiler değişince yeniden yazdır;
+  QR her zaman güncel sayfayı açar.</p>
+
+<div class="em-print">
+  <div class="em-sheet">
+    <section class="em-card front" aria-label="Ön yüz">
+      <header>🆘 ACİL DURUM · EMERGENCY</header>
+      <div class="body">
+        {% if c.full_name %}<div class="name">{{ c.full_name }}{% if d.age is not none %} <small>· {{ d.age }} yaş / age</small>{% endif %}</div>{% endif %}
+        {% if d.blood or c.allergies %}
+          <div class="mid">
+            {% if d.blood %}<div class="blood"><span class="lbl">Kan · Blood</span><b>{{ d.blood }}</b></div>{% endif %}
+            {% if c.allergies %}<div class="allergy"><span class="lbl">⚠️ Alerjiler · Allergies</span><div class="clamp">{{ c.allergies }}</div></div>{% endif %}
+          </div>
+        {% endif %}
+        {% if d.contacts %}
+          <div class="ice">
+            <span class="lbl">Acil durumda arayın · ICE</span>
+            {% for k in d.contacts[:2] %}
+              <div>{{ k.name or k.relation }}{% if k.name and k.relation %} ({{ k.relation }}){% endif %} · <b>{{ k.phone }}</b></div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </section>
+    <section class="em-card back" aria-label="Arka yüz">
+      {{ qr | safe }}
+      <div class="scan">Tıbbi bilgiler için okutun<small>Scan for medical info</small></div>
+    </section>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='emergency.js') }}?v=1" defer></script>
+{% endblock %}

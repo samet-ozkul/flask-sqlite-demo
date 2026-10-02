@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Acil Durum Kartı{% endblock %}
+{% block head %}
+<style>
+  .em-top { display: grid; gap: 14px; align-items: center; grid-template-columns: 1fr; }
+  @media (min-width: 560px) { .em-top { grid-template-columns: 200px 1fr; } }
+  .qr-box svg { width: min(200px, 100%); height: auto; aspect-ratio: 1; border-radius: 8px; display: block; margin: 0 auto; }
+  .em-url { overflow-wrap: anywhere; }
+  .em-stats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 10px; }
+  .em-contacts { list-style: none; margin: 0; padding: 0; }
+  .em-contacts > li { display: grid; gap: 6px; grid-template-columns: 1fr 1fr; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .em-contacts > li:last-child { border-bottom: 0; }
+  .em-contacts > li > :first-child, .em-contacts .em-pick { grid-column: 1 / -1; }
+  @media (min-width: 720px) {
+    .em-contacts > li { grid-template-columns: 1.4fr 1fr 1.2fr 1fr; }
+    .em-contacts > li > :first-child, .em-contacts .em-pick { grid-column: auto; }
+  }
+  .em-contacts input, .em-contacts select { padding: 8px 10px; }
+  .em-meds { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: -4px 0 12px; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🆘 Acil Durum Kartı", "İlk yardım ekibi için tıbbi bilgiler: kilit ekranı QR'ı, cüzdan kartı, tek dokunuşla yakınlarını arama") %}
+  {% if current %}<a class="btn" href="{{ url }}" target="_blank" rel="noopener">👁️ Önizle</a>{% endif %}
+{% endcall %}
+
+{% macro contact_row(name="", relation="", phone="") -%}
+  <li>
+    <input name="contact_name" value="{{ name }}" maxlength="60" placeholder="Ad (ör. Ayşe Özkul)" aria-label="Ad">
+    <input name="contact_relation" value="{{ relation }}" maxlength="30" placeholder="Yakınlık (ör. Eşi)" aria-label="Yakınlık">
+    <input name="contact_phone" value="{{ phone }}" type="tel" maxlength="30" placeholder="0532 123 45 67" aria-label="Telefon">
+    <select class="em-pick hidden" aria-label="Kişilerden seç"><option value="">📇 Kişilerden seç…</option></select>
+  </li>
+{%- endmacro %}
+
+<p class="flash warning">⚠️ Bağlantıyı ya da QR'ı bilen <b>herkes</b> bu bilgileri girişsiz görebilir. Sadece acil durumda
+  gerekecek bilgileri yaz; kimlik numarası, adres, şifre gibi bilgileri yazma.</p>
+
+{% if current %}
+  <section class="card">
+    <div class="em-top">
+      <div class="qr-box">{{ qr | safe }}</div>
+      <div>
+        <h2 style="margin-bottom: 4px">Kartın</h2>
+        <a class="em-url" href="{{ url }}" target="_blank" rel="noopener">{{ url }}</a>
+        <div class="em-stats">
+          {% if current.enabled %}<span class="badge good">Yayında</span>{% else %}<span class="badge">Kapalı</span>{% endif %}
+          <span class="muted small">👁️ {{ current.views }} görüntülenme</span>
+          {% if current.last_viewed_at %}<span class="muted small">· son {{ current.last_viewed_at | localdt }}</span>{% endif %}
+        </div>
+        <div class="row-flex">
+          <a class="btn sm primary" href="{{ url_for('emergency.wallpaper') }}">📱 Kilit ekranı duvar kâğıdı</a>
+          <a class="btn sm" href="{{ url_for('emergency.wallet') }}">🪪 Cüzdan kartı</a>
+          <form method="post" action="{{ url_for('emergency.regenerate') }}" class="inline"
+                data-confirm="Yeni bağlantı oluşturulsun mu? Eski bağlantı, QR, duvar kâğıdı ve yazdırdığın cüzdan kartı artık açılmaz; yenilerini indirip yazdırman gerekir.">
+            {{ ui.csrf() }}<button class="btn sm">🔄 Bağlantıyı yenile</button>
+          </form>
+        </div>
+        {% if not current.enabled %}
+          <p class="flash warning small" style="margin: 10px 0 0">Kart yayında değil: QR, duvar kâğıdı ve cüzdan kartı
+            okutulunca “bulunamadı” görünür. Önizlemeyi sadece sen görürsün.</p>
+        {% endif %}
+        <p class="muted small">Duvar kâğıdını telefonunun <b>kilit ekranına</b> koy (iPhone: Fotoğraflar → Paylaş → Duvar Kâğıdı
+          Olarak Kullan; Android: Galeri → Duvar kâğıdı olarak ayarla → Kilit ekranı). Cüzdan kartını yazdırıp kimliğinin yanına koy.
+          {% if telegram_ready %}📲 Kartın başkası tarafından açılınca Telegram'dan haber verilir (en fazla 30 dakikada bir).
+          {% else %}Telegram'ı <a href="{{ url_for('settings.index') }}">Ayarlar</a>'dan bağlarsan kartın açılınca haber verilir.{% endif %}</p>
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<form method="post" action="{{ url_for('emergency.index') }}">
+  {{ ui.csrf() }}
+  <section class="card">
+    <h2>Görünürlük</h2>
+    {{ ui.checkbox("🆘 Kart yayında: bağlantıyı / QR'ı bilen herkes görebilir", "enabled", form.enabled) }}
+    <p class="muted small" style="margin-top: -6px">Kapalıyken bağlantı “bulunamadı” gösterir. Telefonun kilit ekranına ya da
+      cüzdanına koyacaksan açık olmalı.</p>
+  </section>
+
+  <section class="card">
+    <h2>Kimlik</h2>
+    <div class="form-row">
+      {{ ui.field("Ad soyad", "full_name", form.full_name, attrs='maxlength="80" autocomplete="name"', placeholder="ör. Samet Özkul") }}
+      {{ ui.field("Doğum tarihi", "birth_date", form.birth_date, type="date", hint="İsteğe bağlı; sayfada yaşın da yazar") }}
+    </div>
+    <div class="form-row">
+      {{ ui.select("Kan grubu", "blood_type", blood_types.items(), form.blood_type) }}
+      {{ ui.select("Organ bağışı", "organ_donor", organ_options.items(), form.organ_donor) }}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Sağlık bilgileri</h2>
+    {{ ui.textarea("Alerjiler", "allergies", form.allergies, rows=2, placeholder="ör. Penisilin, arı sokması, fıstık") }}
+    {{ ui.textarea("Kronik hastalıklar", "conditions", form.conditions, rows=2, placeholder="ör. Tip 1 diyabet, astım, epilepsi") }}
+    {{ ui.textarea("Kullandığı ilaçlar", "medications", form.medications, rows=3, placeholder="Her satıra bir ilaç ve dozu") }}
+    <div class="em-meds">
+      <a class="btn sm" href="{{ url_for('emergency.index', ilaclar=1) }}">🩺 Sağlık'taki ilaçları getir</a>
+      <span class="muted small">Alanı Sağlık modülündeki aktif ilaçlarla doldurur; kaydetmez. Kaydedilmemiş değişikliklerin kaybolur.</span>
+    </div>
+    {{ ui.textarea("Diğer notlar", "notes", form.notes, rows=2, placeholder="ör. Kalp pili var · Gözlük kullanıyorum · Diyabet — insülin kullanıyor") }}
+  </section>
+
+  <section class="card">
+    <h2>Acil durumda aranacak kişiler <span class="muted small">en fazla {{ max_contacts }}</span></h2>
+    <ol class="em-contacts">
+      {% for k in form.contacts[:max_contacts] %}{{ contact_row(k.name, k.relation, k.phone) }}{% endfor %}
+      {% for _ in range(max_contacts - (form.contacts[:max_contacts] | length)) %}{{ contact_row() }}{% endfor %}
+    </ol>
+    <p class="muted small">Sayfada her kişi için büyük bir 📞 Ara düğmesi çıkar. Boş satır kaydedilmez.
+      {% if picks %}“📇 Kişilerden seç” ile Kişiler modülündeki telefonlu bir kaydı satıra doldurabilirsin.{% endif %}</p>
+    {% if picks %}<script type="application/json" id="em-picks">{{ picks | tojson }}</script>{% endif %}
+  </section>
+
+  <button class="btn primary block">Kaydet</button>
+</form>
+
+{% if current %}
+  <div class="center" style="margin-top: 14px">
+    {{ ui.delete_button(url_for('emergency.delete'), "🗑️ Kartı sil",
+                        confirm="Acil durum kartı silinsin mi? Bağlantı ve QR hemen çalışmaz; kart 30 gün çöp kutusunda kalır.",
+                        small=False) }}
+  </div>
+{% endif %}
+
+<p class="muted small center" style="margin-top: 14px">Kart sayfasında sadece burada yazdıkların görünür; kullanıcı adın,
+  notların ve diğer kayıtların asla gösterilmez. Kapalı kart ile olmayan kart dışarıdan aynı görünür.</p>
+<script src="{{ url_for('static', filename='emergency.js') }}?v=1" defer></script>
+{% endblock %}
