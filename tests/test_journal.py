@@ -97,7 +97,11 @@ def test_page():
     # Başkasının günlüğü görünmez; aramada çıkar
     assert "Yürüyüşe" not in AYSE_C.text("/gunluk/")
     assert "Yürüyüşe" in ADMIN.text("/ara/?q=yuruyuse") and "Yürüyüşe" not in AYSE_C.text("/ara/?q=yuruyuse")
-    # Silme
+    # Silme: Sil düğmesi kaydetme formunun içinde değil, kendi formuna bağlı (iç içe form olmasın)
+    page = ADMIN.text(f"/gunluk/?gun={y}")
+    save_form = page.split('<input type="hidden" name="date"', 1)[1].split("</form>", 1)[0]
+    assert "<form" not in save_form and 'form="journal-delete"' in save_form
+    assert f'id="journal-delete" method="post" action="/gunluk/{y}/sil"' in page
     ADMIN.post(f"/gunluk/{y}/sil")
     assert entry(y) is None
     print("  page OK")
