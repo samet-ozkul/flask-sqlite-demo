@@ -151,6 +151,8 @@ def _time(user_id, start, now):
     if not rows:
         return None
     s = summarize(rows, now)
+    if s["total"] < 60:   # bir dakikadan kısa (yanlışlıkla başlatıp durdurulmuş) kayıtlar "0 dk" satırı göstermesin
+        return None
     return {"total": s["total"], "count": s["count"], "top": s["projects"][0] if s["projects"] else None}
 
 
