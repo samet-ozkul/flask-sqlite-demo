@@ -37,6 +37,7 @@ MODULES = [
     ("kanban", "kanban.index", "Kanban", "🗂️", "Araçlar"),
     ("profile", "profile.edit", "Profil Sayfası", "🌐", "Araçlar"),
     ("scanner", "scanner.index", "Belge Tara", "📄", "Araçlar"),
+    ("shortlinks", "shortlinks.index", "Kısa Link & QR", "🔗", "Araçlar"),
 ]
 
 # Menüde gösterilmeyen altyapı modülleri

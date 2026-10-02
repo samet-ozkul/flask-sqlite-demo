@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ link.title or link.code }} · Kısa Link{% endblock %}
+{% block head %}
+<style>
+  .sl-top { display: grid; gap: 14px; align-items: center; grid-template-columns: 1fr; }
+  @media (min-width: 600px) { .sl-top { grid-template-columns: 240px 1fr; } }
+  .qr-box svg { width: min(240px, 100%); height: auto; aspect-ratio: 1; display: block; margin: 0 auto; border-radius: 8px; }
+  .sl-short { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+  .sl-url { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1rem; font-weight: 600;
+            overflow-wrap: anywhere; user-select: all; }
+  .sl-target { overflow-wrap: anywhere; }
+  .stat .value.sm { font-size: 1rem; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🔗 " ~ (link.title or domain(link.target)), back=url_for('shortlinks.index')) %}
+  {{ ui.delete_button(url_for('shortlinks.delete', link_id=link.id), "Sil",
+                      "Kısa link silinsin mi? Kısa adres ve QR çalışmaz olur (çöp kutusundan geri getirilebilir).") }}
+{% endcall %}
+
+<section class="card">
+  <div class="sl-top">
+    <div class="qr-box">{{ qr | safe }}</div>
+    <div>
+      <div class="sl-short">
+        <a class="sl-url" id="sl-url" href="{{ url }}" target="_blank" rel="noopener">{{ url }}</a>
+        <button type="button" class="btn sm hidden" data-copy="sl-url">📋 Kopyala</button>
+      </div>
+      <div class="row-flex">
+        {% if not link.active %}<span class="badge">Pasif</span>{% endif %}
+        {% if expired %}<span class="badge overdue">Süresi doldu</span>{% endif %}
+        {% if link.active and not expired %}<span class="badge good">Açık</span>{% endif %}
+      </div>
+      <p class="muted small sl-target">🎯 <a href="{{ link.target }}" target="_blank" rel="noopener noreferrer">{{ link.target }}</a></p>
+      <div class="row-flex">
+        <a class="btn sm primary" href="{{ url_for('shortlinks.link_qr', link_id=link.id) }}">⬇️ QR'ı PNG indir</a>
+        <a class="btn sm" href="{{ url_for('shortlinks.preview', code=link.code) }}" target="_blank" rel="noopener">👁️ Önizleme sayfası</a>
+        <form method="post" action="{{ url_for('shortlinks.toggle', link_id=link.id) }}" class="inline">
+          {{ ui.csrf() }}
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <button class="btn sm">{{ '⏸️ Durdur' if link.active else '▶️ Yeniden aç' }}</button>
+        </form>
+      </div>
+      {% if not link.active or expired %}
+        <p class="muted small">Kısa adres şu an açılmıyor; okutan ya da tıklayan “bulunamadı” görür.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<div class="stats">
+  <div class="stat"><div class="label">Tıklanma</div><div class="value">{{ link.clicks }}</div></div>
+  <div class="stat"><div class="label">Son tıklanma</div><div class="value sm">{{ (link.last_click_at | localdt) or '—' }}</div></div>
+  <div class="stat"><div class="label">Oluşturuldu</div><div class="value sm">{{ link.created_at | localdt('%d.%m.%Y') }}</div></div>
+  <div class="stat"><div class="label">Son gün</div><div class="value sm">{{ link.expires_at | date_tr if link.expires_at else 'Süresiz' }}</div></div>
+</div>
+
+<section class="card">
+  <h2>Düzenle</h2>
+  <form method="post">
+    {{ ui.csrf() }}
+    {{ ui.field("Hedef adres", "target", form.target, required=True,
+                attrs='maxlength="2010" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false"') }}
+    <div class="form-row">
+      {{ ui.field("Kod", "code", form.code, attrs='maxlength="60" autocapitalize="off" autocomplete="off" spellcheck="false"',
+                  hint=base_url ~ "kod · ⚠️ Kodu değiştirirsen eski kısa adres ve basılmış QR'lar çalışmaz.") }}
+      {{ ui.field("Başlık", "title", form.title, attrs='maxlength="120"') }}
+    </div>
+    <div class="form-row">
+      {{ ui.field("Son kullanma tarihi", "expires_at", form.expires_at, type="date", hint="Boş = süresiz") }}
+      <div class="field"><span>&nbsp;</span>{{ ui.checkbox("Açık (kısa adres yönlendirsin)", "active", form.active) }}</div>
+    </div>
+    <button class="btn primary">Kaydet</button>
+  </form>
+</section>
+<script src="{{ url_for('static', filename='shortlinks.js') }}?v=1" defer></script>
+{% endblock %}

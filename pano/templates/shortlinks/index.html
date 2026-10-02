@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Kısa Link &amp; QR{% endblock %}
+{% block head %}
+<style>
+  .sl-short { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 2px 0; }
+  .sl-url { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .86rem; color: var(--primary);
+            overflow-wrap: anywhere; user-select: all; }
+  .sl-rows > li { align-items: flex-start; }
+  .sl-rows .actions { padding-top: 2px; }
+  .sl-rows .badge { vertical-align: 1px; }
+  .qr-box svg { width: min(260px, 100%); height: auto; aspect-ratio: 1; display: block; margin: 0 auto; border-radius: 8px; }
+  .qr-data { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 8em; overflow: auto; }
+  .wifi-pass > summary { cursor: pointer; color: var(--muted); font-size: .85rem; letter-spacing: .08em; width: fit-content; }
+  .wifi-pass code { display: inline-block; margin-top: 2px; padding: 1px 6px; border-radius: 4px; background: var(--surface-2);
+                    overflow-wrap: anywhere; user-select: all; }
+</style>
+{% endblock %}
+{% block content %}
+{{ ui.page_header("🔗 Kısa Link & QR", "Kendi adresinle kısa link, Wi-Fi misafir kartı ve QR kod") }}
+
+<nav class="tabs" aria-label="Bölümler">
+  {% for key, label in tabs.items() %}
+    <a href="{{ url_for('shortlinks.index', tab=key) }}" class="{{ 'active' if tab == key }}" {% if tab == key %}aria-current="page"{% endif %}>
+      {{ label }}{% if counts.get(key) %} <span class="pill-count">{{ counts[key] }}</span>{% endif %}
+    </a>
+  {% endfor %}
+</nav>
+
+{% if tab == 'wifi' %}
+  {% include "shortlinks/_wifi.html" %}
+{% elif tab == 'qr' %}
+  {% include "shortlinks/_qr.html" %}
+{% else %}
+  {% include "shortlinks/_links.html" %}
+{% endif %}
+<script src="{{ url_for('static', filename='shortlinks.js') }}?v=1" defer></script>
+{% endblock %}

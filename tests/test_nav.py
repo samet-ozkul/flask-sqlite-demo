@@ -10,6 +10,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from helpers import Client, make_app  # noqa: E402
 
+from markupsafe import escape  # noqa: E402
+
 app = make_app()
 
 from pano.auth import create_user  # noqa: E402
@@ -37,7 +39,7 @@ def test_defaults_and_menu():
     # ☰ Modüller: her modül bir kez, gruplu
     menu = page.split('class="navmenu-panel"', 1)[1].split("</details>", 1)[0]
     for _key, _ep, title, _icon, _group in MODULES:
-        assert f'data-name="{title}"' in menu, title
+        assert f'data-name="{escape(title)}"' in menu, title   # "Kısa Link & QR" -> &amp;
     assert "Araçlar" in menu or not any(m[4] == "Araçlar" for m in MODULES)
     # Hızlı geçiş verisi tüm modüller + hesap sayfaları; güvenli JSON
     data = json.loads(page.split('id="quickjump-data">', 1)[1].split("</script>", 1)[0])
