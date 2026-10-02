@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ r.year }} Yıl Özeti{% endblock %}
+{% block head %}
+<style>
+  /* Renkler: açık temada koyu, koyu temada açık tonlar (style.css'teki tema kalıbı) */
+  :root {
+    --yr-hero-a: #6d28d9; --yr-hero-b: #2563eb; --yr-hero-c: #0891b2; --yr-hero-text: #ffffff;
+    --yr-c1: #e11d48; --yr-s1: #ffe4e9; --yr-c2: #ea580c; --yr-s2: #ffedd5; --yr-c3: #16a34a; --yr-s3: #dcfce7;
+    --yr-c4: #2563eb; --yr-s4: #dbeafe; --yr-c5: #9333ea; --yr-s5: #f3e8ff; --yr-c6: #0e7490; --yr-s6: #cffafe;
+    --heat-0: var(--surface-2); --heat-1: #9be9a8; --heat-2: #40c463; --heat-3: #30a14e; --heat-4: #216e39;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --yr-hero-a: #4c1d95; --yr-hero-b: #1e3a8a; --yr-hero-c: #155e75;
+      --yr-c1: #fb7185; --yr-s1: #3b1a22; --yr-c2: #fb923c; --yr-s2: #3a2412; --yr-c3: #4ade80; --yr-s3: #15301f;
+      --yr-c4: #60a5fa; --yr-s4: #172a4a; --yr-c5: #c084fc; --yr-s5: #2e1a47; --yr-c6: #22d3ee; --yr-s6: #123239;
+      --heat-1: #0e4429; --heat-2: #006d32; --heat-3: #26a641; --heat-4: #39d353;
+    }
+  }
+  :root[data-theme="dark"] {
+    --yr-hero-a: #4c1d95; --yr-hero-b: #1e3a8a; --yr-hero-c: #155e75;
+    --yr-c1: #fb7185; --yr-s1: #3b1a22; --yr-c2: #fb923c; --yr-s2: #3a2412; --yr-c3: #4ade80; --yr-s3: #15301f;
+    --yr-c4: #60a5fa; --yr-s4: #172a4a; --yr-c5: #c084fc; --yr-s5: #2e1a47; --yr-c6: #22d3ee; --yr-s6: #123239;
+    --heat-1: #0e4429; --heat-2: #006d32; --heat-3: #26a641; --heat-4: #39d353;
+  }
+  .yr-hero { border-radius: var(--radius); padding: 20px 18px; margin-bottom: 14px; color: var(--yr-hero-text);
+             background: linear-gradient(135deg, var(--yr-hero-a), var(--yr-hero-b) 60%, var(--yr-hero-c)); }
+  .yr-hero .yr-year { font-size: 3rem; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+  .yr-hero .yr-year small { font-size: .9rem; font-weight: 500; letter-spacing: 0; opacity: .85; }
+  .yr-hero p { margin: 8px 0 0; opacity: .92; overflow-wrap: anywhere; }
+  .yr-hl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  @media (min-width: 700px) { .yr-hl { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .yr-hl a { display: block; padding: 14px; border-radius: var(--radius); background: var(--s); color: var(--text); min-width: 0; }
+  .yr-hl a:hover { text-decoration: none; filter: brightness(.98); }
+  .yr-hl .ico { font-size: 1.4rem; line-height: 1; }
+  .yr-hl b { display: block; margin-top: 6px; font-size: clamp(1.15rem, 5.2vw, 1.7rem); line-height: 1.2; color: var(--c);
+             font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .yr-hl .l { font-size: .85rem; color: var(--muted); }
+  .yr-hl .c1 { --c: var(--yr-c1); --s: var(--yr-s1); } .yr-hl .c2 { --c: var(--yr-c2); --s: var(--yr-s2); }
+  .yr-hl .c3 { --c: var(--yr-c3); --s: var(--yr-s3); } .yr-hl .c4 { --c: var(--yr-c4); --s: var(--yr-s4); }
+  .yr-hl .c5 { --c: var(--yr-c5); --s: var(--yr-s5); } .yr-hl .c6 { --c: var(--yr-c6); --s: var(--yr-s6); }
+  .yr-sections > .card { min-width: 0; }
+  .yr-facts { list-style: none; margin: 0 0 12px; padding: 0; }
+  .yr-facts li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 0;
+                 border-bottom: 1px solid var(--border); }
+  .yr-facts li:last-child { border-bottom: 0; }
+  .yr-facts li > span:first-child { color: var(--muted); flex-shrink: 0; }
+  .yr-facts b { text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
+  .yr-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .yr-chips span { background: var(--surface-2); border-radius: 99px; padding: 3px 10px; font-size: .85rem; overflow-wrap: anywhere; }
+  .yr-mini { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .yr-mini a { display: block; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); }
+  .yr-mini a:hover { text-decoration: none; }
+  .yr-mini b { display: block; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+  .yr-mini small { display: block; color: var(--muted); }
+  /* Isı haritası: sütunlar haftalar, satırlar Pzt..Paz */
+  .heat-wrap { overflow-x: auto; padding-bottom: 6px; }
+  .heat { --cell: 11px; --gap: 3px; display: inline-grid; grid-template-columns: auto auto; gap: 4px 6px; }
+  .heat-months { grid-column: 2; grid-row: 1; display: grid; grid-template-columns: repeat(var(--cols), var(--cell));
+                 gap: var(--gap); font-size: .68rem; color: var(--muted); height: 1rem; }
+  .heat-months span { white-space: nowrap; }
+  .heat-wd { grid-column: 1; grid-row: 2; display: grid; grid-template-rows: repeat(7, var(--cell)); gap: var(--gap);
+             font-size: .62rem; line-height: var(--cell); color: var(--muted); }
+  .heat-grid { grid-column: 2; grid-row: 2; display: grid; grid-template-rows: repeat(7, var(--cell));
+               grid-auto-flow: column; grid-auto-columns: var(--cell); gap: var(--gap); }
+  .yr-heat i { display: block; width: 11px; height: 11px; border-radius: 2px; background: var(--heat-0); }
+  .yr-heat i.h1 { background: var(--heat-1); } .yr-heat i.h2 { background: var(--heat-2); }
+  .yr-heat i.h3 { background: var(--heat-3); } .yr-heat i.h4 { background: var(--heat-4); }
+  .yr-heat i.hx { background: transparent; }
+  .heat-legend { display: flex; align-items: center; justify-content: flex-end; gap: 3px; font-size: .75rem; color: var(--muted); margin-top: 4px; }
+  .stars { color: var(--warn); white-space: nowrap; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("📊 %d Yıl Özeti%s" % (r.year, " (şu ana kadar)" if r.ongoing else ""), "Tüm modüllerdeki kayıtlarından derlendi") %}
+  {% if not r.empty %}
+    {% if telegram_linked %}
+      <form method="post" action="{{ url_for('yearreview.send') }}" class="inline">
+        {{ ui.csrf() }}<input type="hidden" name="yil" value="{{ r.year }}">
+        <button class="btn sm">📨 Telegram'a gönder</button>
+      </form>
+    {% else %}
+      <a class="btn sm" href="{{ url_for('settings.index') }}#telegram" title="Özeti Telegram'a göndermek için hesabını bağla">📨 Telegram'ı bağla</a>
+    {% endif %}
+  {% endif %}
+{% endcall %}
+
+<nav class="tabs" aria-label="Yıl">
+  {% for y in years | reverse %}
+    <a href="{{ url_for('yearreview.index', yil=y) }}" class="{{ 'active' if y == r.year }}">{{ y }}</a>
+  {% endfor %}
+</nav>
+
+{% if r.empty %}
+  <div class="card">{{ ui.empty("Bu yıl için özetlenecek kayıt yok. Harcama, alışkanlık, günlük, zaman takibi… ekledikçe yıl özetin burada birikir.", "📊") }}</div>
+{% else %}
+
+<section class="yr-hero">
+  <div class="yr-year">{{ r.year }}{% if r.ongoing %} <small>şu ana kadar</small>{% endif %}</div>
+  <p>{{ g.user.display_name or g.user.username }} için yılın özeti{% if r.heat.active_days %} · {{ r.heat.active_days | num }} gün aktif · {{ r.heat.total | num }} kayıt{% endif %}</p>
+</section>
+
+{% if r.highlights %}
+<div class="yr-hl">
+  {% for h in r.highlights %}
+    <a class="c{{ loop.index }}" href="{{ url_for(h.endpoint) }}"><span class="ico">{{ h.icon }}</span><b>{{ h.value }}</b><span class="l">{{ h.label }}</span></a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% set heat = r.heat %}
+{% if heat.total %}
+<section class="card yr-heat">
+  <h2>📅 Etkinlik</h2>
+  <div class="heat-wrap">
+    <div class="heat" style="--cols: {{ heat.cols }}">
+      <div class="heat-months">{% for col, label in heat.months %}<span style="grid-column: {{ col }} / span 4">{{ label }}</span>{% endfor %}</div>
+      <div class="heat-wd">{% for w in weekdays %}<span>{{ w }}</span>{% endfor %}</div>
+      <div class="heat-grid">{% for cls, title in heat.cells %}<i class="{{ cls }}"{% if title %} title="{{ title }}"{% endif %}></i>{% endfor %}</div>
+    </div>
+  </div>
+  <div class="heat-legend">Az <i class="h0"></i><i class="h1"></i><i class="h2"></i><i class="h3"></i><i class="h4"></i> Çok</div>
+  <p class="muted small">
+    {{ heat.active_days | num }} gün kayıt eklendi ya da iş tamamlandı.
+    {% if heat.best_day %}En yoğun gün: <b>{{ heat.best_day[0] | date_tr }}</b> ({{ heat.best_day[1] }} kayıt).{% endif %}
+    {% if heat.best_month %}En yoğun ay: <b>{{ heat.best_month[0] }}</b> ({{ heat.best_month[1] | num }} kayıt).{% endif %}
+  </p>
+</section>
+{% endif %}
+
+<div class="grid two yr-sections">
+
+{% set e = r.expenses %}
+{% if e %}
+<section class="card">
+  <h2>💸 Harcamalar <a class="more" href="{{ url_for('expenses.index') }}">Harcamalar →</a></h2>
+  <ul class="yr-facts">
+    <li><span>Toplam</span><b>{{ e.total | money }}</b></li>
+    <li><span>Aylık ortalama</span><b>{{ e.avg | money }}</b></li>
+    <li><span>Kayıt</span><b>{{ e.count | num }} harcama · {{ e.categories }} kategori</b></li>
+    <li><span>En çok harcanan ay</span><b><a href="{{ url_for('expenses.index', ay=e.top_month.key) }}">{{ e.top_month.name }}</a> · {{ e.top_month.total | money }}</b></li>
+    {% if e.biggest %}<li><span>En büyük harcama</span><b>{{ e.biggest.amount | money }} · {{ e.biggest.note or e.biggest.category }} <span class="muted small">{{ e.biggest.date | date_tr }}</span></b></li>{% endif %}
+    {% if e.change is not none %}
+      <li><span>{{ e.cmp_label | capitalize }}</span><b><span class="badge {{ 'overdue' if e.change > 0 else 'good' }}">{{ arrow(e.change) }} %{{ e.change_pct }}</span> <span class="muted small">{{ e.prev | money }}</span></b></li>
+    {% endif %}
+  </ul>
+  <h3>En çok harcanan kategoriler</h3>
+  {{ ui.bars(e.bars) }}
+</section>
+{% endif %}
+
+{% if r.bills %}
+<section class="card">
+  <h2>🧾 Faturalar <a class="more" href="{{ url_for('bills.index', sekme='odenen') }}">Faturalar →</a></h2>
+  <ul class="yr-facts">
+    <li><span>Ödenen fatura</span><b>{{ r.bills.count | num }}</b></li>
+    <li><span>Toplam</span><b>{{ r.bills.total | money }}</b></li>
+  </ul>
+  <p class="muted small">Harcamalara eklenen faturalar harcama toplamında da var.</p>
+</section>
+{% endif %}
+
+{% if r.tasks %}
+<section class="card">
+  <h2>✅ Yapılacaklar <a class="more" href="{{ url_for('lists.index') }}">Listeler →</a></h2>
+  <ul class="yr-facts">
+    {% if r.tasks.todo %}<li><span>Tamamlanan görev</span><b>{{ r.tasks.todo | num }}</b></li>{% endif %}
+    {% if r.tasks.shopping %}<li><span>Alınan alışveriş maddesi</span><b>{{ r.tasks.shopping | num }}</b></li>{% endif %}
+  </ul>
+</section>
+{% endif %}
+
+{% set h = r.habits %}
+{% if h %}
+<section class="card">
+  <h2>🔥 Alışkanlıklar <a class="more" href="{{ url_for('habits.index') }}">Alışkanlıklar →</a></h2>
+  <ul class="yr-facts">
+    <li><span>İşaretlenen gün</span><b>{{ h.days | num }} gün</b></li>
+    <li><span>Toplam işaret</span><b>{{ h.marks | num }}</b></li>
+    <li><span>En uzun seri</span><b>{{ h.streak.streak }} gün · {{ h.streak.icon }} {{ h.streak.name }}</b></li>
+    <li><span>En istikrarlı</span><b>{{ h.steady.icon }} {{ h.steady.name }} · {{ h.steady.count }} gün (%{{ h.steady.rate }})</b></li>
+  </ul>
+  {% if h.count > 1 %}{{ ui.bars(h.bars) }}{% endif %}
+</section>
+{% endif %}
+
+{% set j = r.journal %}
+{% if j %}
+<section class="card">
+  <h2>📓 Günlük <a class="more" href="{{ url_for('journal.index') }}">Günlük →</a></h2>
+  <ul class="yr-facts">
+    <li><span>Yazılan gün</span><b>{{ j.days | num }}</b></li>
+    <li><span>En uzun yazma serisi</span><b>{{ j.streak }} gün</b></li>
+    {% if j.top %}<li><span>En sık ruh hali</span><b>{{ j.top[0] }} {{ j.top[1] }}{% if j.avg %} · ort. {{ j.avg | num(1) }}/5{% endif %}</b></li>{% endif %}
+  </ul>
+  {% if j.bars %}{{ ui.bars(j.bars) }}{% endif %}
+</section>
+{% endif %}
+
+{% set w = r.watch %}
+{% if w %}
+<section class="card">
+  <h2>🎬 İzleme / Okuma <a class="more" href="{{ url_for('watchlist.index') }}">Liste →</a></h2>
+  <div class="yr-chips">{% for icon, label, n in w.kinds %}<span>{{ icon }} {{ n }} {{ label | lower }}</span>{% endfor %}</div>
+  {% if w.top %}
+    <h3>En yüksek puanlılar</h3>
+    <ul class="rows">
+      {% for it in w.top %}
+        <li><span class="ico">{{ w.icons[it.kind] }}</span>
+          <div class="grow"><div class="title">{{ it.title }}</div>{% if it.creator %}<div class="meta">{{ it.creator }}</div>{% endif %}</div>
+          <span class="stars" title="{{ it.rating }}/5">{{ '★' * it.rating }}</span></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endif %}
+
+{% set pl = r.places %}
+{% if pl %}
+<section class="card">
+  <h2>🗺️ Harita <a class="more" href="{{ url_for('places.index') }}">Harita →</a></h2>
+  <ul class="yr-facts">
+    {% if pl.city_count %}<li><span>Gezilen şehir</span><b>{{ pl.city_count }}{% if pl.countries %} · {{ pl.countries | length }} ülke{% endif %}</b></li>{% endif %}
+    {% if pl.places %}<li><span>Gezilen yer</span><b>{{ pl.places }}</b></li>{% endif %}
+  </ul>
+  {% if pl.cities %}<div class="yr-chips">{% for c in pl.cities %}<span>📍 {{ c.name }}{% if c.country %} <span class="muted">· {{ c.country }}</span>{% endif %}</span>{% endfor %}{% if pl.city_count > pl.cities | length %}<span class="muted">+{{ pl.city_count - pl.cities | length }}</span>{% endif %}</div>{% endif %}
+  {% if pl.place_cats %}<div class="yr-chips">{% for icon, label, n in pl.place_cats %}<span>{{ icon }} {{ label }}: {{ n }}</span>{% endfor %}</div>{% endif %}
+</section>
+{% endif %}
+
+{% set tm = r.time %}
+{% if tm %}
+<section class="card">
+  <h2>⏱️ Zaman takibi <a class="more" href="{{ url_for('timetrack.report', aralik='ozel', bas='%d-01-01' % r.year, bit='%d-12-31' % r.year) }}">Rapor →</a></h2>
+  <ul class="yr-facts">
+    <li><span>Toplam</span><b>{{ duration(tm.total) }}</b></li>
+    <li><span>Kayıt</span><b>{{ tm.count | num }} kayıt · {{ tm.days }} gün</b></li>
+    {% if tm.earning is not none %}<li><span>Kazanç</span><b>{{ tm.earning | money }}</b></li>{% endif %}
+  </ul>
+  <h3>En çok zaman harcanan projeler</h3>
+  {{ ui.bars(tm.bars) }}
+</section>
+{% endif %}
+
+{% set car = r.car %}
+{% if car %}
+<section class="card">
+  <h2>🚗 Araç <a class="more" href="{{ url_for('car.index') }}">Araç →</a></h2>
+  <ul class="yr-facts">
+    {% if car.km %}<li><span>Yapılan yol</span><b>{{ car.km | num }} km</b></li>{% endif %}
+    {% if car.fuel_count %}<li><span>Yakıt</span><b>{{ car.fuel | money }}{% if car.liters %} · {{ car.liters | num(1) }} L{% endif %} · {{ car.fuel_count }} dolum</b></li>{% endif %}
+    {% if car.service %}<li><span>Bakım</span><b>{{ car.service }}</b></li>{% endif %}
+    {% if car.repair %}<li><span>Onarım</span><b>{{ car.repair }}</b></li>{% endif %}
+    {% if car.total %}<li><span>Toplam araç gideri</span><b>{{ car.total | money }}</b></li>{% endif %}
+  </ul>
+</section>
+{% endif %}
+
+{% set hl = r.health %}
+{% if hl %}
+<section class="card">
+  <h2>🩺 Sağlık <a class="more" href="{{ url_for('health.index') }}">Sağlık →</a></h2>
+  <ul class="yr-facts">
+    {% if hl.first is not none %}
+      <li><span>Kilo</span><b>{{ kg(hl.first) }}{% if hl.change is not none %} → {{ kg(hl.last) }}{% endif %} kg{% if hl.change is not none %} <span class="badge">{{ kg(hl.change, True) }} kg</span>{% endif %}</b></li>
+      {% if hl.change is not none %}<li><span>En düşük / en yüksek</span><b>{{ kg(hl.low) }} / {{ kg(hl.high) }} kg</b></li>{% endif %}
+    {% endif %}
+    <li><span>Ölçüm</span><b>{{ hl.count | num }}</b></li>
+  </ul>
+  <div class="yr-chips">{% for icon, label, n in hl.kinds %}<span>{{ icon }} {{ label }}: {{ n }}</span>{% endfor %}</div>
+</section>
+{% endif %}
+
+{% set gl = r.goals %}
+{% if gl %}
+<section class="card">
+  <h2>🏁 Hedefler <a class="more" href="{{ url_for('goals.index') }}">Hedefler →</a></h2>
+  <ul class="yr-facts">
+    {% if gl.done %}<li><span>Tamamlanan hedef</span><b>{{ gl.done | length }}</b></li>{% endif %}
+    {% if gl.entries %}<li><span>Net biriktirilen</span><b>{{ gl.saved | money }}</b></li>{% endif %}
+  </ul>
+  {% if gl.done %}<div class="yr-chips">{% for goal in gl.done %}<span>{{ goal.icon }} {{ goal.name }} · {{ goal.target | money }}</span>{% endfor %}</div>{% endif %}
+</section>
+{% endif %}
+
+{% if r.misc %}
+<section class="card wide">
+  <h2>🧩 Diğerleri</h2>
+  <div class="yr-mini">
+    {% for m in r.misc %}
+      <a href="{{ url_for(m.endpoint) }}">{{ m.icon }} <b>{{ m.value | num }}</b><small>{{ m.label }}{% if m.sub %} · {{ m.sub }}{% endif %}</small></a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+</div>
+{% endif %}
+{% endblock %}
