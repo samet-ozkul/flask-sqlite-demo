@@ -147,6 +147,10 @@ def test_redirect():
     assert link_by_code("sule-cicek")["clicks"] == 3
     # HEAD sayılmaz
     assert RAW.head("/k/sule-cicek").status_code == 302 and link_by_code("sule-cicek")["clicks"] == 3
+    # Link önizlemesi (WhatsApp, Telegram...) yönlendirilir ama sayılmaz
+    for ua in ("WhatsApp/2.23.20.0 A", "TelegramBot (like TwitterBot)"):
+        assert RAW.get("/k/sule-cicek", headers={"User-Agent": ua}).status_code == 302
+    assert link_by_code("sule-cicek")["clicks"] == 3
     # Girişli istemci de yönlenir
     assert ADMIN.get("/k/sule-cicek").status_code == 302 and link_by_code("sule-cicek")["clicks"] == 4
     page = ADMIN.text("/kisa-link/")

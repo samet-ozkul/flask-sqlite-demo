@@ -783,6 +783,29 @@ MIGRATIONS = [
     ALTER TABLE users ADD COLUMN quota_mb INTEGER;
     ALTER TABLE users ADD COLUMN upload_max_mb INTEGER;
     """,
+    # 29: acil durum kartı (/acil/<anahtar>, girişsiz; kullanıcı başına tek kart; id çöp kutusu için)
+    """
+    CREATE TABLE emergency_cards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,                -- secrets.token_urlsafe; yenilenince eski bağlantı/QR açılmaz
+        enabled INTEGER NOT NULL DEFAULT 0,
+        full_name TEXT NOT NULL DEFAULT '',
+        birth_date TEXT,                           -- 'YYYY-MM-DD'
+        blood_type TEXT NOT NULL DEFAULT '',       -- emergency.BLOOD_TYPES anahtarı ('' = bilinmiyor)
+        allergies TEXT NOT NULL DEFAULT '',
+        conditions TEXT NOT NULL DEFAULT '',       -- kronik hastalıklar
+        medications TEXT NOT NULL DEFAULT '',
+        organ_donor TEXT NOT NULL DEFAULT '',      -- '' belirtilmedi | yes | no
+        notes TEXT NOT NULL DEFAULT '',
+        contacts TEXT NOT NULL DEFAULT '[]',       -- JSON: [{"name", "relation", "phone"}], en fazla 5
+        views INTEGER NOT NULL DEFAULT 0,
+        last_viewed_at TEXT,                       -- UTC 'YYYY-MM-DD HH:MM:SS'
+        notified_at TEXT,                          -- son Telegram bildirimi (en fazla 30 dakikada bir)
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    """,
     # 30: kısa linkler (/k/<kod>; kod tüm kullanıcılar arasında tekil, küçük harf) ve Wi-Fi QR kartları
     """
     CREATE TABLE short_links (

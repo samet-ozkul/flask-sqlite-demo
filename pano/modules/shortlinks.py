@@ -1,6 +1,7 @@
 """🔗 Kısa Link & QR: kendi adresinle kısa link, Wi-Fi misafir kartı ve serbest QR.
 
 - Yönetim /kisa-link/ (giriş gerekli); kısa adres /k/<kod> girişsiz açılır, 302 ile hedefe gider, tıklanma sayılır
+  (link önizleme robotları sayılmaz)
 - Kod tüm kullanıcılar arasında tekil; boşsa karışmayan harflerden (0/o/1/l/i yok) 6 karakter, elle yazılırsa
   küçük harf a-z, rakam ve tire (Türkçe ve büyük harfler dönüştürülür: Ş -> s); adreste büyük/küçük harf fark etmez
 - Pasif, süresi dolmuş ve olmayan kod dışarıdan aynı 404; /k/<kod>/onizle hedefi gösterir (betiksiz, sayılmaz)
@@ -26,7 +27,7 @@ from .. import trash
 from ..auth import login_required
 from ..db import execute, get_db, owned_or_404, query, query_one
 from ..totp import qr_svg
-from ..utils import fold, form_bool, form_choice, form_date, form_str, redirect_back, today_str
+from ..utils import fold, form_bool, form_choice, form_date, form_str, is_link_preview, redirect_back, today_str
 from .links import domain_of
 from .profile import PHONE_RE, RESERVED as PROFILE_RESERVED, clean_link_url, tel_number
 
@@ -473,7 +474,8 @@ def _public_headers(resp):
 @bp.route("/k/<code>")
 def go(code):
     link = _live_or_404(code)
-    if request.method == "GET":   # HEAD (bağlantı önizleyiciler, bot kontrolleri) sayılmaz
+    # HEAD istekleri ve WhatsApp/Telegram gibi uygulamaların link önizlemesi tıklanma sayılmaz
+    if request.method == "GET" and not is_link_preview(request.user_agent.string):
         db = get_db()
         db.execute("UPDATE short_links SET clicks = clicks + 1, last_click_at = CURRENT_TIMESTAMP WHERE id = ?",
                    (link["id"],))

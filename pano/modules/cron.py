@@ -1,7 +1,7 @@
 """⏰ Dışarıdan tetiklenen görevler (cron-job.org gibi ücretsiz bir servis çağırır).
 
 PythonAnywhere ücretsiz planında zamanlanmış görev olmadığı için:
-  GET /cron/<CRON_SECRET>/gunluk      -> herkese Telegram günlük özeti (günde bir kez)
+  GET /cron/<CRON_SECRET>/gunluk      -> herkese Telegram günlük özeti (günde bir kez; 1 Ocak'ta yıl özeti)
   GET /cron/<CRON_SECRET>/hatirlatma  -> yapılacak, fatura ve ilaç hatırlatmaları (5 dakikada bir)
   GET /cron/<CRON_SECRET>/yedek       -> yöneticilere Telegram'dan veritabanı yedeği
 CRON_SECRET ayarlı değilse bu adresler 404 döner.
@@ -127,6 +127,19 @@ def daily(secret):
                     result["reports"] = result.get("reports", 0) + 1
                 except telegram.TelegramError as e:
                     result["errors"].append(f"{user['username']} rapor: {e}")
+
+    # Yılbaşı: geçen yılın özeti (1 Ocak; Telegram'ı bağlı, günlük özeti açık ve geçen yıl verisi olana, yılda bir kez)
+    from . import yearreview
+    result["year_reviews"] = 0
+    now = todo.now_local()
+    for user, year in yearreview.pending_new_year(now):
+        try:
+            telegram.send_message(user["telegram_chat_id"], yearreview.new_year_message(
+                user, year, now, url_for("yearreview.index", yil=year, _external=True), telegram.escape))
+            yearreview.mark_sent(user["id"], year)
+            result["year_reviews"] += 1
+        except Exception as e:  # bir kullanıcının hatası (Telegram ya da verisi) diğerlerini durdurmasın
+            result["errors"].append(f"{user['username']} yıl özeti: {e}")
 
     # Varlık değer geçmişi (grafik için günde bir kayıt; kur alınamazsa o gün atlanır)
     from .assets import record_snapshot

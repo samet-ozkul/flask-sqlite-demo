@@ -79,6 +79,20 @@ def safe_path(url):
     return None
 
 
+# Bağlantı önizlemesi yapan uygulamalar ve arama motorları (sayaç / bildirim tetiklemesin).
+# Genel "bot" kelimesi kullanılmaz: bazı telefon modellerinin adında geçer (ör. CUBOT).
+PREVIEW_AGENTS = ("whatsapp", "telegrambot", "facebookexternalhit", "facebot", "meta-externalagent", "slackbot",
+                  "twitterbot", "discordbot", "linkedinbot", "skypeuripreview", "viber", "pinterest", "redditbot",
+                  "googlebot", "bingbot", "applebot", "yandexbot", "duckduckbot", "baiduspider", "embedly",
+                  "iframely", "vkshare", "google-inspectiontool")
+
+
+def is_link_preview(user_agent):
+    """İstek bir insan değil de link önizlemesi / arama motoru robotu mu?"""
+    ua = (user_agent or "").lower()
+    return any(name in ua for name in PREVIEW_AGENTS)
+
+
 def redirect_back(endpoint, **values):
     """Formdaki/URL'deki `next` (ya da next=dashboard) varsa oraya, yoksa endpoint'e yönlendirir."""
     target = request.form.get("next") or request.args.get("next")
