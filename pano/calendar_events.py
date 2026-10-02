@@ -1,7 +1,8 @@
 """Tüm tarihli kayıtlar tek listede: takvim sayfası ve telefon takvimi aboneliği (ICS) kullanır.
 
 Kaynaklar: faturalar, abonelik yenilemeleri, borç/alacak vadeleri, araç tarihleri, garanti bitişleri,
-randevular, yapılacaklar (açık), kanban kartları (bitti sütunu hariç), önemli günler, kişilerin doğum günleri.
+randevular, yapılacaklar (açık), kanban kartları (bitti sütunu hariç), ev bakımı (sıradaki tarih), önemli günler,
+kişilerin doğum günleri.
 Abonelik, önemli günler ve doğum günleri aralık içinde çoğaltılır.
 """
 from datetime import date, timedelta
@@ -90,6 +91,13 @@ def events_between(user_id, start, end, external=False):
     for r in query("SELECT * FROM documents WHERE user_id = ? AND expires_on BETWEEN ? AND ?", (user_id, s, e)):
         add("document", r["id"], r["expires_on"], f"{r['name']} bitiyor", DOC_KINDS[r["kind"]][1], "documents.edit",
             detail=r["holder"], doc_id=r["id"])
+
+    # Ev bakımı: etkin işlerin sıradaki tarihi
+    from .modules.homecare import task_period
+    for r in query("SELECT * FROM home_tasks WHERE user_id = ? AND active = 1 AND next_due BETWEEN ? AND ?",
+                   (user_id, s, e)):
+        add("home", r["id"], r["next_due"], r["name"], r["icon"], "homecare.detail", detail=task_period(r),
+            task_id=r["id"])
 
     # Siparişler: beklenen teslim (iptal edilenler hariç) ve iade son günü (iade başlatılınca tamamlandı sayılır)
     for r in query("SELECT * FROM orders WHERE user_id = ? AND status != 'cancelled' AND expected_on BETWEEN ? AND ?",

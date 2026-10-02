@@ -110,7 +110,7 @@ def test_reset():
 def test_csrf_and_login():
     raw = app.test_client()
     assert raw.get("/kasa/").status_code == 302
-    assert raw.post("/kasa/kayit", data={"data": blob(40)}).status_code == 302  # girişsiz
+    assert raw.post("/kasa/kayit", data={"data": blob(40)}).status_code == 400  # girişsiz ve anahtarsız: CSRF reddeder
     assert ADMIN.c.post("/kasa/kayit", data={"data": blob(40)}).status_code == 400  # CSRF anahtarı yok
     print("  csrf/login OK")
 

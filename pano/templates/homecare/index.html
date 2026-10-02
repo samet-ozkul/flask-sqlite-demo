@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "homecare/_form.html" import task_fields, task_row with context %}
+{% block title %}Ev Bakımı{% endblock %}
+{% block head %}
+<style>
+  .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; margin-bottom: 14px; }
+  .chips a { white-space: nowrap; }
+  .chips a.on { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+  .home-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+  .tpl-list { list-style: none; margin: 0 0 12px; padding: 0; }
+  .tpl-list li { border-bottom: 1px solid var(--border); }
+  .tpl-list li:last-child { border-bottom: 0; }
+  .tpl-list label { display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer; }
+  .tpl-list input { width: 18px; height: 18px; flex-shrink: 0; }
+  .tpl-list .ico { font-size: 1.2rem; width: 26px; text-align: center; flex-shrink: 0; }
+  .tpl-list .grow { flex: 1; min-width: 0; }
+  .tpl-list .name { display: block; font-weight: 500; overflow-wrap: anywhere; }
+  .tpl-list .meta { display: block; font-size: .82rem; color: var(--muted); }
+  .tpl-list li.added label { cursor: default; opacity: .6; }
+  details.passive > summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+  details.passive[open] > summary { margin-bottom: 6px; }
+</style>
+{% endblock %}
+{% block content %}
+{% set here = request.full_path.rstrip('?') %}
+{{ ui.page_header("🔧 Ev Bakımı", summary if total else "Kombi, klima, filtreler, dedektör pilleri... periyodik işler ve Telegram hatırlatması") }}
+
+<div class="card">
+  <details class="add">
+    <summary>＋ Yeni iş</summary>
+    <form method="post" action="{{ url_for('homecare.create') }}">
+      {{ ui.csrf() }}
+      {{ task_fields() }}
+      <button class="btn primary">Ekle</button>
+    </form>
+  </details>
+</div>
+
+<div class="card">
+  <details class="add" {% if not total %}open{% endif %}>
+    <summary>📋 Hazır şablonlardan ekle</summary>
+    <form method="post" action="{{ url_for('homecare.add_templates') }}">
+      {{ ui.csrf() }}
+      <p class="muted small">İşaretlediklerin önerilen periyot ve ayla eklenir; tarihleri sonra iş sayfasından düzeltebilirsin
+        (ör. poliçe bitiş günü, filtrenin en son değiştiği gün).</p>
+      <ul class="tpl-list">
+        {% for tp in templates %}
+          <li class="{{ 'added' if tp.added }}">
+            <label>
+              <input type="checkbox" name="tpl" value="{{ tp.key }}" {% if tp.added %}disabled{% endif %}>
+              <span class="ico">{{ tp.icon }}</span>
+              <span class="grow">
+                <span class="name">{{ tp.name }}</span>
+                <span class="meta">{{ tp.period }}{% if tp.month %} · {{ tp.month }}{% endif %} ·
+                  {% if tp.added %}✓ listende{% else %}ilk: {{ tp.due | rel_days if tp.due == today_str() else tp.due | date_tr }}{% endif %}</span>
+              </span>
+            </label>
+          </li>
+        {% endfor %}
+      </ul>
+      <button class="btn primary">Seçilenleri ekle</button>
+    </form>
+  </details>
+</div>
+
+{% if total %}
+  <div class="chips" aria-label="Kategoriye göre">
+    <a class="tag {{ 'on' if not cat }}" href="{{ url_for('homecare.index') }}">Tümü <span class="muted">{{ total }}</span></a>
+    {% for key, (label, icon) in categories.items() if counts.get(key) %}
+      <a class="tag {{ 'on' if key == cat }}" href="{{ url_for('homecare.index', kategori=key) }}">{{ icon }} {{ label }} <span class="muted">{{ counts[key] }}</span></a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if active %}
+  <div class="card">
+    <ul class="rows">
+      {% for t in active %}{{ task_row(t, here) }}{% endfor %}
+    </ul>
+  </div>
+{% elif total %}
+  {{ ui.empty("Burada etkin iş yok.", "🔧") }}
+{% else %}
+  {{ ui.empty("Henüz iş yok. Yukarıdaki şablonlardan birkaçını seç ya da kendi işini ekle; zamanı gelince hatırlatalım.", "🔧") }}
+{% endif %}
+
+{% if inactive %}
+  <div class="card">
+    <details class="passive">
+      <summary>⏸️ Pasif işler <span class="pill-count">{{ inactive | length }}</span></summary>
+      <ul class="rows">
+        {% for t in inactive %}{{ task_row(t, here) }}{% endfor %}
+      </ul>
+    </details>
+  </div>
+{% endif %}
+{% endblock %}

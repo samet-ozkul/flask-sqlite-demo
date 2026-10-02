@@ -6,7 +6,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from helpers import Client, make_app  # noqa: E402
+from helpers import Client, csrf as csrf_of, make_app  # noqa: E402
 
 app = make_app()
 
@@ -83,6 +83,27 @@ def test_old_cookie_without_epoch():
     print("  old cookie OK")
 
 
+def test_csrf_requires_token():
+    # Oturumda form anahtarı yokken anahtarsız form da reddedilir (eskiden None == None diye geçiyordu)
+    with app.app_context():
+        create_user("form", "form12345")
+    raw = app.test_client()
+    r = raw.post("/giris", data={"username": "form", "password": "form12345"})
+    assert r.status_code == 400 and not logged_in(raw)
+    c = Client(app, "form", "form12345")
+    with c.c.session_transaction() as sess:
+        sess.pop("_csrf", None)
+    before = query_one_app("SELECT COUNT(*) AS n FROM notes")["n"]
+    assert c.c.post("/notlar/yeni", data={"title": "CSRF", "content": "x"}).status_code == 400
+    # Yanlış anahtar da geçmez; doğru anahtarla çalışır
+    c.token = csrf_of(c.c.get("/notlar/"))
+    assert c.c.post("/notlar/yeni", data={"_csrf": "yanlis", "title": "CSRF"}).status_code == 400
+    assert query_one_app("SELECT COUNT(*) AS n FROM notes")["n"] == before
+    assert c.post("/notlar/yeni", data={"title": "Geçerli", "content": "x"}).status_code == 302
+    assert query_one_app("SELECT COUNT(*) AS n FROM notes")["n"] == before + 1
+    print("  csrf OK")
+
+
 def query_one_app(sql, args=()):
     with app.app_context():
         return query_one(sql, args)
@@ -93,4 +114,5 @@ if __name__ == "__main__":
     test_password_change()
     test_admin_reset()
     test_old_cookie_without_epoch()
+    test_csrf_requires_token()
     print("OK")

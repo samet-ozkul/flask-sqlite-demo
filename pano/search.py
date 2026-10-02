@@ -7,7 +7,7 @@ eşleştirme Python'da yapılır; kişisel veride tablo başına son 1000 kayda 
 from flask import url_for
 
 from .db import query
-from .utils import fmt_date, fmt_money, fold
+from .utils import fmt_date, fmt_money, fold, parse_date
 
 ROW_LIMIT = 1000
 
@@ -23,6 +23,11 @@ def _order_detail(r):
                                   fmt_money(r["amount"]) if r["amount"] is not None else "") if x)
 
 
+def _home_period(r):
+    from .modules.homecare import task_period
+    return task_period(r).lower()
+
+
 def _map_title(r):
     from .modules.places import CATEGORIES
     if r["kind"] == "city":
@@ -34,6 +39,17 @@ def _map_url(r):
     if r["kind"] == "city":
         return url_for("places.city", city_id=r["id"])
     return url_for("places.edit", place_id=r["id"])
+
+
+def _week_title(r):
+    from .modules.weekly import SCORES, week_label
+    return f"{week_label(parse_date(r['week_start']))} haftası" + (f" {SCORES[r['score']][0]}" if r["score"] else "")
+
+
+def _week_detail(r):
+    from .modules.weekly import parse_priorities
+    priorities = ", ".join(p["text"] for p in parse_priorities(r["priorities"]))
+    return " · ".join(x for x in (r["went_well"], r["hard"], r["learned"], priorities) if x)
 
 
 def _sources(user_id):
@@ -100,6 +116,10 @@ def _sources(user_id):
          ("name", "holder", "note"), lambda r: r["name"],
          lambda r: " · ".join(x for x in (r["holder"], "bitiş " + fmt_date(r["expires_on"])) if x),
          lambda r: url_for("documents.edit", doc_id=r["id"])),
+        ("Ev Bakımı", "🔧", "SELECT * FROM home_tasks WHERE user_id = ? ORDER BY next_due LIMIT ?", (user_id,),
+         ("name", "notes"), lambda r: r["name"] + ("" if r["active"] else " (pasif)"),
+         lambda r: "sıradaki " + fmt_date(r["next_due"]) + " · " + _home_period(r),
+         lambda r: url_for("homecare.detail", task_id=r["id"])),
         ("İzleme / Okuma", "🎬", "SELECT * FROM watchlist WHERE user_id = ? ORDER BY id DESC LIMIT ?", (user_id,),
          ("title", "creator", "note", "year"), lambda r: r["title"] + (" ✓" if r["status"] == "done" else ""),
          lambda r: " · ".join(x for x in (r["year"], r["creator"]) if x),
@@ -116,6 +136,10 @@ def _sources(user_id):
         ("Günlük", "📓", "SELECT * FROM journal WHERE user_id = ? ORDER BY date DESC LIMIT ?", (user_id,),
          ("text",), lambda r: fmt_date(r["date"], True) + (" " + _mood(r["mood"]) if r["mood"] else ""),
          lambda r: r["text"], lambda r: url_for("journal.index", ay=r["date"][:7], gun=r["date"])),
+        # Öncelikler JSON metniyle aranır (ensure_ascii=False: Türkçe harfler olduğu gibi)
+        ("Haftalık Değerlendirme", "🗓️", "SELECT * FROM weekly_reviews WHERE user_id = ? ORDER BY week_start DESC LIMIT ?",
+         (user_id,), ("went_well", "hard", "learned", "priorities"), _week_title, _week_detail,
+         lambda r: url_for("weekly.index", hafta=r["week_start"])),
         ("Önemli Günler", "🎂", "SELECT * FROM special_days WHERE user_id = ? LIMIT ?", (user_id,),
          ("name", "note"), lambda r: r["name"], lambda r: f"{r['day']:02d}.{r['month']:02d}",
          lambda r: url_for("specialdays.edit", day_id=r["id"])),

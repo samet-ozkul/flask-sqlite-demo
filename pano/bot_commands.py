@@ -10,6 +10,7 @@ Mesajı gönderen, bu sohbete bağlı pano kullanıcısıdır.
   /yap fatura öde yarın 14:00 -> yapılacak (sondaki tarih/saat kelimeleri anlaşılır)
   /liste [ad]                -> açık maddeler, dokununca işaretlenir
   /bugun                     -> günün özeti
+  /hafta                     -> bu haftanın sayıları ve öncelikleri
   /kisalt url [kod]          -> kısa link (/k/kod)
   link                      -> Sonra Bak'a kaydedilir
   fotoğraf / PDF             -> garantiye ya da nota eklenir (sorulur)
@@ -46,6 +47,7 @@ COMMANDS = [
     ("zaman", "Çalışan sayaç ve bugünün toplamı"),
     ("bugun", "Günün özeti"),
     ("rapor", "Geçen ayın raporu (/rapor bu ay)"),
+    ("hafta", "Bu haftanın sayıları ve öncelikleri"),
     ("ara", "Her yerde ara: /ara matkap"),
     ("sor", "Verilerine soru sor: /sor bu ay ne kadar harcadım"),
     ("yardim", "Komutlar"),
@@ -71,6 +73,7 @@ HELP = """<b>Kişisel Pano komutları</b>
     <code>/durdur</code> — sayacı durdur · <code>/zaman</code> — çalışan sayaç ve bugünün toplamı
 ☀️ <code>/bugun</code> — günün özeti
 📊 <code>/rapor</code> — geçen ayın raporu · <code>/rapor bu ay</code>
+🗓️ <code>/hafta</code> — bu haftanın sayıları ve öncelikleri (pazar değerlendirmesi panoda: Haftalık Değerlendirme)
 🔍 <code>/ara matkap</code> — notlar, envanter, garantiler... her yerde ara
 🤖 <code>/sor bu ay markete ne kadar harcadım?</code> — verilerine soru sor (yapay zekâ açıksa)
 
@@ -175,6 +178,7 @@ def handle_message(msg):
             "liste": cmd_list, "l": cmd_list,
             "bugun": cmd_today,
             "rapor": cmd_report,
+            "hafta": cmd_week,
             "ara": cmd_search,
             "sor": cmd_ask,
         }.get(command, cmd_help)
@@ -194,7 +198,8 @@ def handle_callback(cq, chat_id, message_id):
     prefix = data.split(":", 1)[0]
     handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
                 "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood, "ct": cb_contact, "ctz": cb_contact,
-                "tt": cb_timer, "loc": cb_location, "scn": cb_scan, "bk": cb_booking}
+                "tt": cb_timer, "loc": cb_location, "scn": cb_scan, "hm": cb_home, "wk": cb_weekly_score,
+                "bk": cb_booking}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -348,6 +353,34 @@ def cb_journal_mood(user, chat_id, message_id, callback_id, data):
         pass
 
 
+# ---------- Haftalık değerlendirme ----------
+def cmd_week(user, chat_id, rest):
+    from .modules import weekly
+    telegram.send_message(chat_id, weekly.week_text(user["id"], weekly.now_local(), link("weekly.index"), esc))
+
+
+def cb_weekly_score(user, chat_id, message_id, callback_id, data):
+    """Pazar mesajındaki puan butonu (wk:<hafta başı>:<1-5>): butona basanın o haftaki puanını kaydeder."""
+    from datetime import date
+    from .modules import weekly
+    parts = data.split(":")
+    try:
+        start, score = date.fromisoformat(parts[1]), int(parts[2])
+    except (IndexError, ValueError):
+        telegram.answer_callback(callback_id)
+        return
+    if score not in weekly.SCORES or not weekly.can_score(start, weekly.now_local().date()):
+        telegram.answer_callback(callback_id, "Bu hafta için artık kaydedilemiyor.")
+        return
+    weekly.save_review(user["id"], start, score=score)
+    telegram.answer_callback(callback_id, f"{weekly.SCORES[score][0]} kaydedildi")
+    try:
+        telegram.edit_message(chat_id, message_id, weekly.saved_message(
+            start, score, link("weekly.index", hafta=start.isoformat()), esc))
+    except telegram.TelegramError:
+        pass
+
+
 # ---------- Kişiler ----------
 def cb_contact(user, chat_id, message_id, callback_id, data):
     """Dürtme mesajı: ct:<id> -> bugün arandı olarak kaydet, ctz:<id> -> yarın yeniden hatırlat."""
@@ -373,6 +406,37 @@ def cb_contact(user, chat_id, message_id, callback_id, data):
     url = link("contacts.detail", contact_id=contact["id"])
     try:
         telegram.edit_message(chat_id, message_id, f'{text}\n<a href="{esc(url)}">Kişi sayfası →</a>')
+    except telegram.TelegramError:
+        pass
+
+
+# ---------- Ev bakımı ----------
+def cb_home(user, chat_id, message_id, callback_id, data):
+    """Ev bakımı hatırlatması: hm:done:<id> -> bugün yapıldı (sıradaki tarih yazılır), hm:snz:<id> -> 1 hafta ertele."""
+    from .modules import homecare
+    _prefix, action, raw_id = (data.split(":") + ["", ""])[:3]
+    task = query_one("SELECT * FROM home_tasks WHERE id = ? AND user_id = ?",
+                     (int(raw_id) if raw_id.isdigit() else 0, user["id"]))
+    if task is None or action not in ("done", "snz"):
+        telegram.answer_callback(callback_id, "İş bulunamadı, silinmiş olabilir.")
+        return
+    name = f"{task['icon']} <b>{esc(task['name'])}</b>"
+    if action == "done":
+        day = today_str()
+        if homecare.done_on_day(task["id"], day):  # çift dokunuş: ikinci kez kaydetme
+            telegram.answer_callback(callback_id, "Bugün zaten kaydedilmiş.")
+            next_due = task["next_due"]
+        else:
+            next_due = homecare.complete(task, day)["next_due"]
+            telegram.answer_callback(callback_id, "✅ Kaydedildi")
+        text = f"✅ {name} yapıldı. Sıradaki: {fmt_date(next_due, True)}."
+    else:
+        new_due = homecare.snooze(task)
+        telegram.answer_callback(callback_id, "⏰ 1 hafta ertelendi")
+        text = f"⏰ {name} {fmt_date(new_due, True)} tarihine ertelendi."
+    url = link("homecare.detail", task_id=task["id"])
+    try:
+        telegram.edit_message(chat_id, message_id, f'{text}\n<a href="{esc(url)}">Ev Bakımı →</a>')
     except telegram.TelegramError:
         pass
 

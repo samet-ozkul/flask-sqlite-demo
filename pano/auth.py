@@ -87,9 +87,11 @@ def init_app(app):
                 g.user = None
                 session.clear()
 
-        if (request.method == "POST" and not getattr(view, "csrf_exempt", False)
-                and request.form.get("_csrf") != session.get("_csrf")):
-            abort(400, "Geçersiz form anahtarı. Sayfayı yenileyip tekrar deneyin.")
+        if request.method == "POST" and not getattr(view, "csrf_exempt", False):
+            expected = session.get("_csrf")
+            # Oturumda anahtar yoksa da reddedilir: yoksa anahtarsız form "None == None" diye geçerdi
+            if not expected or not secrets.compare_digest(request.form.get("_csrf") or "", expected):
+                abort(400, "Geçersiz form anahtarı. Sayfayı yenileyip tekrar deneyin.")
 
 
 # ---------- Giriş deneme sınırı ----------
