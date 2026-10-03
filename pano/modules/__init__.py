@@ -24,6 +24,7 @@ MODULES = [
     ("car", "car.index", "Araç", "🚗", "Ev ve araç"),
     ("warranty", "warranty.index", "Garanti", "🛡️", "Ev ve araç"),
     ("inventory", "inventory.index", "Ev Envanteri", "📦", "Ev ve araç"),
+    ("loans", "loans.index", "Ödünç", "🔁", "Ev ve araç"),
     ("documents", "documents.index", "Belgeler", "🪪", "Ev ve araç"),
     ("homecare", "homecare.index", "Ev Bakımı", "🔧", "Ev ve araç"),
     ("habits", "habits.index", "Alışkanlıklar", "🔥", "Kişisel"),
@@ -44,6 +45,7 @@ MODULES = [
     ("yearreview", "yearreview.index", "Yıl Özeti", "📊", "Araçlar"),
     ("shortlinks", "shortlinks.index", "Kısa Link & QR", "🔗", "Araçlar"),
     ("booking", "booking.index", "Randevu Sayfası", "📅", "Araçlar"),
+    ("polls", "polls.index", "Anket", "🗳️", "Araçlar"),
 ]
 
 # Menüde gösterilmeyen altyapı modülleri

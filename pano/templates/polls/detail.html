@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{# Anket ayrıntısı (sahibi): link + QR, sonuçlar, kim neye oy verdi (tarih anketinde isim × tarih ızgarası), kişiye
+   özel linkler, kapat/aç, CSV, tek tek oy silme. #}
+{% block title %}{{ poll.question }} · Anket{% endblock %}
+{% block head %}
+<style>
+  .pl-top { display: grid; gap: 14px; align-items: center; grid-template-columns: 1fr; }
+  @media (min-width: 600px) { .pl-top { grid-template-columns: 200px 1fr; } }
+  .qr-box svg { width: min(200px, 100%); height: auto; aspect-ratio: 1; display: block; margin: 0 auto; border-radius: 8px; }
+  .pl-short { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .pl-url { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .95rem; font-weight: 600;
+            overflow-wrap: anywhere; user-select: all; }
+  .pl-desc { white-space: pre-line; overflow-wrap: anywhere; }
+  .stat .value.sm { font-size: 1rem; }
+  .pl-res + .pl-res { margin-top: 12px; }
+  .pl-res-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .pl-res-label { overflow-wrap: anywhere; }
+  .pl-res.lead .pl-res-label { font-weight: 700; }
+  .pl-res-num { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); font-size: .88rem; }
+  .pl-track { height: 10px; margin-top: 4px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+  .pl-track > span { display: block; height: 100%; min-width: 2px; border-radius: 99px; background: var(--muted); }
+  .pl-res.lead .pl-track > span { background: var(--primary); }
+  .pl-grid th, .pl-grid td { text-align: center; white-space: nowrap; }
+  .pl-grid th:first-child, .pl-grid td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface);
+                                                      white-space: normal; min-width: 7em; overflow-wrap: anywhere; }
+  .pl-grid .best { background: var(--ok-soft); }
+  .pl-grid td.yes { color: var(--ok); font-weight: 700; }
+  .pl-grid td.na { color: var(--muted); }
+  .pl-votes td { overflow-wrap: anywhere; }
+  .pl-votes td:last-child, .pl-grid td:last-child { width: 1%; }
+  .pl-bulk { margin: 8px 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); font-size: .82rem;
+             white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; max-height: 220px; overflow: auto; }
+  .pl-inv .grow .meta a, .pl-inv .pl-link { overflow-wrap: anywhere; }
+  .pl-link { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .8rem; user-select: all; }
+</style>
+{% endblock %}
+{% block content %}
+{% macro vote_delete(v) -%}
+  <form method="post" action="{{ url_for('polls.vote_delete', poll_id=poll.id, vote_id=v.id) }}" class="inline"
+        data-confirm="Bu oy silinsin mi? Geri alınamaz{{ '; kişiye özel linki yeniden oy verebilir' if v.invite }}.">
+    {{ ui.csrf() }}
+    <button class="btn sm icon danger" title="Oyu sil" aria-label="Oyu sil">🗑️</button>
+  </form>
+{%- endmacro %}
+
+{% call ui.page_header("🗳️ " ~ poll.question, back=url_for('polls.index')) %}
+  <a class="btn" href="{{ url_for('polls.edit', poll_id=poll.id) }}">✏️ Düzenle</a>
+  {{ ui.delete_button(url_for('polls.delete', poll_id=poll.id), "Sil",
+                      "Anket silinsin mi? Link çalışmaz olur; oylarıyla birlikte çöp kutusundan geri getirilebilir.") }}
+{% endcall %}
+
+<section class="card">
+  <div class="pl-top">
+    <div class="qr-box">{{ qr | safe }}</div>
+    <div>
+      <div class="pl-short">
+        <a class="pl-url" id="pl-url" href="{{ url }}" target="_blank" rel="noopener">{{ url }}</a>
+        <button type="button" class="btn sm hidden" data-copy="pl-url">📋 Kopyala</button>
+      </div>
+      <div class="row-flex">
+        {% if closed %}<span class="badge">🔒 Kapandı</span>{% else %}<span class="badge good">Açık</span>{% endif %}
+        <span class="badge">{{ kinds[poll.kind][0] }} {{ kinds[poll.kind][1] }}{% if poll.kind == 'multi' and poll.max_choices %} · en fazla {{ poll.max_choices }}{% endif %}</span>
+        {% if poll.invite_only %}<span class="badge">🔑 Sadece davetliler</span>{% endif %}
+        {% if poll.one_per_ip %}<span class="badge">📶 IP başına tek oy</span>{% endif %}
+        {% if poll.notify %}<span class="badge">💬 Telegram bildirimi</span>{% endif %}
+      </div>
+      {% if poll.description %}<p class="muted small pl-desc">{{ poll.description }}</p>{% endif %}
+      <div class="row-flex" style="margin-top: 10px">
+        <a class="btn sm primary" href="{{ url_for('polls.qr_png', poll_id=poll.id) }}">⬇️ QR'ı PNG indir</a>
+        <a class="btn sm" href="{{ url }}" target="_blank" rel="noopener">👁️ Anket sayfası</a>
+        <form method="post" action="{{ url_for('polls.toggle', poll_id=poll.id) }}" class="inline"
+              {% if not closed %}data-confirm="Anket kapatılsın mı? Artık oy verilemez; istediğinde yeniden açabilirsin."{% endif %}>
+          {{ ui.csrf() }}
+          <button class="btn sm">{{ "▶️ Yeniden aç" if closed else "⏸️ Anketi kapat" }}</button>
+        </form>
+        {% if t.total %}<a class="btn sm" href="{{ url_for('polls.export', poll_id=poll.id) }}">⬇️ CSV</a>{% endif %}
+      </div>
+      {% if poll.notify and not telegram_ready %}
+        <p class="muted small">💬 Telegram bağlı değil; bildirim gelmez (Ayarlar'dan bağla).</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<div class="stats">
+  <div class="stat"><div class="label">Oy</div><div class="value">{{ t.total }}</div></div>
+  <div class="stat"><div class="label">Görüntülenme</div><div class="value">{{ poll.views }}</div>
+    <div class="sub">sen ve link önizlemeleri sayılmaz</div></div>
+  <div class="stat"><div class="label">Bitiş</div>
+    <div class="value sm">{% if poll.closed and not closes_past %}Elle kapatıldı{% elif closes %}{{ long_when(closes) }}{% else %}Süresiz{% endif %}</div>
+    {% if closes_past %}<div class="sub">süre doldu</div>{% endif %}</div>
+  <div class="stat"><div class="label">Sonuçları görenler</div><div class="value sm">{{ visibility[poll.results_visibility] }}</div></div>
+</div>
+
+<section class="card">
+  <h2>📊 Sonuçlar <span class="muted small">· {{ t.total }} oy</span></h2>
+  {% if not t.total %}<p class="muted small">Henüz oy yok. Linki ya da QR'ı paylaş.</p>{% endif %}
+  {% for r in t.rows %}
+    <div class="pl-res {{ 'lead' if r.lead }}">
+      <div class="pl-res-top">
+        <span class="pl-res-label">{% if r.lead %}{{ "⭐ " if poll.kind == 'date' else "🏆 " }}{% endif %}{{ r.label }}</span>
+        <span class="pl-res-num">{{ r.count }}{{ " kişi" if poll.kind == 'date' else " oy" }} · %{{ r.pct }}</span>
+      </div>
+      <div class="pl-track"><span style="width: {{ r.pct }}%"></span></div>
+    </div>
+  {% endfor %}
+  {% if poll.kind != 'single' and t.total %}
+    <p class="muted small">Yüzde, oy verenlerin kaçının o seçeneği işaretlediğini gösterir.</p>
+  {% endif %}
+  {% if poll.kind == 'date' and t.leaders %}
+    <p>⭐ <b>En uygun:</b> {{ t.leaders | map(attribute='label') | join(", ") }} ({{ t.leaders[0].count }}/{{ t.total }} kişi)</p>
+  {% endif %}
+</section>
+
+<section class="card" id="oylar">
+  <h2>🗂️ {{ "Kim neye oy verdi" if needs_name else "Oylar" }} {% if votes %}<span class="pill-count">{{ votes | length }}</span>{% endif %}</h2>
+  {% if not votes %}
+    <p class="muted small">Henüz oy yok.</p>
+  {% elif poll.kind == 'date' %}
+    <div class="table-wrap">
+      <table class="pl-grid">
+        <thead><tr><th>İsim</th>{% for r in t.rows %}<th class="{{ 'best' if r.lead }}" title="{{ r.label }}">{{ r.short }}</th>{% endfor %}<th></th></tr></thead>
+        <tbody>
+          {% for v in votes %}
+            <tr>
+              <td>{{ v.name }}{% if v.invite %} <span class="muted small">🔑 {{ v.invite }}</span>{% endif %}</td>
+              {% for r in t.rows %}
+                {% if v.id <= r.after %}<td class="na" title="Bu tarih bu oydan sonra eklendi">·</td>
+                {% elif r.id in v.chosen %}<td class="yes {{ 'best' if r.lead }}">✓</td>
+                {% else %}<td class="{{ 'best' if r.lead }}"></td>{% endif %}
+              {% endfor %}
+              <td>{{ vote_delete(v) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr><th>Uygun</th>{% for r in t.rows %}<th class="{{ 'best' if r.lead }}">{{ r.count }}</th>{% endfor %}<th></th></tr></tfoot>
+      </table>
+    </div>
+    {% if t.rows | selectattr('after') | list %}<p class="muted small">· = tarih bu kişi oy verdikten sonra eklendi (sorulmadı).</p>{% endif %}
+  {% else %}
+    <details {% if needs_name %}open{% endif %}>
+      <summary class="muted small">{{ "Tabloyu gizle / göster" if needs_name else "İsimsiz oylar: zaman ve seçim (şüpheli oyu silebilirsin)" }}</summary>
+      <div class="table-wrap">
+        <table class="pl-votes">
+          <thead><tr>{% if needs_name %}<th>İsim</th>{% endif %}<th>{{ "Seçim" if poll.kind == 'single' else "Seçimler" }}</th><th>Zaman</th><th></th></tr></thead>
+          <tbody>
+            {% for v in votes %}
+              <tr>
+                {% if needs_name %}<td>{{ v.name or "—" }}{% if v.invite %} <span class="muted small">🔑 {{ v.invite }}</span>{% endif %}</td>{% endif %}
+                <td>{{ v.choices or "—" }}{% if not needs_name and v.invite %} <span class="muted small">🔑 {{ v.invite }}</span>{% endif %}</td>
+                <td class="muted small">{{ v.created_at | localdt }}</td>
+                <td>{{ vote_delete(v) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  {% endif %}
+</section>
+
+{% if poll.invite_only or invites %}
+  <section class="card" id="davet">
+    <h2>🔑 Kişiye özel linkler {% if invites %}<span class="pill-count">{{ invites | selectattr('used_at') | list | length }}/{{ invites | length }} oy verdi</span>{% endif %}</h2>
+    {% if not poll.invite_only %}
+      <p class="flash warning">“Sadece davetliler” kapalı: ortak link de oy alıyor. Kesin sonuç için anketi düzenleyip aç.</p>
+    {% endif %}
+    {% if bulk %}
+      <div class="row-flex"><b class="small">Kullanılmamış linkler</b>
+        <button type="button" class="btn sm hidden" data-copy="pl-bulk">📋 Hepsini kopyala</button></div>
+      <pre class="pl-bulk" id="pl-bulk">{{ bulk }}</pre>
+      <p class="muted small">Her satırı ilgili kişiye gönder (WhatsApp, e-posta…). Her link bir kez oy verir.</p>
+    {% endif %}
+    {% if invites %}
+      <ul class="rows pl-inv">
+        {% for i in invites %}
+          <li>
+            <span class="ico">{{ "✅" if i.used_at else "✉️" }}</span>
+            <div class="grow">
+              <div class="title">{{ i.name }} {% if i.used_at %}<span class="badge good">Oy verdi</span>{% endif %}</div>
+              <div class="meta">
+                {% if i.used_at %}<span>{{ i.used_at | localdt }}</span>{% else %}<span class="pl-link" id="pl-inv-{{ i.id }}">{{ i.url }}</span>{% endif %}
+              </div>
+            </div>
+            {% if not i.used_at %}
+              <div class="actions">
+                <button type="button" class="btn sm icon hidden" data-copy="pl-inv-{{ i.id }}" title="Kopyala" aria-label="Kopyala">📋</button>
+                <form method="post" action="{{ url_for('polls.invite_delete', poll_id=poll.id, invite_id=i.id) }}" class="inline"
+                      data-confirm="Bu link iptal edilsin mi? Artık oy veremez.">
+                  {{ ui.csrf() }}
+                  <button class="btn sm icon danger" title="İptal et" aria-label="İptal et">🚫</button>
+                </form>
+              </div>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if invites | length < max_invites %}
+      <details class="add" {% if not invites %}open{% endif %}>
+        <summary>＋ Link oluştur</summary>
+        <form method="post" action="{{ url_for('polls.invite_create', poll_id=poll.id) }}">
+          {{ ui.csrf() }}
+          {{ ui.textarea("Kimler? (her satıra bir kişi)", "labels", "", rows=4, placeholder="Ahmet\nAyşe\nMehmet",
+                         hint="Etiket sadece sana görünür; oy sayfasında isim alanına yazılı gelir.") }}
+          {{ ui.field("ya da kaç numaralı link", "count", "", type="number", attrs='min="1" max="' ~ max_invites ~ '" inputmode="numeric"',
+                      hint="Etiketsiz: Davetli 1, Davetli 2… (en fazla " ~ max_invites ~ " link)") }}
+          <button class="btn primary">🔑 Linkleri oluştur</button>
+        </form>
+      </details>
+    {% endif %}
+  </section>
+{% endif %}
+
+<section class="card">
+  <h2>ℹ️ Bir kişi bir oy nasıl sağlanıyor?</h2>
+  <p class="muted small">Ortak linkte her tarayıcı bir kez oy verir: oy verince tarayıcıya bu ankete özel bir çerez yazılır
+    (1 yıl){% if poll.one_per_ip %}, ayrıca aynı internet bağlantısından (IP) tek oy kabul edilir{% endif %}{% if needs_name %},
+    aynı isimle ikinci oy da reddedilir{% endif %}. Bu kesin değildir: gizli pencere, başka tarayıcı ya da başka cihazla
+    tekrar oy verilebilir. Kesin sonuç için “Sadece davetliler”i açıp herkese kişiye özel link gönder. Şüpheli oyları
+    yukarıdaki tablodan tek tek silebilirsin.</p>
+</section>
+<script src="{{ url_for('static', filename='polls.js') }}?v=1" defer></script>
+{% endblock %}

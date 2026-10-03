@@ -1,6 +1,7 @@
 """📦 Ev envanteri: "Matkap nerede?" — eşya, yer, kategori, adet, fotoğraf.
 
 Arama Türkçe harf ve büyük/küçük harf duyarsızdır ("sarj" -> "Şarj aleti").
+Ödünçteki eşyada "📤 Ahmet'te (12 gündür)" rozeti; eşya sayfasında "🔁 Ödünç ver" ve ödünç geçmişi (modules/loans.py).
 """
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 
@@ -9,6 +10,7 @@ from ..auth import login_required
 from ..db import execute, owned_or_404, query
 from ..storage import attachments_for, first_thumbs
 from ..utils import form_int, form_str, redirect_back
+from .loans import held_text, inventory_badges, inventory_history
 
 bp = Blueprint("inventory", __name__, url_prefix="/envanter")
 
@@ -68,6 +70,7 @@ def index():
         "inventory/index.html", items=items, q=q, loc=loc, cat=cat, total=total,
         locations=_distinct("location", uid), categories=_distinct("category", uid),
         thumbs=first_thumbs("inventory", [r["id"] for r in items]),
+        loan_badges=inventory_badges(uid, [r["id"] for r in items]),
     )
 
 
@@ -107,6 +110,7 @@ def edit(item_id):
     return render_template(
         "inventory/edit.html", item=item, files=attachments_for("inventory", item_id),
         locations=_distinct("location", uid), categories=_distinct("category", uid),
+        loan_history=inventory_history(uid, item_id), loan_held=held_text,
     )
 
 

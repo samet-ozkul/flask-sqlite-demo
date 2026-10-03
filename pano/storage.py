@@ -33,6 +33,7 @@ ENTITIES = {
     "recipe": "recipes",
     "vehicle": "vehicles",
     "note": "notes",
+    "loan": "loans",
     "ticket": "tickets",
 }
 

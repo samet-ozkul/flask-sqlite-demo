@@ -18,6 +18,7 @@ from .. import trash
 from ..auth import login_required
 from ..db import execute, owned_or_404, query, query_one
 from ..utils import (MONTHS_TR, TZ, fold, form_choice, form_int, form_str, parse_date, redirect_back, today)
+from .loans import days_out, for_contact, since_words
 from .specialdays import occurrence
 
 bp = Blueprint("contacts", __name__, url_prefix="/kisiler")
@@ -309,6 +310,7 @@ def detail(contact_id):
     t = today()
     logs = query("SELECT * FROM contact_logs WHERE contact_id = ? ORDER BY date DESC, id DESC", (contact_id,))
     nxt = next_birthday(contact, t)
+    loans = [(r, since_words(days_out(r, t))) for r in for_contact(uid, contact_id)]  # bu kişideki / bendeki eşyalar
     return render_template(
         "contacts/detail.html", c=contact, st=status(contact, t), logs=logs, kinds=KINDS, quick=QUICK,
         relations=relation_suggestions(uid), every_options=EVERY_OPTIONS, relation_icon=relation_icon, every_label=every_label,
@@ -317,7 +319,8 @@ def detail(contact_id):
         bday_age=age_on(contact, nxt) if nxt else None, shown_birthday=_shown_birthday(contact),
         no_year=bool(contact["birthday"] and contact["birthday"].startswith("--")),
         snoozed=contact["snooze_until"] if contact["snooze_until"] and contact["snooze_until"] > t.isoformat() else None,
-        today=t.isoformat(),
+        today=t.isoformat(), loans_lent=[x for x in loans if x[0]["direction"] == "lent"],
+        loans_borrowed=[x for x in loans if x[0]["direction"] == "borrowed"],
     )
 
 

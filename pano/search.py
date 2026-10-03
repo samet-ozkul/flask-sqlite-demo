@@ -38,6 +38,11 @@ def _ticket_detail(r):
     return " · ".join(x for x in (when, r["venue"], r["booking_code"]) if x)
 
 
+def _loan_detail(r):
+    from .modules.loans import held_text
+    return held_text(r)
+
+
 def _map_title(r):
     from .modules.places import CATEGORIES
     if r["kind"] == "city":
@@ -84,6 +89,9 @@ def _sources(user_id):
          ("name", "location", "category", "note"), lambda r: r["name"],
          lambda r: "📍 " + r["location"] if r["location"] else r["category"],
          lambda r: url_for("inventory.edit", item_id=r["id"])),
+        ("Ödünç", "🔁", "SELECT * FROM loans WHERE user_id = ? ORDER BY returned_on IS NOT NULL, id DESC LIMIT ?",
+         (user_id,), ("item_name", "person_name", "note"), lambda r: r["item_name"] + (" ✓" if r["returned_on"] else ""),
+         _loan_detail, lambda r: url_for("loans.edit", loan_id=r["id"])),
         ("Garanti", "🛡️", "SELECT * FROM warranties WHERE user_id = ? ORDER BY id DESC LIMIT ?", (user_id,),
          ("product", "brand", "store", "serial_no", "note"), lambda r: r["product"],
          lambda r: " · ".join(x for x in (r["brand"], r["store"],
@@ -166,6 +174,14 @@ def _sources(user_id):
         ("Kanban", "🗂️", CARD_SELECT + " WHERE (b.user_id = ? OR b.shared = 1) ORDER BY c.id DESC LIMIT ?", (user_id,),
          ("title", "note", "board_name"), lambda r: r["title"] + (" ✓" if r["done"] else ""),
          lambda r: f"{r['board_name']} · {r['column_name']}", lambda r: url_for("kanban.card", card_id=r["id"])),
+        # Soru, açıklama ve seçenek metinleri (tarih seçeneklerinin metni yok)
+        ("Anket", "🗳️",
+         "SELECT p.*, (SELECT COUNT(*) FROM poll_votes v WHERE v.poll_id = p.id) AS votes,"
+         " (SELECT group_concat(NULLIF(o.text, ''), ' · ') FROM poll_options o WHERE o.poll_id = p.id) AS options"
+         " FROM polls p WHERE p.user_id = ? ORDER BY p.id DESC LIMIT ?", (user_id,),
+         ("question", "description", "options"), lambda r: r["question"] + (" (kapandı)" if r["closed"] else ""),
+         lambda r: " · ".join(x for x in (f"{r['votes']} oy", r["description"], r["options"]) if x),
+         lambda r: url_for("polls.detail", poll_id=r["id"])),
     ]
 
 

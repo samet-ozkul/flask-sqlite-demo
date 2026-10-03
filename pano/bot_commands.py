@@ -12,6 +12,7 @@ Mesajı gönderen, bu sohbete bağlı pano kullanıcısıdır.
   /bugun                     -> günün özeti
   /hafta                     -> bu haftanın sayıları ve öncelikleri
   /kisalt url [kod]          -> kısa link (/k/kod)
+  /odunc matkap Ahmet        -> ödünç (son kelime kişi); /odunc -> kimde ne var
   link                      -> Sonra Bak'a kaydedilir
   fotoğraf / PDF             -> garantiye, nota ya da bilet cüzdanına eklenir (sorulur)
   konum                      -> park yeri ya da Harita'ya yer olarak kaydedilir (sorulur)
@@ -49,7 +50,8 @@ COMMANDS = [
     ("rapor", "Geçen ayın raporu (/rapor bu ay)"),
     ("hafta", "Bu haftanın sayıları ve öncelikleri"),
     ("ara", "Her yerde ara: /ara matkap"),
-    ("sor", "Verilerine soru sor: /sor bu ay ne kadar harcadım"),
+    ("odunc", "Ödünç: /odunc matkap Ahmet · kimde ne var: /odunc"),
+    ("sor","Verilerine soru sor: /sor bu ay ne kadar harcadım"),
     ("yardim", "Komutlar"),
 ]
 
@@ -75,6 +77,7 @@ HELP = """<b>Kişisel Pano komutları</b>
 📊 <code>/rapor</code> — geçen ayın raporu · <code>/rapor bu ay</code>
 🗓️ <code>/hafta</code> — bu haftanın sayıları ve öncelikleri (pazar değerlendirmesi panoda: Haftalık Değerlendirme)
 🔍 <code>/ara matkap</code> — notlar, envanter, garantiler... her yerde ara
+🔁 <code>/odunc matkap Ahmet</code> — Ahmet'e matkap verildi (son kelime kişi) · <code>/odunc</code> — kimde ne var
 🤖 <code>/sor bu ay markete ne kadar harcadım?</code> — verilerine soru sor (yapay zekâ açıksa)
 
 🔖 Link gönder → Sonra Bak'a kaydedilir
@@ -181,6 +184,7 @@ def handle_message(msg):
             "rapor": cmd_report,
             "hafta": cmd_week,
             "ara": cmd_search,
+            "odunc": cmd_loan,
             "sor": cmd_ask,
         }.get(command, cmd_help)
         handler(user, chat_id, rest.strip())
@@ -200,7 +204,7 @@ def handle_callback(cq, chat_id, message_id):
     handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
                 "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood, "ct": cb_contact, "ctz": cb_contact,
                 "tt": cb_timer, "loc": cb_location, "scn": cb_scan, "hm": cb_home, "wk": cb_weekly_score,
-                "bk": cb_booking, "tk": cb_ticket}
+                "bk": cb_booking, "ln": cb_loan, "tk": cb_ticket}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -438,6 +442,51 @@ def cb_home(user, chat_id, message_id, callback_id, data):
     url = link("homecare.detail", task_id=task["id"])
     try:
         telegram.edit_message(chat_id, message_id, f'{text}\n<a href="{esc(url)}">Ev Bakımı →</a>')
+    except telegram.TelegramError:
+        pass
+
+
+# ---------- Ödünç ----------
+def cmd_loan(user, chat_id, rest):
+    """'/odunc': kimde ne var; '/odunc matkap Ahmet': Ahmet'e matkap verildi (son kelime kişi)."""
+    from .modules import loans
+    if not rest:
+        telegram.send_message(chat_id, loans.list_message(user["id"], today(), link("loans.index"),
+                                                          lambda loan_id: link("loans.edit", loan_id=loan_id), esc))
+        return
+    loan_id = loans.quick_add(user["id"], rest)
+    if loan_id is None:
+        telegram.send_message(chat_id, "Örnek: <code>/odunc matkap Ahmet</code> (son kelime kişinin adı)\n"
+                                       "Kimde ne var: <code>/odunc</code>")
+        return
+    telegram.send_message(chat_id, loans.added_message(loans.get_loan(loan_id, user["id"]),
+                                                       link("loans.edit", loan_id=loan_id), esc))
+
+
+def cb_loan(user, chat_id, message_id, callback_id, data):
+    """Ödünç hatırlatması: ln:ret:<id> -> bugün geri geldi / geri verdim, ln:snz:<id> -> 1 hafta sonra yeniden hatırlat."""
+    from .modules import loans
+    _prefix, action, raw_id = (data.split(":") + ["", ""])[:3]
+    loan = query_one("SELECT * FROM loans WHERE id = ? AND user_id = ?",
+                     (int(raw_id) if raw_id.isdigit() and len(raw_id) < 15 else 0, user["id"]))
+    if loan is None or action not in ("ret", "snz"):
+        telegram.answer_callback(callback_id, "Kayıt bulunamadı, silinmiş olabilir.")
+        return
+    item = f"<b>{esc(loan['item_name'])}</b>"
+    if loan["returned_on"]:  # çift dokunuş ya da panoda zaten işaretlenmiş
+        telegram.answer_callback(callback_id, "Zaten geri gelmiş olarak kayıtlı.")
+        text = f"✅ {item}: {fmt_date(loan['returned_on'], True)} günü geri {'geldi' if loans.is_lent(loan) else 'verildi'}."
+    elif action == "ret":
+        loans.set_returned(loan["id"], today_str())
+        telegram.answer_callback(callback_id, "✅ Kaydedildi")
+        text = f"✅ {esc(loans.returned_text(loan))}"
+    else:
+        until = loans.snooze(loan["id"])
+        telegram.answer_callback(callback_id, "⏰ 1 hafta sonra hatırlatırım")
+        text = f"⏰ {item}: {fmt_date(until, True)} günü yeniden hatırlatırım."
+    url = link("loans.edit", loan_id=loan["id"])
+    try:
+        telegram.edit_message(chat_id, message_id, f'{text}\n<a href="{esc(url)}">Ödünç →</a>')
     except telegram.TelegramError:
         pass
 
