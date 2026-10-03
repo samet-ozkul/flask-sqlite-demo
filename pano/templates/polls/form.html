@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{# Anket oluştur / düzenle. Betik gerekmez: tür seçimine göre alanları app.js'teki data-show-for gizler (JS yoksa hepsi
+   görünür, sunucu türe göre okur); fazladan seçenek satırları "＋ Daha fazla satır" altında. Oy geldiyse (locked) tür,
+   en fazla seçim, isim kuralı ve mevcut seçenekler salt okunur, sadece yeni seçenek eklenir. #}
+{% block title %}{{ "Anketi düzenle" if poll else "Yeni anket" }}{% endblock %}
+{% block head %}
+<style>
+  .pl-kinds { display: grid; gap: 8px; grid-template-columns: 1fr; margin-bottom: 12px; }
+  @media (min-width: 680px) { .pl-kinds { grid-template-columns: repeat(3, 1fr); } }
+  .pl-kind { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border);
+             border-radius: var(--radius-sm); cursor: pointer; }
+  .pl-kind:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+  .pl-kind input { margin-top: 4px; flex-shrink: 0; }
+  .pl-kind small { display: block; font-size: .8rem; }
+  .pl-opts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+  .pl-opt { display: flex; gap: 6px; align-items: center; }
+  .pl-opt .n { width: 1.8em; text-align: right; color: var(--muted); font-size: .85rem; flex-shrink: 0; }
+  .pl-opt input { min-width: 0; margin: 0; }
+  .pl-opt input[type=text] { flex: 1; }
+  .pl-opt input[type=date] { flex: 1 1 9em; }
+  .pl-opt input[type=time] { flex: 0 1 7.5em; }
+  .pl-more > summary { cursor: pointer; margin: 4px 0 8px; width: fit-content; }
+  .pl-locked { margin: 6px 0 12px; padding-left: 1.6em; }
+  .pl-locked li { overflow-wrap: anywhere; }
+  .pl-sub { font-size: .95rem; margin: 10px 0 6px; }
+</style>
+{% endblock %}
+{% block content %}
+{% set hints = {"single": "Herkes bir seçenek seçer", "multi": "Birden çok seçenek işaretlenir (istersen en fazla N)",
+                "date": "Doodle gibi: tarih (+saat) seçenekleri; herkes uygun olduğu günleri işaretler"} %}
+{% call ui.page_header("🗳️ " ~ ("Anketi düzenle" if poll else "Yeni anket"),
+                       back=url_for('polls.detail', poll_id=poll.id) if poll else url_for('polls.index')) %}{% endcall %}
+
+{% macro text_row(i, value) -%}
+  <div class="pl-opt"><span class="n">{{ i }}.</span>
+    <input type="text" name="opt" value="{{ value }}" maxlength="120" aria-label="{{ i }}. seçenek"
+           {% if i == 1 and not locked %}placeholder="ör. Pizza"{% elif i == 2 and not locked %}placeholder="ör. Döner"{% endif %}></div>
+{%- endmacro %}
+{% macro date_row(i, value) -%}
+  <div class="pl-opt"><span class="n">{{ i }}.</span>
+    <input type="date" name="opt_date" value="{{ value[0] }}" min="{{ today }}" aria-label="{{ i }}. tarih">
+    <input type="time" name="opt_time" value="{{ value[1] }}" aria-label="{{ i }}. saat (isteğe bağlı)"></div>
+{%- endmacro %}
+{% set offset = existing | length %}
+
+<form method="post" action="{{ url_for('polls.edit', poll_id=poll.id) if poll else url_for('polls.create') }}">
+  {{ ui.csrf() }}
+  <section class="card">
+    {{ ui.field("Soru", "question", f.question, required=True, attrs='maxlength="200"', placeholder="ör. Akşam ne yiyelim?") }}
+    {{ ui.textarea("Açıklama", "description", f.description, rows=2,
+                   placeholder="İsteğe bağlı: ayrıntı, yer, saat… (en fazla 1000 karakter)") }}
+  </section>
+
+  <section class="card">
+    <h2>Tür ve seçenekler</h2>
+    {% if locked %}
+      <p class="flash warning">🔒 Bu ankete {{ votes }} oy verildi: tür, mevcut seçenekler ve sıraları artık değişmez
+        (verilmiş oyların anlamı bozulmasın). Yeni seçenek ekleyebilirsin; daha önce oy verenlere sorulmamış sayılır.</p>
+      <p><b>{{ kinds[poll.kind][0] }} {{ kinds[poll.kind][1] }}</b>{% if poll.kind == 'multi' %} ·
+        {{ "en fazla " ~ poll.max_choices ~ " seçim" if poll.max_choices else "sınırsız seçim" }}{% endif %}</p>
+      <ol class="pl-locked">{% for label in existing %}<li>{{ label }}</li>{% endfor %}</ol>
+      {% if not text_rows and not date_rows %}<p class="muted small">En fazla {{ max_options }} seçenek olabilir; yenisi eklenemez.</p>{% endif %}
+    {% else %}
+      <div class="pl-kinds" role="radiogroup" aria-label="Anket türü">
+        {% for key, (icon, label) in kinds.items() %}
+          <label class="pl-kind"><input type="radio" name="kind" value="{{ key }}" {% if key == f.kind %}checked{% endif %}>
+            <span><b>{{ icon }} {{ label }}</b><small class="muted">{{ hints[key] }}</small></span></label>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if (not locked or poll.kind != 'date') and text_rows %}
+      <div {% if not locked %}data-show-for="kind=single,multi"{% endif %}>
+        <h3 class="pl-sub">{{ "Yeni seçenekler" if locked else "Seçenekler" }} <span class="muted small">en az {{ 2 if not locked else 1 }}, toplam en fazla {{ max_options }}</span></h3>
+        <div class="pl-opts">{% for v in text_rows[:text_visible] %}{{ text_row(offset + loop.index, v) }}{% endfor %}</div>
+        {% if text_rows | length > text_visible %}
+          <details class="pl-more"><summary class="muted small">＋ Daha fazla satır</summary>
+            <div class="pl-opts">{% for v in text_rows[text_visible:] %}{{ text_row(offset + text_visible + loop.index, v) }}{% endfor %}</div>
+          </details>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% if (not locked or poll.kind == 'date') and date_rows %}
+      <div {% if not locked %}data-show-for="kind=date"{% endif %}>
+        <h3 class="pl-sub">{{ "Yeni tarihler" if locked else "Tarihler" }} <span class="muted small">saat isteğe bağlı · toplam en fazla {{ max_options }}</span></h3>
+        <div class="pl-opts">{% for v in date_rows[:date_visible] %}{{ date_row(offset + loop.index, v) }}{% endfor %}</div>
+        {% if date_rows | length > date_visible %}
+          <details class="pl-more"><summary class="muted small">＋ Daha fazla satır</summary>
+            <div class="pl-opts">{% for v in date_rows[date_visible:] %}{{ date_row(offset + date_visible + loop.index, v) }}{% endfor %}</div>
+          </details>
+        {% endif %}
+        <p class="muted small">Aynı güne farklı saatler de eklenebilir (ör. Cuma 19:00 ve Cuma 21:00). Sayfada kronolojik sıralanır.</p>
+      </div>
+    {% endif %}
+    {% if not locked %}
+      <div data-show-for="kind=multi">
+        {{ ui.field("En fazla kaç seçim", "max_choices", f.max_choices, type="number",
+                    attrs='min="2" max="20" inputmode="numeric"', hint="Boş bırakırsan istediği kadar işaretler") }}
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Kurallar</h2>
+    {% if locked %}
+      <p class="muted small">👤 İsim {{ "istenir" if poll.require_name or poll.kind == 'date' else "istenmez" }} (oy geldikten sonra değişmez).</p>
+    {% else %}
+      <div data-show-for="kind=single,multi">
+        {{ ui.checkbox("👤 Oy verenden isim iste (kim neye oy verdi sadece sana görünür; aynı isimle ikinci oy verilemez)",
+                       "require_name", f.require_name) }}
+      </div>
+      <p class="muted small" data-show-for="kind=date">👤 Tarih anketinde isim her zaman istenir: kimin hangi gün uygun olduğunu görürsün.</p>
+    {% endif %}
+    {{ ui.select("📊 Sonuçları kim görsün", "results_visibility", visibility.items() | list, f.results_visibility) }}
+    {{ ui.checkbox("📶 Aynı internet bağlantısından (IP) tek oy — aynı Wi-Fi'deki aile ya da ofis tek oy sayılır",
+                   "one_per_ip", f.one_per_ip) }}
+    {{ ui.checkbox("🔑 Sadece davetliler: kişiye özel tek kullanımlık linklerle oy verilir, ortak link oy almaz",
+                   "invite_only", f.invite_only) }}
+    {{ ui.field("⏳ Bitiş (isteğe bağlı)", "closes_at", f.closes_at, type="datetime-local",
+                hint="Bu zamandan sonra oy verilemez" ~ ("; Telegram'dan sonuç mesajı gelir" if telegram_ready else "")
+                     ~ ". Boşsa sen kapatana kadar açık. Saatler Türkiye saatidir.") }}
+    {{ ui.checkbox("💬 Her yeni oyda Telegram'dan haber ver (en fazla 10 dakikada bir, toplu)", "notify", f.notify) }}
+    {% if not telegram_ready %}
+      <p class="muted small">Telegram bağlı değil: bildirim için <a href="{{ url_for('settings.index') }}">Ayarlar</a>'dan bağla.</p>
+    {% endif %}
+  </section>
+  <button class="btn primary block">{{ "Kaydet" if poll else "🗳️ Anketi oluştur" }}</button>
+</form>
+{% endblock %}

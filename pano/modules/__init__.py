@@ -44,6 +44,7 @@ MODULES = [
     ("yearreview", "yearreview.index", "Yıl Özeti", "📊", "Araçlar"),
     ("shortlinks", "shortlinks.index", "Kısa Link & QR", "🔗", "Araçlar"),
     ("booking", "booking.index", "Randevu Sayfası", "📅", "Araçlar"),
+    ("polls", "polls.index", "Anket", "🗳️", "Araçlar"),
 ]
 
 # Menüde gösterilmeyen altyapı modülleri

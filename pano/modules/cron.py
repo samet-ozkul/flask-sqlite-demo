@@ -368,6 +368,31 @@ def todo_reminders(secret):
         except telegram.TelegramError as e:
             result["errors"].append(f"sayaç {entry['id']}: {e}")
 
+    # Anket: bitiş zamanı geçenleri kapat (Telegram'ı bağlıysa sahibine bir kez sonuç), bekleyen oyları toplu bildir
+    from . import polls
+    result["polls_closed"] = result["poll_notices"] = 0
+    poll_now = polls.now_local()
+    for poll in polls.expired(poll_now):
+        if poll["chat_id"]:
+            try:
+                telegram.send_message(poll["chat_id"], polls.closed_message(
+                    poll, url_for("polls.detail", poll_id=poll["id"], _external=True), telegram.escape))
+            except telegram.TelegramError as e:
+                result["errors"].append(f"anket {poll['id']}: {e}")
+                continue   # gönderilemediyse sonraki çağrıda yeniden denenir (sayfada zaten kapalı görünür)
+        polls.mark_closed(poll["id"])
+        result["polls_closed"] += 1
+    for poll in polls.pending_notices(poll_now):
+        new = polls.claim_votes(poll, poll_now)
+        if not new:
+            continue
+        try:
+            telegram.send_message(poll["chat_id"], polls.votes_message(
+                poll, new, url_for("polls.detail", poll_id=poll["id"], _external=True), telegram.escape))
+            result["poll_notices"] += 1
+        except telegram.TelegramError as e:
+            result["errors"].append(f"anket {poll['id']}: {e}")
+
     # Aktarma kutusu: süresi dolan metin ve dosyalar
     from .transfer import purge_expired
     result["transfers_purged"] = purge_expired()

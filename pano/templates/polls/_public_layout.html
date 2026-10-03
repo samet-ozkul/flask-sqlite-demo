@@ -1,0 +1,84 @@
+<!doctype html>
+{# Herkese açık anket sayfası: base.html kullanılmaz (menü, kullanıcı bilgisi, betik yok). Sadece anketin sorusu,
+   seçenekleri ve sayıları; isimler gösterilmez. Formda uygulamanın CSRF anahtarı (JS gerekmez). #}
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}{% endblock %}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+  <style>
+    :root {
+      --bg: #f5f6fa; --card: #ffffff; --text: #1c1e26; --muted: #6b7080; --border: #e3e5ec;
+      --accent: #4f46e5; --on-accent: #ffffff; --soft: #eef0ff; --track: #eceef4;
+      --ok: #15803d; --ok-soft: #e6f6eb; --warn: #b45309; --warn-soft: #fdf2e0; --danger: #dc2626; --danger-soft: #fdecec;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f1117; --card: #181b24; --text: #e8e9ee; --muted: #9095a5; --border: #2a2e3a;
+              --accent: #818cf8; --on-accent: #0f1117; --soft: #23264a; --track: #252936;
+              --ok: #4ade80; --ok-soft: #13291c; --warn: #fbbf24; --warn-soft: #2e2410; --danger: #f87171; --danger-soft: #2f1618; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+           padding: max(24px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+           font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    a { color: var(--accent); }
+    .owner { width: 100%; max-width: 560px; margin-bottom: 12px; padding: 8px 12px; border-radius: 10px; font-size: .88rem;
+             background: var(--card); border: 1px dashed var(--border); color: var(--muted); text-align: center; }
+    main { width: 100%; max-width: 560px; background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+           padding: 24px 18px 20px; }
+    h1 { font-size: 1.4rem; margin: 0 0 4px; line-height: 1.25; overflow-wrap: anywhere; }
+    h2 { font-size: 1.05rem; margin: 0 0 10px; }
+    .muted { color: var(--muted); }
+    .small { font-size: .86rem; }
+    p { margin: 6px 0 0; }
+    .desc { white-space: pre-line; overflow-wrap: anywhere; }
+    .meta { margin-top: 10px; font-size: .88rem; color: var(--muted); }
+    fieldset { border: 0; margin: 16px 0 0; padding: 0; min-width: 0; }
+    legend { position: absolute; left: -10000px; }
+    .opt { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; margin-top: 8px; border-radius: 12px;
+           border: 1px solid var(--border); cursor: pointer; overflow-wrap: anywhere; }
+    .opt:hover { border-color: var(--accent); }
+    .opt:has(input:checked) { border-color: var(--accent); background: var(--soft); }
+    .opt input { width: 20px; height: 20px; margin: 1px 0 0; flex-shrink: 0; accent-color: var(--accent); }
+    form label.name { display: block; margin-top: 14px; font-weight: 600; font-size: .92rem; }
+    input[type=text] { display: block; width: 100%; margin-top: 4px; padding: 10px 12px; font: inherit; font-size: 16px;
+                       color: var(--text); background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+    input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+    .hint { display: block; font-weight: 400; color: var(--muted); font-size: .82rem; margin-top: 3px; }
+    .btn { display: block; width: 100%; margin-top: 16px; padding: 13px 16px; border-radius: 12px; border: 0;
+           background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 600; text-align: center;
+           text-decoration: none; cursor: pointer; }
+    .btn:hover { filter: brightness(1.08); }
+    .hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+    .alert { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); }
+    .notice { margin-bottom: 14px; padding: 10px 12px; border-radius: 10px; background: var(--ok-soft); color: var(--ok); }
+    .state { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--soft); overflow-wrap: anywhere; }
+    .state.closed { background: var(--warn-soft); color: var(--warn); }
+    .results { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .res + .res { margin-top: 12px; }
+    .res-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+    .res-label { overflow-wrap: anywhere; }
+    .res.lead .res-label { font-weight: 700; }
+    .res-num { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); font-size: .9rem; }
+    .track { height: 10px; margin-top: 4px; border-radius: 99px; background: var(--track); overflow: hidden; }
+    .track > span { display: block; height: 100%; min-width: 2px; border-radius: 99px; background: var(--muted); }
+    .res.lead .track > span { background: var(--accent); }
+    footer { margin-top: 18px; font-size: .75rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  {% if owner %}
+    <div class="owner">Bu senin anketin; buradan verdiğin oy da sayılır ·
+      <a href="{{ url_for('polls.detail', poll_id=poll.id) }}">📊 Sonuçlar ve ayarlar</a></div>
+  {% endif %}
+  <main>
+    {% block main %}{% endblock %}
+  </main>
+  <footer>Kişisel Pano</footer>
+</body>
+</html>

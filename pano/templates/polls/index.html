@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Anket{% endblock %}
+{% block head %}
+<style>
+  .pl-rows .title a { overflow-wrap: anywhere; }
+  .pl-url { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; color: var(--primary);
+            overflow-wrap: anywhere; user-select: all; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🗳️ Anket", "Anketini oluştur, linki paylaş; linke sahip olan herkes giriş yapmadan bir kez oy versin") %}
+  <a class="btn primary" href="{{ url_for('polls.create') }}">＋ Yeni anket</a>
+{% endcall %}
+
+{% if polls %}
+  <div class="card">
+    <ul class="rows pl-rows">
+      {% for p in polls %}
+        <li>
+          <span class="ico">{{ kinds[p.kind][0] }}</span>
+          <div class="grow">
+            <div class="title">
+              <a href="{{ url_for('polls.detail', poll_id=p.id) }}">{{ p.question }}</a>
+              {% if p.is_closed %}<span class="badge">Kapandı</span>{% else %}<span class="badge good">Açık</span>{% endif %}
+              {% if p.invite_only %}<span class="badge">🔑 Sadece davetliler</span>{% endif %}
+            </div>
+            <div class="meta">
+              <span>🗳️ {{ p.votes }} oy</span>
+              <span>{{ kinds[p.kind][1] }}</span>
+              {% if p.closes and not p.is_closed %}<span>⏳ bitiş {{ long_when(p.closes) }}</span>{% endif %}
+              <span class="pl-url">{{ public_url(p.code) }}</span>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="btn sm" href="{{ url_for('polls.detail', poll_id=p.id) }}">📊 Sonuçlar</a>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  <div class="card">
+    {{ ui.empty("Henüz anket yok. “Akşam ne yiyelim?”, “Toplantı hangi gün olsun?” gibi bir soru sor; linki paylaş, oylar gelsin.", "🗳️") }}
+    <p class="center"><a class="btn primary" href="{{ url_for('polls.create') }}">＋ Yeni anket</a></p>
+  </div>
+{% endif %}
+{% endblock %}

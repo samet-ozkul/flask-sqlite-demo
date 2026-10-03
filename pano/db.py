@@ -975,6 +975,73 @@ MIGRATIONS = [
     CREATE INDEX idx_loans_inventory ON loans(inventory_id);
     CREATE INDEX idx_loans_contact ON loans(contact_id);
     """,
+    # 35: anket (/a/<kod>, girişsiz oy). Bir kişi bir oy: tarayıcı belirteci (çerez) ve oturum anahtarının hash'i,
+    #     isteğe bağlı IP (HMAC; düz saklanmaz), isim ya da kişiye özel tek kullanımlık link. Saatler yerel, saat dilimsiz
+    """
+    CREATE TABLE polls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        code TEXT NOT NULL UNIQUE,                    -- karışmayan harflerden 7 karakter, küçük harf
+        question TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL DEFAULT 'single' CHECK (kind IN ('single', 'multi', 'date')),
+        max_choices INTEGER,                          -- çoklu seçimde en fazla kaç seçenek (NULL = sınırsız)
+        require_name INTEGER NOT NULL DEFAULT 1,      -- tarih anketinde her zaman 1
+        results_visibility TEXT NOT NULL DEFAULT 'after_vote'
+            CHECK (results_visibility IN ('after_vote', 'always', 'owner')),
+        one_per_ip INTEGER NOT NULL DEFAULT 0,        -- aynı internet bağlantısından tek oy
+        invite_only INTEGER NOT NULL DEFAULT 0,       -- sadece kişiye özel linkler oy verir
+        closes_at TEXT,                               -- yerel 'YYYY-MM-DD HH:MM'; NULL = süresiz
+        closed INTEGER NOT NULL DEFAULT 0,            -- elle ya da bitişte cron kapattı
+        notify INTEGER NOT NULL DEFAULT 0,            -- yeni oyları Telegram'dan bildir (en fazla 10 dakikada bir)
+        notified_at TEXT,                             -- son toplu bildirim, yerel 'YYYY-MM-DD HH:MM:SS'
+        notified_vote_id INTEGER NOT NULL DEFAULT 0,  -- bildirilen son oy (sonrakiler "yeni")
+        views INTEGER NOT NULL DEFAULT 0,             -- herkese açık sayfa (sahibi ve link önizlemeleri sayılmaz)
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_polls_user ON polls(user_id, id);
+    CREATE INDEX idx_polls_closing ON polls(closed, closes_at);
+    CREATE TABLE poll_options (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+        text TEXT NOT NULL DEFAULT '',                -- tarih anketinde boş
+        option_date TEXT,                             -- tarih anketinde 'YYYY-MM-DD'
+        option_time TEXT,                             -- isteğe bağlı 'HH:MM'
+        sort INTEGER NOT NULL DEFAULT 0,
+        after_vote_id INTEGER NOT NULL DEFAULT 0      -- oy geldikten sonra eklendiyse o anki son oy (öncekilere sorulmadı)
+    );
+    CREATE INDEX idx_poll_options ON poll_options(poll_id, sort);
+    CREATE TABLE poll_invites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,                   -- /a/<kod>?d=<anahtar>, tek kullanımlık
+        label TEXT NOT NULL DEFAULT '',               -- boşsa numarayla gösterilir
+        used_at TEXT,                                 -- UTC; oy verilince
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_poll_invites ON poll_invites(poll_id, id);
+    CREATE TABLE poll_votes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+        voter_name TEXT NOT NULL DEFAULT '',
+        name_key TEXT NOT NULL DEFAULT '',            -- fold(isim): aynı isimle ikinci oy engellenir
+        voter_hash TEXT NOT NULL DEFAULT '',          -- tarayıcı belirtecinin (çerez) SHA-256'sı
+        session_hash TEXT NOT NULL DEFAULT '',        -- oturum anahtarının HMAC'i (çift tıklamada iki oy olmasın)
+        ip_hash TEXT NOT NULL DEFAULT '',             -- SECRET_KEY ile HMAC; IP düz saklanmaz
+        invite_id INTEGER REFERENCES poll_invites(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_poll_votes ON poll_votes(poll_id, id);
+    CREATE INDEX idx_poll_votes_voter ON poll_votes(poll_id, voter_hash);
+    CREATE INDEX idx_poll_votes_ip ON poll_votes(poll_id, ip_hash, created_at);
+    CREATE TABLE poll_vote_choices (
+        vote_id INTEGER NOT NULL REFERENCES poll_votes(id) ON DELETE CASCADE,
+        option_id INTEGER NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE,
+        PRIMARY KEY (vote_id, option_id)
+    );
+    CREATE INDEX idx_poll_vote_choices_option ON poll_vote_choices(option_id);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)
