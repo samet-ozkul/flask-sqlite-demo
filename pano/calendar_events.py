@@ -1,8 +1,8 @@
 """Tüm tarihli kayıtlar tek listede: takvim sayfası ve telefon takvimi aboneliği (ICS) kullanır.
 
 Kaynaklar: faturalar, abonelik yenilemeleri, borç/alacak vadeleri, araç tarihleri, garanti bitişleri,
-randevular, yapılacaklar (açık), kanban kartları (bitti sütunu hariç), ev bakımı (sıradaki tarih), önemli günler,
-kişilerin doğum günleri.
+randevular, yapılacaklar (açık), kanban kartları (bitti sütunu hariç), ev bakımı (sıradaki tarih), biletler,
+önemli günler, kişilerin doğum günleri.
 Abonelik, önemli günler ve doğum günleri aralık içinde çoğaltılır.
 """
 from datetime import date, timedelta
@@ -113,6 +113,13 @@ def events_between(user_id, start, end, external=False):
     for r in visible_events(user_id, " AND e.date BETWEEN ? AND ?", (s, e)):
         add("event", r["id"], r["date"], r["title"], "👨‍👩‍👧" if r["shared"] else "📅", "events.edit",
             detail=r["place"], time=r["time"], event_id=r["id"])
+
+    # Biletler: etkinlik / kalkış saatiyle (elle arşivlenenler tamamlandı sayılır)
+    from .modules.tickets import kind_icon
+    for r in query("SELECT * FROM tickets WHERE user_id = ? AND starts_on BETWEEN ? AND ?", (user_id, s, e)):
+        add("ticket", r["id"], r["starts_on"], r["title"], kind_icon(r["kind"]), "tickets.detail",
+            detail=" · ".join(x for x in (r["venue"], r["seat"]) if x), time=r["starts_at"], done=bool(r["archived"]),
+            ticket_id=r["id"])
 
     from .modules.specialdays import KINDS, occurrence, ordinal_text
     for r in query("SELECT * FROM special_days WHERE user_id = ?", (user_id,)):

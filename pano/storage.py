@@ -33,6 +33,7 @@ ENTITIES = {
     "recipe": "recipes",
     "vehicle": "vehicles",
     "note": "notes",
+    "ticket": "tickets",
 }
 
 Image.MAX_IMAGE_PIXELS = 60_000_000  # dev boyutlu (decompression bomb) görselleri reddet

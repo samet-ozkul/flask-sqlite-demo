@@ -117,6 +117,14 @@ def upcoming(user_id, days=7, long_days=30):
         add("👨‍👩‍👧" if e["shared"] else "📅", e["title"], e["date"], "events.edit", detail=detail, overdue_ok=False,
             event_id=e["id"])
 
+    # Biletler: kısa vadede etkinlik / yolculuk (arşivlenenler hariç)
+    from .modules.tickets import kind_icon
+    for r in query("SELECT * FROM tickets WHERE user_id = ? AND archived = 0 AND starts_on BETWEEN ? AND ?",
+                   (user_id, ts, soon)):
+        detail = " · ".join(x for x in (r["starts_at"] or "", r["venue"]) if x)
+        add(kind_icon(r["kind"]), r["title"], r["starts_on"], "tickets.detail", detail=detail, overdue_ok=False,
+            ticket_id=r["id"])
+
     from .modules.specialdays import KINDS, upcoming_rows
     for r, nxt, _days, ordinal in upcoming_rows(user_id, within_days=long_days):
         add(KINDS[r["kind"]][1], r["name"], nxt.isoformat(), "specialdays.index", detail=ordinal, overdue_ok=False)

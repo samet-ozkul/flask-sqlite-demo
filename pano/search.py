@@ -28,6 +28,16 @@ def _home_period(r):
     return task_period(r).lower()
 
 
+def _ticket_title(r):
+    from .modules.tickets import kind_icon
+    return f"{kind_icon(r['kind'])} {r['title']}"
+
+
+def _ticket_detail(r):
+    when = (fmt_date(r["starts_on"]) + (" " + r["starts_at"] if r["starts_at"] else "")) if r["starts_on"] else ""
+    return " · ".join(x for x in (when, r["venue"], r["booking_code"]) if x)
+
+
 def _map_title(r):
     from .modules.places import CATEGORIES
     if r["kind"] == "city":
@@ -112,6 +122,9 @@ def _sources(user_id):
          (user_id,), ("title", "place", "note"), lambda r: r["title"],
          lambda r: fmt_date(r["date"]) + (" " + r["time"] if r["time"] else ""),
          lambda r: url_for("events.edit", event_id=r["id"])),
+        ("Bilet Cüzdanı", "🎟️", "SELECT * FROM tickets WHERE user_id = ? ORDER BY starts_on DESC, id DESC LIMIT ?",
+         (user_id,), ("title", "venue", "address", "booking_code", "holder", "note"), _ticket_title, _ticket_detail,
+         lambda r: url_for("tickets.detail", ticket_id=r["id"])),
         ("Belgeler", "🪪", "SELECT * FROM documents WHERE user_id = ? ORDER BY expires_on LIMIT ?", (user_id,),
          ("name", "holder", "note"), lambda r: r["name"],
          lambda r: " · ".join(x for x in (r["holder"], "bitiş " + fmt_date(r["expires_on"])) if x),

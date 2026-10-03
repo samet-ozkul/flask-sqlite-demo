@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "tickets/_form.html" import ticket_fields with context %}
+{% block title %}{{ t.title }}{% endblock %}
+{% block head %}
+<style>
+  .stat .value.text { font-size: 1.1rem; overflow-wrap: anywhere; }
+</style>
+{% endblock %}
+{% block content %}
+{% set text, cls = badge %}
+{% call ui.page_header(kind_icon(t.kind) ~ " " ~ t.title, kinds[t.kind][0] ~ (" · geçmiş" if past else ""),
+                       back=url_for('tickets.index', gecmis=1 if past else None)) %}
+  <a class="btn sm primary" href="{{ url_for('tickets.show', ticket_id=t.id) }}">🎫 Bilet ekranı</a>
+  {{ ui.post_button(url_for('tickets.archive', ticket_id=t.id), "↩️ Arşivden çıkar" if t.archived else "📦 Arşivle", "",
+                    "" if t.archived else "Geçmişe taşı; hatırlatma gelmez") }}
+  {{ ui.delete_button(url_for('tickets.delete', ticket_id=t.id), "Sil", "Bilet ve dosyaları silinsin mi? Çöp kutusundan geri getirebilirsin.") }}
+{% endcall %}
+
+{% if not t.starts_on %}
+  <div class="flash warning">📝 Bu bilet Telegram'dan geldi; başlığı ve tarihi aşağıdan tamamla ki hatırlatma gelsin.</div>
+{% endif %}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Tarih</div>
+    <div class="value text">{{ (t.starts_on | date_tr(True)) if t.starts_on else "—" }}{% if t.starts_at %} · {{ t.starts_at }}{% endif %}</div>
+    <div class="sub">{% if not past or not t.starts_on %}<span class="badge {{ cls }}">{{ text }}</span>{% elif t.archived %}arşivde{% else %}geçti{% endif %}</div>
+  </div>
+  {% if t.venue or t.address %}
+    <div class="stat">
+      <div class="label">Yer</div>
+      <div class="value text">{{ t.venue or t.address }}</div>
+      <div class="sub"><a href="{{ maps }}" target="_blank" rel="noopener">🗺️ Haritada aç</a></div>
+    </div>
+  {% endif %}
+  {% if t.booking_code or t.seat %}
+    <div class="stat">
+      <div class="label">{{ "Rezervasyon kodu" if t.booking_code else "Koltuk / kapı" }}</div>
+      <div class="value text">{{ t.booking_code or t.seat }}</div>
+      <div class="sub">{{ t.seat if t.booking_code else "" }}</div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Bilet dosyaları <span class="pill-count">{{ files | length }}</span></h2>
+  {{ ui.attachments("ticket", t.id, files, request.path) }}
+</div>
+
+<div class="card">
+  <h2>✏️ Bilgiler</h2>
+  <form method="post" action="{{ url_for('tickets.update', ticket_id=t.id) }}">
+    {{ ui.csrf() }}
+    {{ ticket_fields(t, expense) }}
+    <button class="btn primary">Kaydet</button>
+  </form>
+</div>
+
+<p class="muted small">Eklenme: {{ t.created_at | localdt }}</p>
+{% endblock %}
