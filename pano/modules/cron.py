@@ -271,6 +271,21 @@ def todo_reminders(secret):
             except telegram.TelegramError as e:
                 result["errors"].append(f"ev bakımı {task['id']}: {e}")
 
+    # Ödünç: beklenen dönüş günü ve sonra haftada bir; dönüş tarihi yoksa seçilen aralıkla (varsayılan saatten sonra,
+    # aynı gün ikinci kez değil)
+    from . import loans
+    result["loans_sent"] = 0
+    if now.strftime("%H:%M") >= todo.DEFAULT_DUE_TIME:
+        for loan in loans.pending(now):
+            url = url_for("loans.edit", loan_id=loan["id"], _external=True)
+            try:
+                telegram.send_message(loan["chat_id"], loans.message(loan, now.date(), url, telegram.escape),
+                                      buttons=loans.buttons(loan) if with_buttons else None)
+                loans.mark_sent(loan["id"], now.date())
+                result["loans_sent"] += 1
+            except telegram.TelegramError as e:
+                result["errors"].append(f"ödünç {loan['id']}: {e}")
+
     # Kişiler: görüşme vakti gelenlere dürtme (varsayılan saatten sonra, günde bir kontrol; her vade için bir kez)
     from . import contacts
     result["contacts_nudged"] = 0

@@ -79,6 +79,9 @@
               {% if i.location %}<span class="loc">📍 {{ i.location }}</span>{% else %}<span>yeri girilmemiş</span>{% endif %}
               {% if i.category %}<a class="tag" href="{{ url_for('inventory.index', cat=i.category) }}">{{ i.category }}</a>{% endif %}
               {% if i.quantity == 0 %}<span class="badge soon">kalmadı</span>{% endif %}
+              {% for b in loan_badges.get(i.id, []) %}
+                <a class="badge {{ b.cls }}" href="{{ url_for('loans.edit', loan_id=b.id) }}">{{ b.text }}</a>
+              {% endfor %}
             </div>
             {% if i.note %}<div class="meta">{{ i.note | truncate(90) }}</div>{% endif %}
           </div>
