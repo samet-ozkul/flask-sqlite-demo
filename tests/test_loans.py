@@ -274,6 +274,7 @@ def test_whatsapp():
     assert ", bugün verdiğim" in ln.whatsapp_text({**row, "given_on": "2026-10-03"}, t)
     assert ", dün verdiğim" in ln.whatsapp_text({**row, "given_on": "2026-10-02"}, t)
     assert "verdiğim TV sende" in ln.whatsapp_text({**row, "item_name": "TV"}, t)       # kısaltma olduğu gibi
+    assert ln.whatsapp_text({**row, "person_name": "Ahmet Yılmaz"}, t).startswith("Merhaba Ahmet, ")  # sadece ilk ad
     assert "verdiğim ip merdiveni" in ln.whatsapp_text({**row, "item_name": "İp merdiveni"}, t)
     link = ln.whatsapp_link(row, t)
     assert link.startswith("https://wa.me/905321234567?text=") and " " not in link

@@ -186,9 +186,11 @@ def whatsapp_text(row, t=None):
     t = t or today()
     when = _when(parse_date(row["given_on"]) or t, t)
     item = _lower_first(row["item_name"])
+    name = (row["person_name"] or "").split()[0] if (row["person_name"] or "").strip() else ""  # "Ahmet Yılmaz" -> Ahmet
+    hello = f"Merhaba {name}," if name else "Merhaba,"
     if is_lent(row):
-        return f"Merhaba {row['person_name']}, {when} verdiğim {item} sende mi? Müsait olduğunda alabilir miyim? 🙂"
-    return (f"Merhaba {row['person_name']}, {when} senden aldığım {item} hâlâ bende; geri getirmek istiyorum, "
+        return f"{hello} {when} verdiğim {item} sende mi? Müsait olduğunda alabilir miyim? 🙂"
+    return (f"{hello} {when} senden aldığım {item} hâlâ bende; geri getirmek istiyorum, "
             f"ne zaman uygun? 🙂")
 
 
