@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "loans/_form.html" import loan_fields, loan_row, loan_style with context %}
+{% block title %}Ödünç{% endblock %}
+{% block head %}{{ loan_style() }}{% endblock %}
+{% block content %}
+{% set here = request.full_path.rstrip('?') %}
+{{ ui.page_header("🔁 Ödünç", summary or "Matkabı kime verdim? Ödünç verdiğin ve aldığın eşyalar, kaç gündür kimde.") }}
+
+<div class="card">
+  <details class="add" {% if not total %}open{% endif %}>
+    <summary>＋ Yeni kayıt</summary>
+    <form method="post" action="{{ url_for('loans.new') }}" enctype="multipart/form-data" data-loan-form>
+      {{ ui.csrf() }}
+      {{ loan_fields(blank, photo=True) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+<nav class="tabs">
+  {% for key, (icon, label) in tabs.items() %}
+    <a href="{{ url_for('loans.index', sekme=None if key == 'verdiklerim' else key) }}" class="{{ 'active' if tab == key }}">{{ icon }} {{ label }} <span class="pill-count">{{ counts[key] }}</span></a>
+  {% endfor %}
+</nav>
+
+<div class="card">
+  {% if rows %}
+    <ul class="rows loan-rows">
+      {% for l in rows %}{{ loan_row(l, here, thumbs.get(l.id)) }}{% endfor %}
+    </ul>
+  {% elif tab == 'verdiklerim' %}
+    {{ ui.empty("Ödünç verdiğin eşya yok; hepsi evde. Birine bir şey verince buraya yaz, kimde olduğunu unutma.", "📤") }}
+  {% elif tab == 'aldiklarim' %}
+    {{ ui.empty("Kimseden ödünç aldığın bir şey yok.", "📥") }}
+  {% else %}
+    {{ ui.empty("Henüz geri gelen kayıt yok.", "✅") }}
+  {% endif %}
+</div>
+<script src="{{ url_for('static', filename='loans.js') }}?v=1" defer></script>
+{% endblock %}

@@ -4,7 +4,7 @@ from datetime import timedelta
 from flask import url_for
 
 from .db import get_db, query
-from .utils import add_cycle, add_months, days_until, fmt_money, parse_date, today
+from .utils import add_cycle, add_months, days_until, fmt_date, fmt_money, parse_date, today
 
 
 def advance_subscriptions(user_id=None):
@@ -101,6 +101,13 @@ def upcoming(user_id, days=7, long_days=30):
     for r in query("SELECT * FROM home_tasks WHERE user_id = ? AND active = 1 AND next_due <= ?", (user_id, later)):
         if (days_until(r["next_due"]) or 0) <= max(days, r["remind_days"]):
             add(r["icon"], r["name"], r["next_due"], "homecare.detail", detail=task_period(r).lower(), task_id=r["id"])
+
+    # Ödünç: beklenen dönüşü yaklaşan ya da geçmiş, hâlâ dışarıdaki eşyalar
+    from .modules.loans import title_for
+    for r in query("SELECT * FROM loans WHERE user_id = ? AND returned_on IS NULL AND due_on IS NOT NULL"
+                   " AND due_on <= ?", (user_id, soon)):
+        add("🔁", title_for(r), r["due_on"], "loans.edit",
+            detail=("verildi " if r["direction"] == "lent" else "alındı ") + fmt_date(r["given_on"]), loan_id=r["id"])
 
     # Siparişler: beklenen teslim (gecikenler 30 gün görünür) ve iade son günü
     for r in query("SELECT * FROM orders WHERE user_id = ? AND status IN ('ordered', 'shipped')"

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "loans/_form.html" import loan_fields, loan_style with context %}
+{% block title %}{{ l.item_name }}{% endblock %}
+{% block head %}{{ loan_style() }}{% endblock %}
+{% block content %}
+{% call ui.page_header(("📤 " if is_lent(l) else "📥 ") ~ l.item_name, held(l), back=url_for('loans.index', sekme=None if tab == 'verdiklerim' else tab)) %}
+  {{ ui.delete_button(url_for('loans.delete', loan_id=l.id), "Sil", "Kayıt silinsin mi? Çöp kutusundan geri getirebilirsin.") }}
+{% endcall %}
+
+<div class="card">
+  <ul class="loan-info">
+    <li><span>👤</span><span>{{ 'Kime' if is_lent(l) else 'Kimden' }}: {{ l.person_name }}
+      {% if l.contact_live %}· <a href="{{ url_for('contacts.detail', contact_id=l.contact_live) }}">📇 Kişi sayfası</a>{% endif %}</span></li>
+    {% if l.phone %}<li><span>📱</span><span>{{ l.phone }}</span></li>{% endif %}
+    <li><span>📅</span><span>{{ 'Verildi' if is_lent(l) else 'Alındı' }}: {{ l.given_on | date_tr(True) }}</span></li>
+    {% if l.due_on %}
+      <li><span>⏳</span><span>Beklenen dönüş: {{ l.due_on | date_tr(True) }} {% if not l.returned_on %}{{ ui.due_badge(l.due_on) }}{% endif %}</span></li>
+    {% endif %}
+    {% if l.returned_on %}
+      <li><span>✅</span><span>{{ 'Geri geldi' if is_lent(l) else 'Geri verildi' }}: {{ l.returned_on | date_tr(True) }}</span></li>
+    {% endif %}
+    {% if l.inv_live %}
+      <li><span>📦</span><span><a href="{{ url_for('inventory.edit', item_id=l.inv_live) }}">Ev Envanteri'ndeki eşya</a></span></li>
+    {% endif %}
+    {% if next_reminder %}
+      <li><span>🔔</span><span>Sıradaki Telegram hatırlatması: {{ next_reminder | date_tr(True) }}</span></li>
+    {% elif not l.returned_on and not l.due_on and not l.remind_every_days %}
+      <li><span>🔕</span><span>Hatırlatma kapalı</span></li>
+    {% endif %}
+    {% if l.note %}<li><span>📝</span><span class="loan-note">{{ l.note }}</span></li>{% endif %}
+  </ul>
+  {% if l.returned_on %}
+    <form method="post" action="{{ url_for('loans.reopen', loan_id=l.id) }}" class="inline">
+      {{ ui.csrf() }}<input type="hidden" name="next" value="{{ request.path }}">
+      <button class="btn sm">↩️ Geri al (hâlâ dışarıda)</button>
+    </form>
+  {% else %}
+    <div class="row-flex">
+      <form method="post" action="{{ url_for('loans.mark_returned', loan_id=l.id) }}" class="row-flex loan-return">
+        {{ ui.csrf() }}<input type="hidden" name="next" value="{{ request.path }}">
+        <input type="date" name="returned_on" value="{{ today_str() }}" min="{{ l.given_on }}" max="{{ today_str() }}" aria-label="Geri geliş tarihi">
+        <button class="btn ok">{{ '✅ Geri geldi' if is_lent(l) else '✅ Geri verdim' }}</button>
+      </form>
+      {% set wa = whatsapp(l) %}
+      {% if wa %}<a class="btn" href="{{ wa }}" target="_blank" rel="noopener noreferrer">💬 WhatsApp'tan nazikçe hatırlat</a>{% endif %}
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>📷 Fotoğraf</h2>
+  <p class="muted small">Eşyanın {{ 'verildiği' if is_lent(l) else 'alındığı' }} andaki hali: geri geldiğinde karşılaştırmak için.</p>
+  {{ ui.attachments("loan", l.id, files, request.path) }}
+</div>
+
+<div class="card">
+  <details class="add">
+    <summary>✏️ Düzenle</summary>
+    <form method="post" data-loan-form>
+      {{ ui.csrf() }}
+      {{ loan_fields(l) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+
+<p class="muted small">Eklenme: {{ l.created_at | localdt }}</p>
+<script src="{{ url_for('static', filename='loans.js') }}?v=1" defer></script>
+{% endblock %}

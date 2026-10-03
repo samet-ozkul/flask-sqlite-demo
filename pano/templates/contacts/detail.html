@@ -5,6 +5,7 @@
 {% block head %}{{ cp.style() }}{% endblock %}
 {% block content %}
 {% call ui.page_header(relation_icon(c.relation) ~ " " ~ c.name, c.relation or None, back=url_for('contacts.index')) %}
+  <a class="btn sm" href="{{ url_for('loans.new', kisi=c.id) }}" title="Bu kişiye ödünç verdiğin eşyayı kaydet">🔁 Ödünç ver</a>
   {{ ui.delete_button(url_for('contacts.delete', contact_id=c.id), "Sil", "Kişi ve görüşme geçmişi silinsin mi?") }}
 {% endcall %}
 
@@ -24,6 +25,16 @@
       </span></li>
     {% endif %}
     {% if c.address %}<li><span>📍</span><span>{{ c.address }}</span></li>{% endif %}
+    {% if loans_lent %}
+      <li><span>📤</span><span>Onda:
+        {% for l, since in loans_lent %}<a href="{{ url_for('loans.edit', loan_id=l.id) }}">{{ l.item_name }}</a> <span class="muted small">({{ since }})</span>{% if not loop.last %}, {% endif %}{% endfor %}
+      </span></li>
+    {% endif %}
+    {% if loans_borrowed %}
+      <li><span>📥</span><span>Ondan aldığın:
+        {% for l, since in loans_borrowed %}<a href="{{ url_for('loans.edit', loan_id=l.id) }}">{{ l.item_name }}</a> <span class="muted small">({{ since }})</span>{% if not loop.last %}, {% endif %}{% endfor %}
+      </span></li>
+    {% endif %}
     {% if c.note %}<li><span>📝</span><span class="contact-note">{{ c.note }}</span></li>{% endif %}
   </ul>
   {{ cp.actions(c, quick, tel, whatsapp, url_for('contacts.detail', contact_id=c.id)) }}

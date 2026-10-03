@@ -28,6 +28,11 @@ def _home_period(r):
     return task_period(r).lower()
 
 
+def _loan_detail(r):
+    from .modules.loans import held_text
+    return held_text(r)
+
+
 def _map_title(r):
     from .modules.places import CATEGORIES
     if r["kind"] == "city":
@@ -74,6 +79,9 @@ def _sources(user_id):
          ("name", "location", "category", "note"), lambda r: r["name"],
          lambda r: "📍 " + r["location"] if r["location"] else r["category"],
          lambda r: url_for("inventory.edit", item_id=r["id"])),
+        ("Ödünç", "🔁", "SELECT * FROM loans WHERE user_id = ? ORDER BY returned_on IS NOT NULL, id DESC LIMIT ?",
+         (user_id,), ("item_name", "person_name", "note"), lambda r: r["item_name"] + (" ✓" if r["returned_on"] else ""),
+         _loan_detail, lambda r: url_for("loans.edit", loan_id=r["id"])),
         ("Garanti", "🛡️", "SELECT * FROM warranties WHERE user_id = ? ORDER BY id DESC LIMIT ?", (user_id,),
          ("product", "brand", "store", "serial_no", "note"), lambda r: r["product"],
          lambda r: " · ".join(x for x in (r["brand"], r["store"],
