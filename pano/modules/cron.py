@@ -2,7 +2,7 @@
 
 PythonAnywhere ücretsiz planında zamanlanmış görev olmadığı için:
   GET /cron/<CRON_SECRET>/gunluk      -> herkese Telegram günlük özeti (günde bir kez; 1 Ocak'ta yıl özeti)
-  GET /cron/<CRON_SECRET>/hatirlatma  -> yapılacak, fatura ve ilaç hatırlatmaları (5 dakikada bir)
+  GET /cron/<CRON_SECRET>/hatirlatma  -> yapılacak, fatura, bilet ve ilaç hatırlatmaları (5 dakikada bir)
   GET /cron/<CRON_SECRET>/yedek       -> yöneticilere Telegram'dan veritabanı yedeği
 CRON_SECRET ayarlı değilse bu adresler 404 döner.
 """
@@ -285,6 +285,25 @@ def todo_reminders(secret):
                 result["loans_sent"] += 1
             except telegram.TelegramError as e:
                 result["errors"].append(f"ödünç {loan['id']}: {e}")
+
+    # Biletler: bir gün önce akşam kısa "yarın"; etkinlik günü (saatliyse 3-4 saat önce) özet ve bilet dosyaları
+    from . import tickets
+    result["tickets_sent"] = 0
+    for kind, ticket in tickets.pending(now):
+        url = url_for("tickets.show", ticket_id=ticket["id"], _external=True)
+        files, skipped = tickets.files_to_send(ticket) if kind == "day" else ([], 0)
+        try:
+            telegram.send_message(ticket["chat_id"], tickets.message(kind, ticket, now, url, telegram.escape, skipped))
+        except telegram.TelegramError as e:
+            result["errors"].append(f"bilet {ticket['id']}: {e}")
+            continue
+        tickets.mark_sent(ticket, kind)
+        result["tickets_sent"] += 1
+        for att in files:  # mesaj gittiyse dosya hatası tekrar denenmez (bilet ekranı linki mesajda)
+            try:
+                tickets.send_file(ticket["chat_id"], ticket, att)
+            except (telegram.TelegramError, OSError) as e:
+                result["errors"].append(f"bilet {ticket['id']} dosyası: {e}")
 
     # Kişiler: görüşme vakti gelenlere dürtme (varsayılan saatten sonra, günde bir kontrol; her vade için bir kez)
     from . import contacts

@@ -5,7 +5,7 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 
 | Grup | Modüller |
 |---|---|
-| 📅 Genel | **Takvim** (tüm tarihler tek takvimde, telefon takvimine abonelik) · **Etkinlikler** (aileyle paylaşılan ortak takvim, Telegram hatırlatması) · **Otomasyon** (“eğer şu olursa bunu yap” kuralları) · **Arama** (tek kutudan tüm modüller, bottan `/ara`) · **Aktar** (telefon ile bilgisayar arasında süreli metin ve dosya) |
+| 📅 Genel | **Takvim** (tüm tarihler tek takvimde, telefon takvimine abonelik) · **Etkinlikler** (aileyle paylaşılan ortak takvim, Telegram hatırlatması) · **Bilet Cüzdanı** (konser, maç, tiyatro, sinema, uçak, otobüs, tren, müze biletleri; PDF/görsel, kapıda gösterilecek büyük bilet ekranı ve QR, etkinlik günü bilet Telegram'a gelir) · **Otomasyon** (“eğer şu olursa bunu yap” kuralları) · **Arama** (tek kutudan tüm modüller, bottan `/ara`) · **Aktar** (telefon ile bilgisayar arasında süreli metin ve dosya) |
 | 🏠 Pano | Günün özeti: hava durumu, döviz kuru, yaklaşan ödemeler/tarihler, bugünkü alışkanlıklar ve ilaçlar, hızlı harcama ve hızlı not |
 | 📋 Listeler ve notlar | **Notlar** (Markdown, etiket, sabitleme, ek dosya) · **Listeler** (alışveriş/yapılacaklar, kullanıcılar arası paylaşım, paylaşılan listede işi birine atama, yapılacaklara saat ve Telegram hatırlatması) · **Sonra Bak** (link kaydetme, telefondan “Paylaş” ile) · **Şifreli Kasa** (hassas notlar tarayıcıda şifrelenir, sunucu okuyamaz) |
 | 💰 Para | **Harcamalar** (aylık özet, kategori grafiği, bütçe limiti, Excel/CSV) · **Faturalar** (son ödeme, aylık tekrar) · **Abonelikler** (yenileme tarihi, aylık/yıllık toplam) · **Borç / Alacak** · **Kurlar** (30 günlük grafik, kur alarmı) · **Varlıklar** (nakit, döviz, altın; güncel TL değeri ve 90 günlük grafik) · **Hedefler** (birikim hedefi, ayda ne kadar, tahmini bitiş) · **Ortak Harcama** (Splitwise benzeri: kim ne ödedi, kim kime borçlu) · **Siparişler** (kargo takibi, beklenen teslim ve iade son günü hatırlatması) |
@@ -19,6 +19,8 @@ Flask + SQLite; **PythonAnywhere ücretsiz planında** (512 MB disk) çalışaca
 **Hesaplayıcılar** tamamen tarayıcıda çalışır, yazdıkça sonuç güncellenir; sunucuya veri gitmez ve veritabanına bir şey yazılmaz (son girilen değerler sadece o cihazda hatırlanır). Kredide “Vergi ekle” işaretlenirse KKDF %15 + BSMV %15 faize eklenir (ihtiyaç/taşıt kredisi; konut kredisinde yok). Döviz/altın hesabı Kurlar modülündeki güncel kuru kullanır; kur alınamazsa o kart “kur alınamadı” der. İş günü hesabında resmi tatiller düşülmez.
 
 **Kanban:** Pano hazır sütun şablonuyla açılır (Yapılacak / Yapılıyor / Bitti, Fikir / Planlandı / Yapılıyor / Bitti ya da Bekleyenler / Bu hafta / Bugün / Bitti); sütunlar eklenip yeniden adlandırılır, sola/sağa taşınır. Kartlar bilgisayarda sürükle-bırak, telefonda basılı tutup sürükleyerek ya da kartın ⋯ menüsündeki ← → ↑ ↓ ile taşınır. En sağdaki sütun “bitti” sayılır: son tarihi olup orada olmayan kartlar yaklaşanlarda, takvimde ve günlük özette görünür. Silinen sütunun kartları soldaki sütuna geçer. Paylaşılan panoyu herkes düzenler; adını, paylaşımını değiştirmek ve silmek sahibine açıktır.
+
+**Bilet Cüzdanı:** Bilete tür, tarih-saat, yer/adres (Google Haritalar'da açılır), koltuk/kapı, rezervasyon kodu, kimin adına, fiyat ve bilet dosyaları (PDF ya da ekran görüntüsü, birden çok; kotaya sayılır) eklenir; fiyat istenirse Harcamalar'a da işlenir (etkinlik Eğlence, yolculuk Ulaşım). Tarihi geçen biletler kendiliğinden **Geçmiş**'e düşer, silinmez. **🎫 Bilet ekranı** kapıda göstermek için sadedir: rezervasyon kodu büyük ve kopyalanabilir, biletteki QR/barkod metni girildiyse büyük QR, görseller tam genişlikte, PDF'ler tek dokunuşla açılır; destekleyen telefonda ekran kararmaz. Bota bilet PDF'i ya da ekran görüntüsü gönderip **🎟️ Bilet cüzdanına ekle** seçilir: yapay zekâ açıksa başlık, tarih, saat, yer, koltuk ve kod okunur, onaylanınca kaydedilir (PDF'in yazısı ek paket olmadan çıkarılıp metin olarak gönderilir; taranmış PDF okunamaz); kapalıysa dosya tarihsiz taslak bilete eklenir, başlık/tarih panodan tamamlanır. Panoda **📷 Biletten oku** aynısını yapar. Telegram'ı bağlı olana bir gün önce 19:00'dan sonra kısa “yarın” mesajı, etkinlik günü saatli biletlerde başlangıçtan 3 saat (uçak/otobüs/tren 4 saat) önce, saatsizlerde 09:00'dan sonra özet (yer + harita, koltuk, kod, bilet ekranı linki) ve bilet dosyaları belge olarak gelir; her mesaj bir kez gider, tarih/saat değişince yeniden kurulur.
 
 **Yıl Özeti:** Seçilen yılın tüm modüllerden derlenmiş özeti: en dikkat çekici 4-6 sayı, harcamalar (aylık ortalama, en çok harcanan kategoriler ve ay, geçen yıla göre değişim; devam eden yılda geçen yılın aynı dönemiyle), alışkanlıkların en uzun serisi, günlükte ruh hali dağılımı, bitirilen kitap/film/diziler, gezilen şehirler, zaman takibi, araç, kilo değişimi, hedefler ve GitHub benzeri etkinlik ısı haritası. Sadece kişinin kendi kayıtları sayılır (paylaşılan liste ve panolarda başkasının eklediği maddeler hariç). Ocak'ta varsayılan olarak geçen yıl açılır; 1 Ocak'ta günlük cron Telegram'ı bağlı herkese geçen yılın kısa özetini bir kez gönderir, panoda 15 Aralık – 31 Ocak arası bağlantı görünür.
 
@@ -180,7 +182,7 @@ Webhook kuruluyken bota yazarak panoyu açmadan giriş yapabilirsin (`/yardim` h
 | `/durdur` | Sayacı durdurur, süreyi ve bugünün toplamını yazar |
 | `/zaman` | Çalışan sayaç ve bugünün toplamı (proje bazında) |
 | Link | Sonra Bak'a kaydedilir |
-| Fotoğraf / PDF | Hangi garantiye ya da nota ekleneceği sorulur (açıklama yazarsan yeni garantinin adı olur) |
+| Fotoğraf / PDF | Hangi garantiye ya da nota ekleneceği sorulur (açıklama yazarsan yeni garantinin adı olur); **🎟️ Bilet cüzdanına ekle** ile bilet olur (yapay zekâ açıksa bilgileri okunur) |
 | Konum (📎 → Konum) | **🅿️ Park yeri** (Harita'daki park kaydının üzerine yazar, cevapta yol tarifi) ya da **📍 Yer olarak kaydet** (Harita'ya “Telegram konumu GG.AA SS:DD” adlı yer; 30 km içindeki şehrine bağlanır) |
 | Düz yazı | Not / alışveriş / yapılacak / harcama / günlük olarak ne yapılacağı sorulur |
 
@@ -191,7 +193,7 @@ PythonAnywhere ücretsiz planında zamanlanmış görev yok. Bunun yerine [cron-
 | Görev | Adres | Önerilen zaman |
 |---|---|---|
 | Günlük özet (hava, yaklaşan ödemeler, randevular, ilaçlar) + 30 günü dolan çöpü temizleme | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/gunluk` | Her gün 08:00 (`0 8 * * *`) |
-| Yapılacak, fatura, belge, ev bakımı, ilaç, günlük ve haftalık değerlendirme hatırlatmaları, akşam hava uyarısı ve zamanlı otomasyonlar | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
+| Yapılacak, fatura, belge, ev bakımı, bilet, ilaç, günlük ve haftalık değerlendirme hatırlatmaları, akşam hava uyarısı ve zamanlı otomasyonlar | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/hatirlatma` | 5 dakikada bir (`*/5 * * * *`) |
 | Veritabanı yedeğini yöneticilere Telegram'dan gönder | `https://KULLANICI.pythonanywhere.com/cron/CRON_SECRET/yedek` | Haftada bir, Pazar 03:00 (`0 3 * * 0`) |
 
 Günlük özet aynı gün ikinci kez çağrılsa da tekrar gönderilmez. `CRON_SECRET`'ı kimseyle paylaşma.

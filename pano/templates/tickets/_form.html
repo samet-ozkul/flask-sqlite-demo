@@ -1,0 +1,48 @@
+{% import "_macros.html" as ui %}
+
+{# Bilet ekleme/düzenleme alanları. t: tickets satırı ya da None; expense: bağlı harcama (varsa) #}
+{% macro ticket_fields(t=None, expense=None) -%}
+  <div class="form-row three">
+    <label class="field"><span>Tür</span>
+      <select name="kind">
+        {% for k, (label, icon, _cat) in kinds.items() %}
+          <option value="{{ k }}" {% if k == (t.kind if t else 'concert') %}selected{% endif %}>{{ icon }} {{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {{ ui.field("Tarih", "starts_on", t.starts_on if t else "", type="date", required=True) }}
+    {{ ui.field("Saat", "starts_at", t.starts_at if t else "", type="time", hint="Başlangıç / kalkış; boşsa tüm gün") }}
+  </div>
+  {{ ui.field("Başlık", "title", t.title if t else "", required=True,
+              placeholder="ör. Tarkan konseri, İstanbul → Ankara TK2124", attrs='maxlength="150"') }}
+  <div class="form-row">
+    {{ ui.field("Yer", "venue", t.venue if t else "", placeholder="ör. Harbiye Açıkhava, Sabiha Gökçen", attrs='maxlength="150"') }}
+    {{ ui.field("Adres", "address", t.address if t else "", placeholder="Haritada açmak için (boşsa yer adı aranır)",
+                attrs='maxlength="300"') }}
+  </div>
+  <div class="form-row three">
+    {{ ui.field("Koltuk / kapı", "seat", t.seat if t else "", placeholder="ör. Blok A · Sıra 5 · Koltuk 12", attrs='maxlength="150"') }}
+    {{ ui.field("Rezervasyon kodu", "booking_code", t.booking_code if t else "", placeholder="PNR, bilet no",
+                attrs='maxlength="60" autocomplete="off" autocapitalize="characters"') }}
+    {{ ui.field("Kimin adına", "holder", t.holder if t else "", placeholder="ör. Samet + 1 kişi", attrs='maxlength="150"') }}
+  </div>
+  <div class="form-row">
+    {{ ui.money_field("Fiyat (₺)", "price", t.price if t else None) }}
+    {% if expense %}
+      <div class="field"><span>Harcama</span>
+        <a href="{{ url_for('expenses.edit', expense_id=expense.id) }}">💸 Harcamalara işlendi →</a></div>
+    {% else %}
+      <label class="field"><span>Harcama kategorisi</span>
+        <select name="expense_category">
+          <option value="">Türe göre (Eğlence / Ulaşım)</option>
+          {% for c in expense_categories %}<option value="{{ c }}">{{ category_icon(c) }} {{ c }}</option>{% endfor %}
+        </select>
+      </label>
+    {% endif %}
+  </div>
+  {% if not expense %}{{ ui.checkbox("💸 Fiyatı Harcamalar'a da ekle", "add_expense", not t) }}{% endif %}
+  {{ ui.textarea("Barkod / QR içeriği", "barcode_text", t.barcode_text if t else "", rows=2,
+                 placeholder="İsteğe bağlı: biletteki kodun metni (uygulamadan kopyalanabiliyorsa)",
+                 hint="Girersen bilet ekranında büyük QR olarak gösterilir.") }}
+  {{ ui.textarea("Not", "note", t.note if t else "", rows=2, placeholder="Kapı açılış saati, otopark, kiminle gidiliyor...") }}
+{%- endmacro %}

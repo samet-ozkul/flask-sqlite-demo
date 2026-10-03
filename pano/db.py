@@ -1042,6 +1042,34 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_poll_vote_choices_option ON poll_vote_choices(option_id);
     """,
+    # 36: bilet cüzdanı (bilet dosyaları attachments'ta, entity 'ticket'). starts_on NULL: Telegram'dan gelen, tarihi
+    #     henüz girilmemiş taslak. day_sent_for / eve_sent_for: etkinlik günü ve bir gün önceki akşam mesajının hangi
+    #     'tarih saat' için gönderildiği; tarih ya da saat değişince mesajlar yeniden kurulur
+    """
+    CREATE TABLE tickets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL DEFAULT 'other'
+            CHECK (kind IN ('concert', 'theatre', 'cinema', 'sport', 'flight', 'bus', 'train', 'museum', 'other')),
+        title TEXT NOT NULL,
+        starts_on TEXT,                            -- 'YYYY-MM-DD'
+        starts_at TEXT,                            -- 'HH:MM' yerel; NULL = saat yok
+        venue TEXT NOT NULL DEFAULT '',
+        address TEXT NOT NULL DEFAULT '',
+        seat TEXT NOT NULL DEFAULT '',             -- koltuk / blok / sıra / kapı (serbest metin)
+        booking_code TEXT NOT NULL DEFAULT '',     -- PNR / rezervasyon no
+        holder TEXT NOT NULL DEFAULT '',           -- kimin adına / kaç kişi
+        price REAL,
+        expense_id INTEGER,                        -- harcamaya eklendiyse (FK yok: çöpten geri getirme bozulmasın)
+        barcode_text TEXT NOT NULL DEFAULT '',     -- biletteki QR/barkod içeriği (elle girilirse büyük QR gösterilir)
+        note TEXT NOT NULL DEFAULT '',
+        day_sent_for TEXT,
+        eve_sent_for TEXT,
+        archived INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_tickets_user ON tickets(user_id, starts_on);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

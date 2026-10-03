@@ -14,7 +14,7 @@ Mesajı gönderen, bu sohbete bağlı pano kullanıcısıdır.
   /kisalt url [kod]          -> kısa link (/k/kod)
   /odunc matkap Ahmet        -> ödünç (son kelime kişi); /odunc -> kimde ne var
   link                      -> Sonra Bak'a kaydedilir
-  fotoğraf / PDF             -> garantiye ya da nota eklenir (sorulur)
+  fotoğraf / PDF             -> garantiye, nota ya da bilet cüzdanına eklenir (sorulur)
   konum                      -> park yeri ya da Harita'ya yer olarak kaydedilir (sorulur)
   düz yazı                   -> ne yapılacağı butonlarla sorulur
 """
@@ -82,9 +82,10 @@ HELP = """<b>Kişisel Pano komutları</b>
 
 🔖 Link gönder → Sonra Bak'a kaydedilir
 📷 Fotoğraf gönder → garantiye ya da nota eklenir
+🎟️ Bilet PDF'i ya da ekran görüntüsü gönder → “Bilet cüzdanına ekle” (etkinlik günü bilet buraya geri gelir)
 📍 Konum gönder → park yeri ya da Harita'ya yer olarak kaydedilir
 ✍️ Düz yazı gönder → ne yapacağımı sorarım (yapay zekâ açıksa kendisi anlar: "yarın 3'te dişçiyi ara")
-🧾 Yapay zekâ açıksa fiş/fatura fotoğrafından tutar ve kategori okunur"""
+🧾 Yapay zekâ açıksa fiş/fatura fotoğrafından tutar ve kategori, biletten tarih, yer ve koltuk okunur"""
 
 PENDING_TTL = 3600
 LIST_SHOWN = 30
@@ -203,7 +204,7 @@ def handle_callback(cq, chat_id, message_id):
     handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
                 "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood, "ct": cb_contact, "ctz": cb_contact,
                 "tt": cb_timer, "loc": cb_location, "scn": cb_scan, "hm": cb_home, "wk": cb_weekly_score,
-                "bk": cb_booking, "ln": cb_loan}
+                "bk": cb_booking, "ln": cb_loan, "tk": cb_ticket}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -870,6 +871,7 @@ def ask_attachment(user, chat_id, msg):
         return
     warranties = query("SELECT id, product FROM warranties WHERE user_id = ? ORDER BY id DESC LIMIT 5", (user["id"],))
     buttons = [[(f"🛡️ {w['product'][:35]}", f"ph:w:{w['id']}")] for w in warranties]
+    buttons.insert(0, [("🎟️ Bilet cüzdanına ekle", "ph:tk")])
     is_image = bool(msg.get("photo")) or (msg.get("document") or {}).get("mime_type", "").startswith("image/")
     if is_image:
         buttons.insert(0, [("📄 Taramaya ekle (PDF için)", "ph:sc")])
@@ -911,6 +913,9 @@ def cb_attachment(user, chat_id, message_id, callback_id, data):
         return
     if choice == "sc":
         _scan_files(user, chat_id, message_id, callback_id, pending)
+        return
+    if choice == "tk":
+        _ticket_files(user, chat_id, message_id, callback_id, pending)
         return
     telegram.answer_callback(callback_id, "Kaydediliyor...")
     uid, caption = user["id"], pending["caption"]
@@ -1248,6 +1253,88 @@ def cb_booking(user, chat_id, message_id, callback_id, data):
                               buttons=booking.decision_buttons(b["id"]) if b["status"] == "pending" else None)
     except telegram.TelegramError:
         pass
+
+
+# ---------- Bilet cüzdanı: Telegram'dan PDF / fotoğraf ----------
+TICKET_BUTTONS = [[("✅ Kaydet", "tk:ok"), ("✏️ Düzenle (web)", "tk:web")], [("✖️ Vazgeç", "tk:x")]]
+
+
+def _ticket_files(user, chat_id, message_id, callback_id, pending):
+    """Fotoğraf sorusundaki "🎟️ Bilet cüzdanına ekle". Yapay zekâ açıksa ilk dosyadan bilgiler okunur ve onaya sunulur
+    (albümün hepsi aynı bilete eklenir); kapalıysa ya da okunamazsa dosya taslak bilete eklenir, başlık ve tarih
+    web'den tamamlanır."""
+    files = _pending_files(pending)
+    if not assistant.available(user):
+        telegram.answer_callback(callback_id, "Ekleniyor...")
+        _save_ticket(user, chat_id, message_id, files, None, pending["caption"])
+        return
+    telegram.answer_callback(callback_id, "Okunuyor…")
+    telegram.edit_message(chat_id, message_id, "🔍 Bilet okunuyor…")
+    try:
+        info = assistant.read_ticket(telegram.download_file(files[0]["file_id"]), files[0].get("mime", ""))
+    except (ai.AIError, telegram.TelegramError) as e:
+        _save_ticket(user, chat_id, message_id, files, None, pending["caption"],
+                     note=f"⚠️ Bilgileri okuyamadım: {esc(str(e)[:200])}")
+        return
+    _set_pending(chat_id, {"kind": "ticket", "files": files, "caption": pending["caption"], "ticket": info})
+    if not info["is_ticket"]:
+        telegram.edit_message(chat_id, message_id, "🤷 Bu bir bilet gibi görünmüyor; bilgilerini okuyamadım.",
+                              [[("➕ Yine de ekle", "tk:raw"), ("✖️ Vazgeç", "tk:x")]])
+        return
+    from .modules.tickets import card
+    telegram.edit_message(chat_id, message_id, "🎟️ <b>Bilet okundu</b>\n" + card(info, esc), TICKET_BUTTONS)
+
+
+def cb_ticket(user, chat_id, message_id, callback_id, data):
+    """Okunan bilet: tk:ok kaydet, tk:web kaydet ve düzenleme bağlantısı ver, tk:raw bilgisiz (taslak) ekle, tk:x vazgeç."""
+    choice = data.split(":", 1)[1] if ":" in data else ""
+    pending = _pop_pending(chat_id, "ticket")
+    if choice not in ("ok", "web", "raw") or pending is None:
+        expired = pending is None and choice != "x"
+        telegram.answer_callback(callback_id, "Süre doldu, dosyayı tekrar gönder." if expired else "Vazgeçildi.")
+        telegram.edit_message(chat_id, message_id, "⌛ Süre doldu." if expired else "✖️ Vazgeçildi.")
+        return
+    telegram.answer_callback(callback_id, "Kaydediliyor...")
+    _save_ticket(user, chat_id, message_id, pending["files"], pending["ticket"] if choice != "raw" else None,
+                 pending["caption"], edit=choice == "web")
+
+
+def _save_ticket(user, chat_id, message_id, files, info, caption, edit=False, note=""):
+    """Bileti (okunan bilgilerle ya da taslak olarak) kaydeder, dosyaları indirip ekler; sonucu mesaja yazar."""
+    from .modules import tickets
+    from .storage import save_attachment
+    uid = user["id"]
+    v = tickets.values_from(info, caption, files[0]["name"])
+    ticket_id = tickets.add_ticket(uid, v)
+    saved, errors = 0, []
+    for f in files:
+        try:
+            data_bytes = telegram.download_file(f["file_id"])
+            save_attachment(FileStorage(io.BytesIO(data_bytes), filename=f["name"]), uid, "ticket", ticket_id)
+            saved += 1
+        except (telegram.TelegramError, ValueError) as e:
+            errors.append(str(e))
+    if not saved and not info:  # ne bilgi ne dosya: boş taslak bırakma
+        execute("DELETE FROM tickets WHERE id = ?", (ticket_id,))
+        telegram.edit_message(chat_id, message_id, f"⚠️ Eklenemedi: {esc(errors[0] if errors else '')}")
+        return
+    detail, show = link("tickets.detail", ticket_id=ticket_id), link("tickets.show", ticket_id=ticket_id)
+    count = f" ({saved} dosya)" if saved > 1 else ""
+    if info and not edit:
+        when = tickets.when_text(v["starts_on"], v["starts_at"]) if v["starts_on"] else "tarih yok"
+        text = (f"✅ Bilet cüzdanına eklendi{count}: {tickets.kind_icon(v['kind'])} <b>{esc(v['title'])}</b> · {when}\n"
+                f'<a href="{esc(show)}">🎫 Bilet ekranı</a> · <a href="{esc(detail)}">Düzenle →</a>')
+    elif info:
+        text = (f"✏️ Kaydedildi{count}: <b>{esc(v['title'])}</b>. Bilgileri düzelt: "
+                f'<a href="{esc(detail)}">Düzenle →</a>')
+    else:
+        text = (f"🎟️ Bilet cüzdanına eklendi{count}: <b>{esc(v['title'])}</b>\n"
+                f'Başlığı ve tarihi tamamla ki etkinlik günü hatırlatayım: <a href="{esc(detail)}">Düzenle →</a>')
+    if note:
+        text = f"{note}\n{text}"
+    if errors:
+        text += f"\n⚠️ {len(errors)} dosya eklenemedi: {esc(errors[0])}"
+    telegram.edit_message(chat_id, message_id, text)
 
 
 # ---------- Yapay zekâ: fiş okuma ----------

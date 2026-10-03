@@ -1,6 +1,7 @@
 """Yapay zekâ destekli işler (sağlayıcı pano/ai.py'de seçilir).
 
 - read_receipt: fiş / fatura fotoğrafından tutar, mağaza, tarih, kategori, son ödeme tarihi
+- read_ticket: bilet fotoğrafı / ekran görüntüsü ya da PDF'ten başlık, tür, tarih, saat, yer, koltuk, rezervasyon kodu
 - parse_intent: "yarın 3'te dişçiyi ara", "markete 250 verdim" gibi düz yazıyı kayda çevirir
 - answer_question: "bu ay ne kadar harcadım?" — kullanıcının verisinden kısa bir özet çıkarılıp sorulur
 
@@ -13,9 +14,11 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from . import ai
 from .db import query
+from .pdftext import pdf_text
 from .utils import MONTHS_TR, WEEKDAYS_TR, fmt_money, now_local, parse_date, today
 
 RECEIPT_MAX_PX = 1600
+TICKET_TEXT_MAX = 8000   # PDF'ten çıkan yazının modele gönderilen kısmı (bilet bilgisi ilk sayfalarda)
 NULL = {"type": "null"}
 
 
@@ -103,6 +106,94 @@ def read_receipt(image_bytes):
         "category": category,
         "summary": str(data.get("summary") or "")[:160],
     }
+
+
+# ---------- Bilet ----------
+def _ticket_kinds():
+    from .modules.tickets import KINDS
+    return list(KINDS)
+
+
+def _ticket_schema():
+    text = {"type": "string"}
+    return {
+        "type": "object",
+        "properties": {
+            "is_ticket": {"type": "boolean"},
+            "kind": {"type": "string", "enum": _ticket_kinds()},
+            "title": text,
+            "date": {"anyOf": [text, NULL]},
+            "time": {"anyOf": [text, NULL]},
+            "venue": text,
+            "address": text,
+            "seat": text,
+            "booking_code": text,
+            "holder": text,
+            "price": {"anyOf": [{"type": "number"}, NULL]},
+        },
+        "required": ["is_ticket", "kind", "title", "date", "time", "venue", "address", "seat", "booking_code", "holder",
+                     "price"],
+        "additionalProperties": False,
+    }
+
+
+TICKET_SYSTEM = """Etkinlik ve yolculuk biletlerini okuyan bir asistansın: konser, tiyatro, sinema, maç, müze biletleri;
+uçak e-bileti / biniş kartı, otobüs ve tren biletleri (Türkçe ya da yabancı dilde).
+
+- kind: concert (konser, festival), theatre (tiyatro, opera, bale, stand-up), cinema, sport (maç, yarış), flight (uçak),
+  bus (otobüs), train (tren), museum (müze, sergi, ören yeri), other.
+- title: kısa başlık. Etkinlikte etkinliğin ya da sanatçının adı ("Tarkan Konseri", "Fenerbahçe - Galatasaray");
+  yolculukta "Kalkış → Varış" ve sefer/uçuş no ("İstanbul → Ankara TK2124").
+- date: etkinliğin ya da kalkışın tarihi, YYYY-MM-DD. time: başlangıç / kalkış saati HH:MM (24 saat; biniş ya da kapı
+  kapanış saati değil). Yazmıyorsa null.
+- venue: yer (salon, stadyum, sinema, havalimanı, terminal, gar). address: biletteki adres; yoksa boş.
+- seat: koltuk, blok, sıra, kapı, vagon, peron; kısa ("Blok 104 · Sıra 12 · Koltuk 7", "Koltuk 14C · Kapı B12").
+- booking_code: PNR / rezervasyon / bilet numarası (en belirgin olanı).
+- holder: bilet kimin adına (yolcu / seyirci adı); birden çok kişiyse adlar ya da "2 kişi".
+- price: ödenen toplam tutar, sadece Türk lirasıysa (₺, TL, TRY); "1.234,56" yazılışı 1234.56 demektir. Yoksa null.
+- Biletin üzerinde yazmayan bilgiyi uydurma: boş metin ya da null bırak.
+- Belge bir bilet değilse is_ticket=false yap, diğer alanları boş bırak."""
+
+
+def read_ticket(data, mime=""):
+    """{'is_ticket', 'kind', 'title', 'date', 'time', 'venue', 'address', 'seat', 'booking_code', 'holder', 'price'}.
+    Fotoğraf / ekran görüntüsü resim olarak gönderilir; PDF'in yazısı çıkarılıp metin olarak (her sağlayıcıda çalışsın
+    diye). Taranmış (yazısız) PDF okunamaz: AIError."""
+    from .todo_reminders import parse_time
+    prompt = _today_line() + "\nBu bileti oku."
+    if mime == "application/pdf" or data[:5] == b"%PDF-":
+        text = pdf_text(data)
+        if len(text.strip()) < 20:
+            raise ai.AIError("PDF'teki yazı okunamadı (taranmış olabilir); biletin ekran görüntüsünü gönder ya da "
+                             "bilgileri kendin gir.")
+        result = ai.complete_json(TICKET_SYSTEM, f"{prompt}\n\nBilet PDF'inin yazısı:\n{text[:TICKET_TEXT_MAX]}",
+                                  _ticket_schema())
+    else:
+        result = ai.complete_json(TICKET_SYSTEM, prompt, _ticket_schema(), image=to_jpeg(data))
+
+    def clean(key, limit):
+        return " ".join(str(result.get(key) or "").split())[:limit]
+
+    price = result.get("price")
+    try:
+        price = round(float(price), 2) if price is not None else None
+    except (TypeError, ValueError):
+        price = None
+    d = parse_date(result.get("date"))
+    out = {
+        "kind": result.get("kind") if result.get("kind") in _ticket_kinds() else "other",
+        "title": clean("title", 150),
+        "date": d.isoformat() if d else None,
+        "time": parse_time(str(result.get("time") or "")),
+        "venue": clean("venue", 150),
+        "address": clean("address", 300),
+        "seat": clean("seat", 150),
+        "booking_code": clean("booking_code", 60),
+        "holder": clean("holder", 150),
+        "price": price if price and 0 < price < 1e7 else None,
+    }
+    out["is_ticket"] = bool(result.get("is_ticket")) and bool(out["title"])
+    return out
 
 
 # ---------- Doğal dil ----------

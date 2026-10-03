@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "tickets/_form.html" import ticket_fields with context %}
+{% block title %}Bilet Cüzdanı{% endblock %}
+{% block head %}
+<style>
+  .tk-cards { display: grid; gap: 12px; grid-template-columns: 1fr; margin-bottom: 14px; }
+  @media (min-width: 640px) { .tk-cards { grid-template-columns: repeat(2, 1fr); } }
+  .tk-card { display: flex; gap: 14px; align-items: flex-start; margin: 0; }
+  .tk-card.today { border-color: var(--ok); }
+  .tk-card.draft { border-style: dashed; }
+  .tk-icon { font-size: 2.3rem; line-height: 1; width: 46px; text-align: center; flex-shrink: 0; padding-top: 2px; }
+  .tk-body { flex: 1; min-width: 0; }
+  .tk-title { display: block; font-size: 1.12rem; font-weight: 600; color: var(--text); overflow-wrap: anywhere; margin: 4px 0 2px; }
+  .tk-when { font-weight: 500; }
+  .tk-meta { font-size: .85rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 2px; }
+  .tk-meta span { overflow-wrap: anywhere; }
+  .tk-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .read-form { display: inline; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🎟️ Bilet Cüzdanı", "Konser, maç, tiyatro, uçak, otobüs... biletler tek yerde; etkinlik günü Telegram'a gelir") %}
+  {% if ai_ready %}
+    <form method="post" action="{{ url_for('tickets.read') }}" enctype="multipart/form-data" class="read-form">
+      {{ ui.csrf() }}
+      <label class="btn sm" title="Bilet görselinden ya da PDF'inden bilgileri yapay zekâyla oku">📷 Biletten oku
+        <input type="file" name="file" accept="image/*,application/pdf" hidden data-autosubmit>
+      </label>
+    </form>
+  {% endif %}
+{% endcall %}
+
+<div class="card">
+  <details class="add" {% if not upcoming and not past %}open{% endif %}>
+    <summary>＋ Yeni bilet</summary>
+    <form method="post" action="{{ url_for('tickets.create') }}" enctype="multipart/form-data">
+      {{ ui.csrf() }}
+      {{ ticket_fields() }}
+      <label class="field"><span>Bilet dosyaları</span>
+        <input type="file" name="files" accept="image/*,application/pdf" multiple>
+        <small class="muted">PDF ya da ekran görüntüsü; birden çok seçilebilir. Fotoğraflar küçültülür, PDF en fazla 3 MB.</small>
+      </label>
+      <button class="btn primary">Ekle</button>
+    </form>
+  </details>
+</div>
+
+<nav class="tabs" aria-label="Biletler">
+  <a href="{{ url_for('tickets.index') }}" class="{{ 'active' if not past_tab }}">Yaklaşan <span class="pill-count">{{ upcoming | length }}</span></a>
+  <a href="{{ url_for('tickets.index', gecmis=1) }}" class="{{ 'active' if past_tab }}">Geçmiş <span class="pill-count">{{ past | length }}</span></a>
+</nav>
+
+{% if not past_tab %}
+  {% if upcoming %}
+    <div class="tk-cards">
+      {% for t in upcoming %}
+        {% set text, cls = badge(t) %}
+        <div class="card tk-card {{ 'today' if t.starts_on == today }} {{ 'draft' if not t.starts_on }}">
+          <span class="tk-icon" title="{{ kinds[t.kind][0] }}">{{ kind_icon(t.kind) }}</span>
+          <div class="tk-body">
+            <span class="badge {{ cls }}">{{ text }}</span>
+            <a class="tk-title" href="{{ url_for('tickets.detail', ticket_id=t.id) }}">{{ t.title }}</a>
+            {% if t.starts_on %}
+              <div class="tk-when">📅 {{ t.starts_on | date_tr(True) }}{% if t.starts_at %} · {{ t.starts_at }}{% endif %}</div>
+            {% else %}
+              <div class="tk-when muted">Telegram'dan geldi: başlığı ve tarihi tamamla</div>
+            {% endif %}
+            <div class="tk-meta">
+              {% if t.venue %}<span>📍 {{ t.venue }}</span>{% endif %}
+              {% if t.seat %}<span>💺 {{ t.seat }}</span>{% endif %}
+              {% if t.files %}<span>📎 {{ t.files }} dosya</span>{% endif %}
+            </div>
+            <div class="tk-actions">
+              <a class="btn sm primary" href="{{ url_for('tickets.show', ticket_id=t.id) }}">🎫 Bilet ekranı</a>
+              <a class="btn sm" href="{{ url_for('tickets.detail', ticket_id=t.id) }}">{{ 'Tamamla' if not t.starts_on else 'Ayrıntı' }}</a>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    {{ ui.empty("Yaklaşan bilet yok. Yeni bilet ekle ya da bilet PDF'ini / ekran görüntüsünü Telegram'dan bota gönder.", "🎟️") }}
+  {% endif %}
+{% else %}
+  {% if past %}
+    <div class="card">
+      <ul class="rows">
+        {% for t in past %}
+          <li>
+            <span class="ico">{{ kind_icon(t.kind) }}</span>
+            <a class="grow" href="{{ url_for('tickets.detail', ticket_id=t.id) }}">
+              <div class="title">{{ t.title }}</div>
+              <div class="meta">
+                {% if t.starts_on %}<span>{{ t.starts_on | date_tr(True) }}{% if t.starts_at %} · {{ t.starts_at }}{% endif %}</span>{% endif %}
+                {% if t.venue %}<span>📍 {{ t.venue }}</span>{% endif %}
+                {% if t.files %}<span>📎 {{ t.files }}</span>{% endif %}
+                {% if t.archived and (not t.starts_on or t.starts_on >= today) %}<span>📦 arşivde</span>{% endif %}
+              </div>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% else %}
+    {{ ui.empty("Geçmiş bilet yok. Tarihi geçen biletler kendiliğinden buraya taşınır.", "🗂️") }}
+  {% endif %}
+{% endif %}
+{% endblock %}

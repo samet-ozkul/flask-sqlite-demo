@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}🎫 {{ t.title }}{% endblock %}
+{% block head %}
+<style>
+  .pass { max-width: 560px; margin: 0 auto; }
+  .pass-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pass-head { text-align: center; margin: 10px 0 16px; }
+  .pass-head .ico { font-size: 2.8rem; line-height: 1; }
+  .pass-head h1 { font-size: 1.6rem; margin: 8px 0 6px; overflow-wrap: anywhere; }
+  .pass-when { font-size: 1.3rem; font-weight: 700; }
+  .pass-facts { display: grid; gap: 10px; margin-bottom: 14px; }
+  .fact { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+  .fact .label { font-size: .8rem; color: var(--muted); }
+  .fact .value { font-size: 1.4rem; font-weight: 700; overflow-wrap: anywhere; }
+  .fact .value.code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 2rem;
+                      letter-spacing: .06em; user-select: all; }
+  .fact .row-flex { margin-top: 8px; }
+  .pass-qr { margin: 0 0 14px; }
+  .pass-qr svg { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; border-radius: var(--radius-sm); }
+  .pass-img { display: block; margin: 0 0 12px; }
+  .pass-img img { width: 100%; height: auto; display: block; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+  .pass .btn.big { display: block; width: 100%; padding: 14px; font-size: 1.05rem; text-align: center; margin-bottom: 10px; }
+  .pass-note { white-space: pre-line; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pass">
+  <div class="pass-top">
+    <a class="back" href="{{ url_for('tickets.detail', ticket_id=t.id) }}">← Bilet</a>
+    <span class="muted small hidden" data-wakelock>🔆 Ekran açık tutuluyor</span>
+  </div>
+  <p class="muted small center">☀️ Ekran parlaklığını sonuna kadar aç; kod daha kolay okunur.</p>
+
+  <div class="pass-head">
+    <div class="ico">{{ icon }}</div>
+    <h1>{{ t.title }}</h1>
+    {% if t.starts_on %}
+      <div class="pass-when">{{ t.starts_on | date_tr(True) }}{% if t.starts_at %} · {{ t.starts_at }}{% endif %}</div>
+    {% endif %}
+    {% if badge %}<span class="badge {{ badge[1] }}">{{ badge[0] }}</span>{% endif %}
+  </div>
+
+  {% if t.seat or t.booking_code or t.holder %}
+    <div class="pass-facts">
+      {% if t.seat %}
+        <div class="fact"><div class="label">💺 Koltuk / kapı</div><div class="value">{{ t.seat }}</div></div>
+      {% endif %}
+      {% if t.booking_code %}
+        <div class="fact">
+          <div class="label">🔖 Rezervasyon kodu</div>
+          <div class="value code" id="pass-code">{{ t.booking_code }}</div>
+          <div class="row-flex"><button type="button" class="btn sm hidden" data-copy="pass-code">📋 Kopyala</button></div>
+        </div>
+      {% endif %}
+      {% if t.holder %}
+        <div class="fact"><div class="label">👤 Kimin adına</div><div class="value">{{ t.holder }}</div></div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if qr %}<div class="pass-qr" aria-label="Bilet QR kodu">{{ qr | safe }}</div>{% endif %}
+
+  {% for a in images %}
+    <a class="pass-img" href="{{ url_for('files.show', att_id=a.id) }}" target="_blank">
+      <img src="{{ url_for('files.show', att_id=a.id) }}" alt="{{ a.original_name or 'Bilet görseli' }}">
+    </a>
+  {% endfor %}
+  {% for a in pdfs %}
+    <a class="btn big primary" href="{{ url_for('files.show', att_id=a.id) }}" target="_blank">📄 Aç: {{ a.original_name or 'Bilet PDF' }}</a>
+  {% endfor %}
+  {% if not (qr or images or pdfs or t.booking_code) %}
+    <p class="muted center">Bu bilette dosya ya da kod yok. <a href="{{ url_for('tickets.detail', ticket_id=t.id) }}">Dosya ekle →</a></p>
+  {% endif %}
+
+  {% if t.venue or t.address %}
+    <div class="fact">
+      <div class="label">📍 Yer</div>
+      <div>{{ t.venue }}{% if t.venue and t.address %}<br>{% endif %}<span class="muted">{{ t.address }}</span></div>
+      <div class="row-flex"><a class="btn sm" href="{{ maps }}" target="_blank" rel="noopener">🗺️ Haritada aç</a></div>
+    </div>
+  {% endif %}
+  {% if t.note %}<p class="muted pass-note">{{ t.note }}</p>{% endif %}
+</div>
+<script src="{{ url_for('static', filename='tickets.js') }}?v=1" defer></script>
+{% endblock %}
