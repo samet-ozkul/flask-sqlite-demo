@@ -1,0 +1,82 @@
+{% extends "polls/_public_layout.html" %}
+{# Herkese açık anket (/a/<kod>): oy formu ya da durum (oy verildi / kapandı / sadece davetliler) + görünürlüğe göre
+   sonuçlar (sadece sayılar). Betik yok; seçimler hata sonrası korunur. #}
+{% block title %}{{ poll.question }}{% endblock %}
+{% block main %}
+  {% if notice %}<div class="notice" role="status"><b>✅ Teşekkürler, oyun kaydedildi.</b></div>{% endif %}
+  <h1>{{ poll.question }}</h1>
+  {% if poll.description %}<p class="desc">{{ poll.description }}</p>{% endif %}
+  <p class="meta">
+    {% if poll.kind == 'single' %}🔘 Tek seçim
+    {% elif poll.kind == 'multi' %}☑️ {{ "En fazla " ~ poll.max_choices ~ " seçenek işaretleyebilirsin" if poll.max_choices else "İstediğin kadar seçenek işaretleyebilirsin" }}
+    {% else %}📅 Uygun olduğun günlerin hepsini işaretle{% endif %}
+    {% if closes and not closed %} · ⏳ Son oy: {{ closes }}{% endif %}
+  </p>
+  {% if error %}<p class="alert" role="alert">{{ error }}</p>{% endif %}
+
+  {% if closed %}
+    <div class="state closed">🔒 <b>Anket kapandı</b>{% if closes_past and not poll.closed %} ({{ closes }}){% endif %}; artık oy verilemez.</div>
+  {% endif %}
+  {% if voted %}
+    <div class="state">✅ <b>{{ "Bu linkle oy verildi" if invite else "Oyunu verdin" }}</b>{% if my_choices %}: {{ my_choices | join(", ") }}{% elif poll.kind == 'date' %}: hiçbir gün uygun değil{% endif %}.
+      <span class="muted small">Verilen oy değiştirilemez.</span></div>
+  {% endif %}
+
+  {% if can_vote %}
+    <form method="post" action="{{ url_for('polls.public', code=poll.code) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      {% if token %}<input type="hidden" name="d" value="{{ token }}">{% endif %}
+      <fieldset>
+        <legend>Seçenekler</legend>
+        {% for o in options %}
+          <label class="opt">
+            <input type="{{ 'radio' if poll.kind == 'single' else 'checkbox' }}" name="o" value="{{ o.id }}"
+                   {% if o.id | string in form.choices %}checked{% endif %} {% if poll.kind == 'single' %}required{% endif %}>
+            <span>{{ o.label }}</span>
+          </label>
+        {% endfor %}
+      </fieldset>
+      {% if poll.kind == 'date' %}<p class="muted small">Hiçbiri uymuyorsa hiçbirini işaretlemeden de gönderebilirsin.</p>{% endif %}
+      {% if needs_name %}
+        <label class="name">Adın
+          <input type="text" name="name" value="{{ form.name }}" maxlength="60" required autocomplete="name">
+          <span class="hint">Adın sadece anketi oluşturana görünür; aynı adla ikinci oy verilemez.</span></label>
+      {% endif %}
+      <div class="hp" aria-hidden="true">
+        <label>Web sitesi (boş bırak) <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+      </div>
+      <button class="btn">🗳️ Oy ver</button>
+      <p class="muted small">{% if invite %}Bu link sana özel ve bir kez oy verir.{% else %}Her tarayıcı bir kez oy verir.{% endif %}
+        Oy verdikten sonra değiştirilemez.</p>
+    </form>
+  {% elif invite_only and not closed and not voted and not error %}
+    <div class="state">🔑 Bu ankete sadece kişiye özel linklerle oy verilebilir. Linkin yoksa anketi oluşturan kişiden iste.</div>
+  {% endif %}
+
+  {% if show_results %}
+    <section class="results" aria-label="Sonuçlar">
+      <h2>📊 Sonuçlar <span class="muted small">· {{ t.total }} oy</span></h2>
+      {% for r in t.rows %}
+        <div class="res {{ 'lead' if r.lead }}">
+          <div class="res-top">
+            <span class="res-label">{% if r.lead %}{{ "⭐ " if poll.kind == 'date' else "🏆 " }}{% endif %}{{ r.label }}</span>
+            <span class="res-num">{{ r.count }}{{ " kişi" if poll.kind == 'date' else " oy" }} · %{{ r.pct }}</span>
+          </div>
+          <div class="track"><span style="width: {{ r.pct }}%"></span></div>
+        </div>
+      {% endfor %}
+      {% if poll.kind != 'single' and t.total %}
+        <p class="muted small">Yüzde, oy verenlerin kaçının o seçeneği işaretlediğini gösterir.</p>
+      {% endif %}
+      {% if owner and poll.results_visibility == 'owner' %}
+        <p class="muted small">🔒 Sonuçları sadece sen görüyorsun.</p>
+      {% elif owner and poll.results_visibility == 'after_vote' and not closed %}
+        <p class="muted small">🔒 Sonuçları şu an sen ve oy verenler görüyor; anket kapanınca herkes görür.</p>
+      {% endif %}
+    </section>
+  {% elif voted or closed %}
+    <p class="muted small">🔒 Sonuçları sadece anketi oluşturan görüyor.</p>
+  {% elif poll.results_visibility == 'after_vote' %}
+    <p class="muted small">📊 Sonuçlar oy verince görünür.</p>
+  {% endif %}
+{% endblock %}
