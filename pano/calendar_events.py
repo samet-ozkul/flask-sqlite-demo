@@ -2,7 +2,7 @@
 
 Kaynaklar: faturalar, abonelik yenilemeleri, borç/alacak vadeleri, araç tarihleri, garanti bitişleri,
 randevular, yapılacaklar (açık), kanban kartları (bitti sütunu hariç), ev bakımı (sıradaki tarih), önemli günler,
-kişilerin doğum günleri.
+kişilerin doğum günleri, ödünçteki eşyaların beklenen dönüşü.
 Abonelik, önemli günler ve doğum günleri aralık içinde çoğaltılır.
 """
 from datetime import date, timedelta
@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from flask import url_for
 
 from .db import query
-from .utils import add_cycle, fmt_money
+from .utils import add_cycle, fmt_date, fmt_money
 
 VEHICLE_FIELDS = [("inspection_date", "muayene"), ("insurance_date", "trafik sigortası"),
                   ("casco_date", "kasko"), ("service_date", "bakım")]
@@ -98,6 +98,13 @@ def events_between(user_id, start, end, external=False):
                    (user_id, s, e)):
         add("home", r["id"], r["next_due"], r["name"], r["icon"], "homecare.detail", detail=task_period(r),
             task_id=r["id"])
+
+    # Ödünç: hâlâ dışarıdaki eşyaların beklenen dönüş günü
+    from .modules.loans import title_for
+    for r in query("SELECT * FROM loans WHERE user_id = ? AND returned_on IS NULL AND due_on BETWEEN ? AND ?",
+                   (user_id, s, e)):
+        add("loan", r["id"], r["due_on"], title_for(r), "🔁", "loans.edit",
+            detail=("verildi " if r["direction"] == "lent" else "alındı ") + fmt_date(r["given_on"]), loan_id=r["id"])
 
     # Siparişler: beklenen teslim (iptal edilenler hariç) ve iade son günü (iade başlatılınca tamamlandı sayılır)
     for r in query("SELECT * FROM orders WHERE user_id = ? AND status != 'cancelled' AND expected_on BETWEEN ? AND ?",

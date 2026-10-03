@@ -1,0 +1,104 @@
+{% import "_macros.html" as ui %}
+
+{% macro loan_style() -%}
+<style>
+  .loan-rows a.grow { color: var(--text); }
+  .loan-rows a.grow:hover { text-decoration: none; }
+  .loan-rows a.grow:hover .title { color: var(--primary); }
+  .loan-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+  .loan-info { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
+  .loan-info li { display: flex; gap: 8px; align-items: baseline; overflow-wrap: anywhere; }
+  .loan-info li > span:first-child { width: 22px; flex-shrink: 0; text-align: center; }
+  .loan-note { white-space: pre-line; }
+  .loan-return input[type=date] { width: auto; flex: 0 1 11em; min-width: 0; }
+</style>
+{%- endmacro %}
+
+{# Ekleme / düzenleme alanları. l: loans satırı ya da aynı anahtarlı sözlük (boş form, hatalı gönderim).
+   Envanterden / Kişiler'den seçince ad (ve telefon) loans.js ile dolar; JS yoksa boş bırakılan ad sunucuda dolar. #}
+{% macro loan_fields(l, photo=False) -%}
+  <div class="form-row three">
+    {{ ui.select("Ne oldu?", "direction", directions.items() | list, l.direction) }}
+    {{ ui.field("Eşya", "item_name", l.item_name, placeholder="ör. Matkap", attrs='maxlength="150" autocomplete="off"') }}
+    {% if inv_choices %}
+      <label class="field"><span>📦 Ev Envanteri'nden</span>
+        <select name="inventory_id" data-loan-pick="item">
+          <option value="">— Seçme (serbest yaz) —</option>
+          {% for i in inv_choices %}
+            <option value="{{ i.id }}" data-name="{{ i.name }}" {% if i.id == l.inventory_id %}selected{% endif %}>{{ i.name }}{% if i.location %} · 📍 {{ i.location }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </label>
+    {% endif %}
+  </div>
+  <div class="form-row three">
+    {{ ui.field("Kişi", "person_name", l.person_name, placeholder="Kime verdin / kimden aldın?",
+                attrs='list="loan-persons" maxlength="100" autocomplete="off"') }}
+    {% if contact_choices %}
+      <label class="field"><span>📇 Kişiler'den</span>
+        <select name="contact_id" data-loan-pick="person">
+          <option value="">— Seçme (serbest yaz) —</option>
+          {% for c in contact_choices %}
+            <option value="{{ c.id }}" data-name="{{ c.name }}" data-phone="{{ c.phone }}" {% if c.id == l.contact_id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    {% endif %}
+    {{ ui.field("Telefon", "phone", l.phone, type="tel", placeholder="0532 123 45 67",
+                attrs='maxlength="30" autocomplete="off"', hint="İsteğe bağlı; WhatsApp'tan hatırlatmak için") }}
+  </div>
+  <datalist id="loan-persons">{% for p in persons %}<option value="{{ p }}">{% endfor %}</datalist>
+  <div class="form-row three">
+    {{ ui.field("Tarih", "given_on", l.given_on, type="date", required=True, attrs='max="' ~ today_str() ~ '"',
+                hint="Verdiğin / aldığın gün") }}
+    {{ ui.field("Beklenen dönüş", "due_on", l.due_on or "", type="date", hint="İsteğe bağlı") }}
+    <label class="field"><span>Telegram hatırlatması</span>
+      <select name="remind_every_days">
+        {% for v, label in remind_options %}
+          <option value="{{ v }}" {% if v == l.remind_every_days %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <small class="muted">Dönüş tarihi yoksa; varsa o gün ve sonra haftada bir</small>
+    </label>
+  </div>
+  {{ ui.textarea("Not", "note", l.note, rows=2, placeholder="ör. Uçlarıyla birlikte verdim, kutusu bende") }}
+  {% if photo %}
+    <label class="field"><span>📷 Fotoğraf (isteğe bağlı)</span>
+      <input type="file" name="photo" accept="image/*">
+      <small class="muted">Eşyanın o andaki hali; otomatik küçültülür</small>
+    </label>
+  {% endif %}
+{%- endmacro %}
+
+{# Liste satırı: eşya, kimde / kimden ve kaç gündür, dönüş rozeti; hızlı "Geri geldi" ve WhatsApp #}
+{% macro loan_row(l, here, thumb=None) -%}
+  <li>
+    <a href="{{ url_for('loans.edit', loan_id=l.id) }}" aria-hidden="true" tabindex="-1">
+      {% if thumb %}<img class="thumb" src="{{ url_for('files.thumb', att_id=thumb.id) }}" alt="" loading="lazy">
+      {% else %}<span class="ico">{{ '✅' if l.returned_on else ('📤' if is_lent(l) else '📥') }}</span>{% endif %}
+    </a>
+    <a class="grow" href="{{ url_for('loans.edit', loan_id=l.id) }}">
+      <div class="title">{{ l.item_name }}</div>
+      <div class="meta">
+        <span>{{ held(l) }}</span>
+        {% if l.due_on and not l.returned_on %}<span>Dönüş {{ l.due_on | date_tr }}</span>{{ ui.due_badge(l.due_on) }}{% endif %}
+      </div>
+      {% if l.note %}<div class="meta">{{ l.note | truncate(90) }}</div>{% endif %}
+    </a>
+    <div class="loan-side">
+      {% if l.returned_on %}
+        <form method="post" action="{{ url_for('loans.reopen', loan_id=l.id) }}" class="inline">
+          {{ ui.csrf() }}<input type="hidden" name="next" value="{{ here }}">
+          <button class="btn sm" title="Yanlışlıkla işaretlendiyse yeniden açar">↩️ Geri al</button>
+        </form>
+      {% else %}
+        <form method="post" action="{{ url_for('loans.mark_returned', loan_id=l.id) }}" class="inline">
+          {{ ui.csrf() }}<input type="hidden" name="next" value="{{ here }}">
+          <button class="btn sm ok">{{ '✅ Geri geldi' if is_lent(l) else '✅ Geri verdim' }}</button>
+        </form>
+        {% set wa = whatsapp(l) %}
+        {% if wa %}<a class="btn sm" href="{{ wa }}" target="_blank" rel="noopener noreferrer" title="WhatsApp'tan nazikçe hatırlat">💬 Hatırlat</a>{% endif %}
+      {% endif %}
+    </div>
+  </li>
+{%- endmacro %}

@@ -950,6 +950,31 @@ MIGRATIONS = [
     CREATE INDEX idx_bookings_user ON bookings(user_id, start_at);
     CREATE INDEX idx_bookings_ip ON bookings(ip_hash, created_at);
     """,
+    # 34: ödünç — verilen / alınan eşyalar. inventory_id ve contact_id için FK yok (home_task_logs.expense_id gibi):
+    #     envanterden ya da Kişiler'den silinen kayıt ödünçte adıyla kalır, çöpten geri getirme hiçbir sırada bozulmaz
+    """
+    CREATE TABLE loans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        direction TEXT NOT NULL DEFAULT 'lent' CHECK (direction IN ('lent', 'borrowed')),  -- ben verdim / ben aldım
+        item_name TEXT NOT NULL,
+        inventory_id INTEGER,                      -- Ev Envanteri eşyası (NULL: serbest metin)
+        person_name TEXT NOT NULL,
+        contact_id INTEGER,                        -- Kişiler kaydı (NULL: serbest ad)
+        phone TEXT NOT NULL DEFAULT '',
+        given_on TEXT NOT NULL,                    -- 'YYYY-MM-DD', verildiği / alındığı gün
+        due_on TEXT,                               -- beklenen dönüş (isteğe bağlı)
+        remind_every_days INTEGER NOT NULL DEFAULT 14,  -- dönüş tarihi yoksa kaç günde bir hatırlatılır (0 = hiç)
+        note TEXT NOT NULL DEFAULT '',
+        returned_on TEXT,                          -- NULL = hâlâ dışarıda
+        reminded_on TEXT,                          -- son Telegram hatırlatmasının günü
+        snooze_until TEXT,                         -- "⏰ 1 hafta sonra": sıradaki hatırlatma bu gün
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_loans_user ON loans(user_id, returned_on);
+    CREATE INDEX idx_loans_inventory ON loans(inventory_id);
+    CREATE INDEX idx_loans_contact ON loans(contact_id);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

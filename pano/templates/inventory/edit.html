@@ -16,6 +16,36 @@
 </div>
 
 <div class="card">
+  <div class="row-flex" style="justify-content: space-between; margin-bottom: 6px">
+    <h2 style="margin: 0">🔁 Ödünç</h2>
+    <a class="btn sm" href="{{ url_for('loans.new', envanter=item.id) }}">🔁 Ödünç ver</a>
+  </div>
+  {% if loan_history %}
+    <ul class="rows">
+      {% for l in loan_history %}
+        <li>
+          <span class="ico">{{ '✅' if l.returned_on else ('📤' if l.direction == 'lent' else '📥') }}</span>
+          <a class="grow" href="{{ url_for('loans.edit', loan_id=l.id) }}">
+            <div class="title">{{ loan_held(l) }}</div>
+            {% if l.due_on and not l.returned_on %}
+              <div class="meta"><span>Dönüş {{ l.due_on | date_tr }}</span>{{ ui.due_badge(l.due_on) }}</div>
+            {% endif %}
+          </a>
+          {% if not l.returned_on %}
+            <form method="post" action="{{ url_for('loans.mark_returned', loan_id=l.id) }}" class="inline">
+              {{ ui.csrf() }}<input type="hidden" name="next" value="{{ request.path }}">
+              <button class="btn sm ok">{{ '✅ Geri geldi' if l.direction == 'lent' else '✅ Geri verdim' }}</button>
+            </form>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted small">Bu eşya hiç ödünç verilmedi. Verince kimde olduğu ve kaç gündür dışarıda olduğu burada görünür.</p>
+  {% endif %}
+</div>
+
+<div class="card">
   <h2>Fotoğraflar</h2>
   <p class="muted small">Eşyanın ya da durduğu yerin (dolap, kutu, raf) fotoğrafı bulmayı kolaylaştırır.</p>
   {{ ui.attachments("inventory", item.id, files, request.path) }}
