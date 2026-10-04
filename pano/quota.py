@@ -3,8 +3,8 @@
 - users.quota_mb: kullanıcının dosyalarının toplam kaplayabileceği alan (NULL = sınır yok, sadece genel disk kotası)
 - users.upload_max_mb: tek dosyanın en fazla boyutu (NULL = modülün kendi sınırı; 0 = dosya yükleyemez)
 Sayılanlar: ekler (çöp kutusundakiler dahil, dosyaları diskte durur), Aktar dosyaları, tarama kutusu, profil
-fotoğrafı, davetiye kapak fotoğrafları. Metin kayıtları (not, harcama...) çok küçük olduğu için sayılmaz. Genel disk kotası (STORAGE_QUOTA_MB)
-her zaman ayrıca geçerlidir.
+fotoğrafı, davetiye kapak fotoğrafları. Metin kayıtları (not, harcama...) çok küçük olduğu için sayılmaz.
+Genel disk kotası (STORAGE_QUOTA_MB) her zaman ayrıca geçerlidir.
 Yeni kullanıcıların varsayılanı: DEFAULT_QUOTA_MB / DEFAULT_UPLOAD_MAX_MB (boşsa sınırsız).
 """
 import json
