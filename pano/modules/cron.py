@@ -2,7 +2,7 @@
 
 PythonAnywhere ücretsiz planında zamanlanmış görev olmadığı için:
   GET /cron/<CRON_SECRET>/gunluk      -> herkese Telegram günlük özeti (günde bir kez; 1 Ocak'ta yıl özeti)
-  GET /cron/<CRON_SECRET>/hatirlatma  -> yapılacak, fatura, bilet ve ilaç hatırlatmaları (5 dakikada bir)
+  GET /cron/<CRON_SECRET>/hatirlatma  -> yapılacak, fatura, bilet, davetiye ve ilaç hatırlatmaları (5 dakikada bir)
   GET /cron/<CRON_SECRET>/yedek       -> yöneticilere Telegram'dan veritabanı yedeği
 CRON_SECRET ayarlı değilse bu adresler 404 döner.
 """
@@ -426,6 +426,27 @@ def todo_reminders(secret):
             result["poll_notices"] += 1
         except telegram.TelegramError as e:
             result["errors"].append(f"anket {poll['id']}: {e}")
+
+    # Davetiye: bekleyen yeni/değişen yanıtlar toplu; LCV son günü geçince bir kez özet (varsayılan saatten sonra),
+    # etkinlikten bir gün önce akşam bir kez "Yarın" mesajı
+    from . import invites
+    result["invite_notices"] = result["invite_summaries"] = 0
+    invite_now = invites.now_local()
+    for inv in invites.pending_notices(invite_now):
+        try:
+            if invites.send_changes(inv, inv["chat_id"], invite_now):
+                result["invite_notices"] += 1
+        except telegram.TelegramError as e:
+            result["errors"].append(f"davetiye {inv['id']}: {e}")
+    for kind, inv in invites.pending_summaries(invite_now):
+        try:
+            telegram.send_message(inv["chat_id"], invites.summary_message(
+                kind, inv, url_for("invites.detail", invite_id=inv["id"], _external=True), telegram.escape))
+        except telegram.TelegramError as e:
+            result["errors"].append(f"davetiye {inv['id']}: {e}")
+            continue   # gönderilemediyse sonraki çağrıda yeniden denenir
+        invites.mark_sent(inv, kind)
+        result["invite_summaries"] += 1
 
     # Aktarma kutusu: süresi dolan metin ve dosyalar
     from .transfer import purge_expired

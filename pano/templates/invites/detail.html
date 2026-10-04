@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{# Davetiye ayrıntısı (sahibi): link + QR + WhatsApp'ta paylaş, sayılar, yanıt listesi (CSV, tek tek silme), kişiye özel
+   davet linkleri (yanıt bekleyenler, WhatsApp davet mesajı), yanıtları kapat/aç. #}
+{% block title %}{{ inv.title }} · Davetiye{% endblock %}
+{% block head %}
+<style>
+  .iv-top { display: grid; gap: 14px; align-items: center; grid-template-columns: 1fr; }
+  @media (min-width: 600px) { .iv-top { grid-template-columns: 200px 1fr; } }
+  .qr-box svg { width: min(200px, 100%); height: auto; aspect-ratio: 1; display: block; margin: 0 auto; border-radius: 8px; }
+  .iv-short { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .iv-url { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .95rem; font-weight: 600;
+            overflow-wrap: anywhere; user-select: all; }
+  .iv-when { font-weight: 600; margin: 4px 0; }
+  .iv-desc { white-space: pre-line; overflow-wrap: anywhere; }
+  .iv-cover { display: block; width: 100%; max-width: 420px; aspect-ratio: 1200 / 630; object-fit: cover;
+              border-radius: var(--radius-sm); margin-bottom: 10px; }
+  .stat .value.sm { font-size: 1rem; }
+  .iv-table td { overflow-wrap: anywhere; }
+  .iv-table td:last-child { width: 1%; }
+  .iv-table .st { white-space: nowrap; }
+  .iv-guests .grow .meta, .iv-link { overflow-wrap: anywhere; }
+  .iv-link { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .8rem; user-select: all; }
+  .iv-waiting { overflow-wrap: anywhere; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header(inv.cover_emoji ~ " " ~ inv.title, back=url_for('invites.index')) %}
+  <a class="btn" href="{{ url_for('invites.edit', invite_id=inv.id) }}">✏️ Düzenle</a>
+  {{ ui.delete_button(url_for('invites.delete', invite_id=inv.id), "Sil",
+                      "Davetiye silinsin mi? Link çalışmaz olur, takvimden de kalkar; yanıtlarıyla birlikte çöp kutusundan geri getirilebilir.") }}
+{% endcall %}
+
+<section class="card">
+  <div class="iv-top">
+    <div class="qr-box">{{ qr | safe }}</div>
+    <div>
+      <div class="iv-short">
+        <a class="iv-url" id="iv-url" href="{{ url }}" target="_blank" rel="noopener">{{ url }}</a>
+        <button type="button" class="btn sm hidden" data-copy="iv-url">📋 Kopyala</button>
+      </div>
+      <div class="row-flex">
+        {% if state == 'open' %}<span class="badge good">Yanıtlar açık</span>
+        {% elif state == 'ended' %}<span class="badge">🏁 Sona erdi</span>
+        {% elif state == 'closed' %}<span class="badge">🔒 Yanıtlar kapalı</span>
+        {% else %}<span class="badge soon">⏳ LCV süresi doldu</span>{% endif %}
+        {% if inv.invite_only %}<span class="badge">🔑 Sadece davetliler</span>{% endif %}
+        {% if event %}<a class="badge" href="{{ url_for('events.edit', event_id=event.id) }}">📅 Takvimde</a>{% endif %}
+        {% if inv.notify %}<span class="badge">💬 Telegram bildirimi</span>{% endif %}
+      </div>
+      <p class="iv-when">📅 {{ when }}</p>
+      {% if inv.place or inv.address %}
+        <p class="muted small">📍 {{ inv.place }}{% if inv.place and inv.address %} · {% endif %}{{ inv.address }}
+          {% if maps %}· <a href="{{ maps }}" target="_blank" rel="noopener noreferrer">Haritada aç</a>{% endif %}</p>
+      {% endif %}
+      {% if deadline %}<p class="muted small">⏳ LCV son günü: {{ deadline }}</p>{% endif %}
+      <div class="row-flex" style="margin-top: 10px">
+        <a class="btn sm primary" href="{{ share }}" target="_blank" rel="noopener noreferrer">💬 WhatsApp'ta paylaş</a>
+        <a class="btn sm" href="{{ url }}" target="_blank" rel="noopener">👁️ Davetiye sayfası</a>
+        <a class="btn sm" href="{{ url_for('invites.qr_png', invite_id=inv.id) }}">⬇️ QR (PNG)</a>
+        {% if state != 'ended' %}
+          <form method="post" action="{{ url_for('invites.toggle', invite_id=inv.id) }}" class="inline"
+                {% if not inv.closed %}data-confirm="Yanıtlar kapatılsın mı? Yeni yanıt verilemez, verilenler değiştirilemez; istediğinde yeniden açabilirsin."{% endif %}>
+            {{ ui.csrf() }}
+            <button class="btn sm">{{ "▶️ Yanıtları aç" if inv.closed else "⏸️ Yanıtları kapat" }}</button>
+          </form>
+        {% endif %}
+        {% if rows %}<a class="btn sm" href="{{ url_for('invites.export', invite_id=inv.id) }}">⬇️ CSV</a>{% endif %}
+      </div>
+      {% if inv.notify and not telegram_ready %}
+        <p class="muted small">💬 Telegram bağlı değil; bildirim gelmez (Ayarlar'dan bağla).</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<div class="stats">
+  <div class="stat"><div class="label">✅ Geliyor</div><div class="value">{{ t.yes }} kişi</div>
+    <div class="sub">{{ t.yes_responses }} yanıt{% if inv.capacity %} · kontenjan {{ inv.capacity }}{% endif %}</div></div>
+  {% if inv.allow_maybe or t.maybe %}<div class="stat"><div class="label">🤔 Belki</div><div class="value">{{ t.maybe }}</div></div>{% endif %}
+  <div class="stat"><div class="label">❌ Gelemiyor</div><div class="value">{{ t.no }}</div></div>
+  {% if guests %}<div class="stat"><div class="label">⏳ Yanıt bekleyen</div><div class="value">{{ waiting | length }}</div>
+    <div class="sub">{{ guests | length }} davetliden</div></div>{% endif %}
+  <div class="stat"><div class="label">👁️ Görüntülenme</div><div class="value">{{ inv.views }}</div>
+    <div class="sub">sen ve link önizlemeleri sayılmaz</div></div>
+</div>
+
+<section class="card" id="yanitlar">
+  <h2>📋 Yanıtlar {% if rows %}<span class="pill-count">{{ rows | length }}</span>{% endif %}</h2>
+  {% if not rows %}
+    <p class="muted small">Henüz yanıt yok. Linki ya da QR'ı paylaş{% if inv.invite_only %}; “Sadece davetliler” açık, aşağıdan kişiye özel link oluştur{% endif %}.</p>
+  {% else %}
+    <p class="muted small">{{ summary }}</p>
+    <div class="table-wrap">
+      <table class="iv-table">
+        <thead><tr><th>İsim</th><th>Durum</th>{% if inv.ask_count %}<th>Kişi</th>{% endif %}<th>Not</th>
+          {% if inv.question %}<th title="{{ inv.question }}">{{ inv.question | truncate(30, True, "…") }}</th>{% endif %}
+          <th>Zaman</th><th></th></tr></thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>{{ r.name }}{% if r.guest_label %} <span class="muted small">🔑 {{ r.guest_label }}</span>{% endif %}</td>
+              <td class="st">{{ statuses[r.status][0] }} {{ statuses[r.status][1] }}</td>
+              {% if inv.ask_count %}<td>{{ r.count if r.status == 'yes' else "" }}</td>{% endif %}
+              <td class="small">{{ r.note }}</td>
+              {% if inv.question %}<td class="small">{{ r.answer }}</td>{% endif %}
+              <td class="muted small">{{ r.updated_at | localdt }}</td>
+              <td>
+                <form method="post" action="{{ url_for('invites.response_delete', invite_id=inv.id, response_id=r.id) }}" class="inline"
+                      data-confirm="“{{ r.name }}” yanıtı silinsin mi? Geri alınamaz{{ '; kişiye özel linki yeniden yanıt verebilir' if r.guest_id }}.">
+                  {{ ui.csrf() }}
+                  <button class="btn sm icon danger" title="Yanıtı sil" aria-label="Yanıtı sil">🗑️</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</section>
+
+<section class="card" id="davetliler">
+  <h2>🔑 Kişiye özel davet linkleri {% if guests %}<span class="pill-count">{{ guests | length - waiting | length }}/{{ guests | length }} yanıt verdi</span>{% endif %}</h2>
+  {% if inv.invite_only and not guests %}
+    <p class="flash warning">“Sadece davetliler” açık: ortak link yeni yanıt almaz. Aşağıdan davetlileri ekle, her birine kendi linkini gönder.</p>
+  {% elif not inv.invite_only %}
+    <p class="muted small">İsteğe bağlı: davetli başına link oluşturursan kimin yanıt vermediğini görürsün; herkes kendi
+      linkinden yanıtını değiştirir. Ortak link de yanıt almaya devam eder.</p>
+  {% endif %}
+  {% if waiting %}
+    <p class="iv-waiting"><b>⏳ Yanıt bekleyenler:</b> {{ waiting | map(attribute='label') | join(", ") }}</p>
+  {% endif %}
+  {% if guests %}
+    <ul class="rows iv-guests">
+      {% for gst in guests %}
+        <li>
+          <span class="ico">{% if gst.response_id %}{{ statuses[gst.status][0] }}{% else %}✉️{% endif %}</span>
+          <div class="grow">
+            <div class="title">{{ gst.label }}
+              {% if gst.response_id %}<span class="badge good">{{ statuses[gst.status][1] }}{% if gst.status == 'yes' and gst.count > 1 %} · {{ gst.count }} kişi{% endif %}</span>
+              {% else %}<span class="badge">Yanıt bekleniyor</span>{% endif %}</div>
+            <div class="meta">
+              {% if gst.phone %}<span>📞 {{ gst.phone }}</span>{% endif %}
+              <span class="iv-link" id="iv-guest-{{ gst.id }}">{{ gst.url }}</span>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="btn sm" href="{{ gst.whatsapp }}" target="_blank" rel="noopener noreferrer"
+               title="{{ 'WhatsApp’ta ' ~ gst.phone ~ ' numarasına davet mesajı' if gst.has_phone else 'WhatsApp’ta davet mesajı (kişiyi sen seç)' }}">💬{% if gst.has_phone %} Davet et{% endif %}</a>
+            <button type="button" class="btn sm icon hidden" data-copy="iv-guest-{{ gst.id }}" title="Linki kopyala" aria-label="Linki kopyala">📋</button>
+            {% if not gst.response_id %}
+              <form method="post" action="{{ url_for('invites.guest_delete', invite_id=inv.id, guest_id=gst.id) }}" class="inline"
+                    data-confirm="“{{ gst.label }}” linki iptal edilsin mi? Artık yanıt veremez.">
+                {{ ui.csrf() }}
+                <button class="btn sm icon danger" title="Linki iptal et" aria-label="Linki iptal et">🚫</button>
+              </form>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% if guests | length < max_guests %}
+    <details class="add" {% if inv.invite_only and not guests %}open{% endif %}>
+      <summary>＋ Davetli ekle</summary>
+      <form method="post" action="{{ url_for('invites.guest_create', invite_id=inv.id) }}">
+        {{ ui.csrf() }}
+        {{ ui.textarea("Davetliler (her satıra bir kişi ya da aile; istersen yanına telefon)", "guests", "", rows=4,
+                       placeholder="Ahmet ve ailesi, 0532 123 45 67\nAyşe Teyze\nMehmet 0505 111 22 33",
+                       hint="Etiket sadece sana görünür; yanıt formunda ad olarak yazılı gelir. Telefonu olana 💬 ile hazır WhatsApp davet mesajı gider.") }}
+        <button class="btn primary">🔑 Linkleri oluştur</button>
+      </form>
+    </details>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>ℹ️ Davetiye</h2>
+  {% if inv.photo %}<img class="iv-cover" src="{{ url_for('invites.cover', code=inv.code, v=photo_v) }}" alt="Kapak fotoğrafı">{% endif %}
+  {% if inv.host %}<p class="muted small">💌 Ev sahibi: {{ inv.host }}</p>{% endif %}
+  {% if inv.description %}<p class="iv-desc">{{ inv.description }}</p>{% endif %}
+  <p class="muted small">
+    {{ "🤔 “Belki” seçeneği var" if inv.allow_maybe else "“Belki” seçeneği yok" }} ·
+    {{ ("👥 kişi sayısı soruluyor (yanıt başına en fazla " ~ inv.max_per_response ~ ")") if inv.ask_count else "kişi sayısı sorulmuyor" }}
+    {% if inv.capacity %}· 🎟️ kontenjan {{ inv.capacity }} kişi{% endif %}
+    {% if inv.question %}· ❓ “{{ inv.question }}”{% endif %}
+    · 👀 {{ show_guests[inv.show_guests] }}</p>
+  <p class="muted small">Aynı tarayıcıdan sayfaya dönen davetli yanıtını değiştirebilir (tarayıcıya çerez yazılır; başka
+    cihaz için sayfada kişisel düzenleme linki gösterilir). Aynı isimle ikinci yanıt verilemez. Kesin liste için kişiye özel
+    linkleri kullan.</p>
+</section>
+<script src="{{ url_for('static', filename='invites.js') }}?v=1" defer></script>
+{% endblock %}

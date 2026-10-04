@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{# Davetiyelerim: yaklaşanlar (tarih sırasıyla) ve geçmiş; her birinde yanıt özeti ve herkese açık link. #}
+{% block title %}Davetiye{% endblock %}
+{% block head %}
+<style>
+  .iv-rows .title a { overflow-wrap: anywhere; }
+  .iv-rows .ico { font-size: 1.4rem; }
+  .iv-url { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; color: var(--primary);
+            overflow-wrap: anywhere; user-select: all; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🎉 Davetiye", "Doğum günü, düğün, yemek… davetiyeni hazırla, linki paylaş; davetliler giriş yapmadan katılıp katılmayacaklarını yazsın") %}
+  <a class="btn primary" href="{{ url_for('invites.create') }}">＋ Yeni davetiye</a>
+{% endcall %}
+
+{% macro invite_list(items) -%}
+  <ul class="rows iv-rows">
+    {% for i in items %}
+      <li>
+        <span class="ico">{{ i.cover_emoji }}</span>
+        <div class="grow">
+          <div class="title">
+            <a href="{{ url_for('invites.detail', invite_id=i.id) }}">{{ i.title }}</a>
+            {% if i.state == 'open' %}<span class="badge good">Yanıtlar açık</span>
+            {% elif i.state == 'ended' %}<span class="badge">Sona erdi</span>
+            {% else %}<span class="badge">Yanıtlar kapalı</span>{% endif %}
+            {% if i.invite_only %}<span class="badge">🔑 Sadece davetliler</span>{% endif %}
+          </div>
+          <div class="meta">
+            <span>📅 {{ i.when }}</span>
+            {% if i.place %}<span>📍 {{ i.place }}</span>{% endif %}
+            <span>{{ i.summary }}</span>
+            {% if i.capacity %}<span>🎟️ {{ i.yes }}/{{ i.capacity }}</span>{% endif %}
+            {% if i.state != 'ended' %}<span class="iv-url">{{ public_url(i.code) }}</span>{% endif %}
+          </div>
+        </div>
+        <div class="actions">
+          <a class="btn sm" href="{{ url_for('invites.detail', invite_id=i.id) }}">📋 Yanıtlar</a>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{%- endmacro %}
+
+{% if upcoming or past %}
+  <section class="card">
+    <h2>📬 Yaklaşan {% if upcoming %}<span class="pill-count">{{ upcoming | length }}</span>{% endif %}</h2>
+    {% if upcoming %}{{ invite_list(upcoming) }}{% else %}<p class="muted small">Yaklaşan davetiye yok.</p>{% endif %}
+  </section>
+  {% if past %}
+    <section class="card">
+      <details>
+        <summary><b>🗂️ Geçmiş</b> <span class="pill-count">{{ past | length }}</span></summary>
+        {{ invite_list(past) }}
+      </details>
+    </section>
+  {% endif %}
+{% else %}
+  <div class="card">
+    {{ ui.empty("Henüz davetiye yok. Tarih, saat ve yeri yaz; renkli bir davetiye sayfası hazır olsun. Linki WhatsApp'tan gönder, kimin geleceğini buradan izle.", "🎉") }}
+    <p class="center"><a class="btn primary" href="{{ url_for('invites.create') }}">＋ Yeni davetiye</a></p>
+  </div>
+{% endif %}
+{% endblock %}

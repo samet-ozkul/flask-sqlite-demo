@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{# Davetiye oluştur / düzenle. Betik gerekmez; kapak fotoğrafı yüklenirse 1,91:1 kırpılır (link önizlemesinde de görünür). #}
+{% block title %}{{ "Davetiyeyi düzenle" if inv else "Yeni davetiye" }}{% endblock %}
+{% block head %}
+<style>
+  .iv-accents { display: flex; flex-wrap: wrap; gap: 8px; }
+  .iv-accents label { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; cursor: pointer;
+                      border: 1px solid var(--border); border-radius: 99px; font-size: .88rem; }
+  .iv-accents label:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+  .iv-accents input { margin: 0; }
+  .iv-accents .dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; }
+  .iv-photo { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: -4px 0 12px; }
+  .iv-photo img { width: 160px; max-width: 100%; aspect-ratio: 1200 / 630; object-fit: cover; border-radius: var(--radius-sm); }
+  .iv-photo .check { margin: 0; }
+</style>
+{% endblock %}
+{% block content %}
+{% call ui.page_header("🎉 " ~ ("Davetiyeyi düzenle" if inv else "Yeni davetiye"),
+                       back=url_for('invites.detail', invite_id=inv.id) if inv else url_for('invites.index')) %}{% endcall %}
+
+<form method="post" action="{{ url_for('invites.edit', invite_id=inv.id) if inv else url_for('invites.create') }}"
+      enctype="multipart/form-data">
+  {{ ui.csrf() }}
+  <section class="card">
+    <h2>Davetiye</h2>
+    {{ ui.field("Başlık", "title", f.title, required=True, attrs='maxlength="' ~ limits.title ~ '"',
+                placeholder="ör. Elif'in 5. yaş günü") }}
+    {{ ui.field("Ev sahibi", "host", f.host, attrs='maxlength="' ~ limits.host ~ '"', placeholder="ör. Ayşe & Mehmet",
+                hint="Davetiyede “… seni davet ediyor” olarak görünür; boş bırakılabilir") }}
+    <div class="form-row three">
+      {{ ui.field("Tarih", "starts_on", f.starts_on, type="date", required=True,
+                  attrs=('min="' ~ today ~ '"') if not inv else "") }}
+      {{ ui.field("Başlangıç", "starts_at", f.starts_at, type="time", required=True) }}
+      {{ ui.field("Bitiş (isteğe bağlı)", "ends_at", f.ends_at, type="time",
+                  hint="Gece yarısını geçebilir (ör. 21:00–02:00)") }}
+    </div>
+    <div class="form-row">
+      {{ ui.field("Yer", "place", f.place, attrs='maxlength="' ~ limits.place ~ '"', placeholder="ör. Neşeli Çocuk Kafe") }}
+      {{ ui.field("Adres", "address", f.address, attrs='maxlength="' ~ limits.address ~ '"',
+                  placeholder="ör. Atatürk Cad. No: 5, Selçuklu / Konya",
+                  hint="Davetiyede “📍 Haritada aç” (Google Haritalar) linki olur") }}
+    </div>
+    {{ ui.textarea("Açıklama / program", "description", f.description, rows=4,
+                   placeholder="İsteğe bağlı: program, kıyafet, hediye notu, otopark… (en fazla 2000 karakter)") }}
+  </section>
+
+  <section class="card">
+    <h2>Görünüm</h2>
+    <div class="form-row">
+      {{ ui.field("Kapak emojisi", "cover_emoji", f.cover_emoji, attrs='maxlength="' ~ limits.cover_emoji ~ '"',
+                  hint="ör. " ~ emoji_hints ~ " · fotoğraf yoksa kapakta büyük görünür") }}
+      <label class="field"><span>Kapak fotoğrafı (isteğe bağlı)</span>
+        <input type="file" name="photo" accept="image/*">
+        <small class="muted">1200×630'a kırpılır (WhatsApp/Telegram önizlemesinde de görünür); konum (EXIF) bilgisi silinir.</small>
+      </label>
+    </div>
+    {% if inv and inv.photo %}
+      <div class="iv-photo">
+        <img src="{{ url_for('invites.cover', code=inv.code, v=photo_v) }}" alt="Kapak fotoğrafı">
+        {{ ui.checkbox("Fotoğrafı kaldır", "remove_photo") }}
+      </div>
+    {% endif %}
+    <div class="field"><span>Renk teması</span>
+      <div class="iv-accents">
+        {% for key, (label, light, _dark) in accents.items() %}
+          <label><input type="radio" name="accent" value="{{ key }}" {% if key == f.accent %}checked{% endif %}>
+            <span class="dot" style="background: {{ light }}"></span>{{ label }}</label>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Yanıtlar (LCV)</h2>
+    {{ ui.field("LCV son tarihi (isteğe bağlı)", "rsvp_deadline", f.rsvp_deadline, type="date",
+                attrs=('min="' ~ today ~ '"') if not inv else "",
+                hint="Bu günün sonuna kadar yanıt verilir ve değiştirilir; boşsa etkinlik başlayana kadar"
+                     ~ ("; geçince Telegram'dan özet gelir" if telegram_ready else "") ~ ".") }}
+    {{ ui.checkbox("🤔 “Belki” seçeneği olsun", "allow_maybe", f.allow_maybe) }}
+    <div class="form-row">
+      {{ ui.checkbox("👥 Gelenlere kaç kişi olduklarını sor", "ask_count", f.ask_count) }}
+      {{ ui.field("Yanıt başına en fazla kişi", "max_per_response", f.max_per_response, type="number",
+                  attrs='min="1" max="' ~ count_max ~ '" inputmode="numeric"', hint="Kişi sayısı soruluyorsa (yanıtlayan dahil)") }}
+    </div>
+    {{ ui.field("Toplam kontenjan (isteğe bağlı)", "capacity", f.capacity, type="number",
+                attrs='min="1" max="' ~ capacity_max ~ '" inputmode="numeric"', placeholder="sınırsız",
+                hint="Gelen kişi sayısı buna ulaşınca yeni “Geliyorum” alınmaz; “Belki” ve “Gelemiyorum” alınır.") }}
+    {{ ui.field("Özel soru (isteğe bağlı)", "question", f.question, attrs='maxlength="' ~ limits.question ~ '"',
+                placeholder="ör. Yemek tercihin / alerjin var mı?", hint="Yanıt formunda sorulur; cevaplar sadece sana görünür") }}
+    {{ ui.select("👀 Kimin geldiği davetiyede görünsün mü?", "show_guests", show_guests.items() | list, f.show_guests) }}
+    {{ ui.checkbox("🔑 Sadece davetliler: ortak link yeni yanıt almaz, herkes kendi kişiye özel linkinden yanıt verir",
+                   "invite_only", f.invite_only) }}
+  </section>
+
+  <section class="card">
+    <h2>Takvim ve bildirim</h2>
+    {{ ui.checkbox("📅 Takvimime ekle (sadece sana görünen etkinlik; tarih değişince güncellenir, davetiye silinince kalkar)",
+                   "calendar", f.calendar) }}
+    {{ ui.checkbox("💬 Her yeni yanıtta Telegram'dan haber ver (en fazla 10 dakikada bir, toplu)", "notify", f.notify) }}
+    {% if not telegram_ready %}
+      <p class="muted small">Telegram bağlı değil: bildirim, LCV özeti ve bir gün önceki “Yarın” mesajı için
+        <a href="{{ url_for('settings.index') }}">Ayarlar</a>'dan bağla.</p>
+    {% else %}
+      <p class="muted small">LCV son tarihi geçince bir kez özet, etkinlikten bir gün önce akşam “Yarın: … · kaç kişi geliyor” mesajı gelir.</p>
+    {% endif %}
+  </section>
+  <button class="btn primary block">{{ "Kaydet" if inv else "🎉 Davetiyeyi oluştur" }}</button>
+</form>
+{% endblock %}
