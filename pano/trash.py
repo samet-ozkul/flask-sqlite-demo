@@ -4,7 +4,9 @@ move() kaydı ve bağlı satırlarını (liste maddeleri, araç kayıtları, hed
 JSON olarak kutuya koyar, sonra siler. Tablolar AUTOINCREMENT kullandığı için silinen id bir daha
 verilmez; geri getirirken satırlar aynı id'lerle yerine konur, bağlantılar bozulmaz.
 Ek dosyaları kutuda kaldığı sürece diskte durur; süre dolunca (purge) silinir.
+BLOB sütunları (ör. davetiye kapak fotoğrafı) kutuda base64 metin olarak durur, geri getirilince bayt olur.
 """
+import base64
 import json
 
 from flask import url_for
@@ -13,6 +15,7 @@ from markupsafe import Markup, escape
 from .db import get_db, query, query_one
 
 KEEP_DAYS = 30
+BLOB_KEY = "$blob"
 
 
 def notice(what):
@@ -23,6 +26,19 @@ def notice(what):
 
 def _rows(table, where, args):
     return [dict(r) for r in query(f"SELECT * FROM {table} WHERE {where}", args)]
+
+
+def _encode(value):
+    """json.dumps'ın bilmediği değer: BLOB (bayt) -> {"$blob": base64}."""
+    if isinstance(value, bytes):
+        return {BLOB_KEY: base64.b64encode(value).decode("ascii")}
+    raise TypeError(f"{type(value).__name__} çöp kutusuna yazılamaz")
+
+
+def _decode(value):
+    if isinstance(value, dict) and BLOB_KEY in value:
+        return base64.b64decode(value[BLOB_KEY])
+    return value
 
 
 def move(user_id, module, label, parent, children=(), entity=None):
@@ -46,7 +62,7 @@ def move(user_id, module, label, parent, children=(), entity=None):
         capture("attachments", "entity = ? AND entity_id = ?", (entity, row_id))
     db = get_db()
     cur = db.execute("INSERT INTO trash (user_id, module, label, payload) VALUES (?, ?, ?, ?)",
-                     (user_id, module, label[:150], json.dumps(payload, ensure_ascii=False)))
+                     (user_id, module, label[:150], json.dumps(payload, ensure_ascii=False, default=_encode)))
     # Ek satırları da kaldırılır (dosyalar diskte kalır); çocuk satırlar ON DELETE CASCADE ile gider
     if entity:
         db.execute("DELETE FROM attachments WHERE entity = ? AND entity_id = ?", (entity, row_id))
@@ -67,7 +83,7 @@ def restore(trash_id, user_id):
             for row in payload["rows"][table]:
                 cols = list(row)
                 db.execute(f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
-                           [row[c] for c in cols])
+                           [_decode(row[c]) for c in cols])
         db.execute("DELETE FROM trash WHERE id = ?", (trash_id,))
         db.commit()
     except Exception as e:  # ör. bağlı olduğu liste de silinmişse

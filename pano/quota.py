@@ -3,8 +3,8 @@
 - users.quota_mb: kullanıcının dosyalarının toplam kaplayabileceği alan (NULL = sınır yok, sadece genel disk kotası)
 - users.upload_max_mb: tek dosyanın en fazla boyutu (NULL = modülün kendi sınırı; 0 = dosya yükleyemez)
 Sayılanlar: ekler (çöp kutusundakiler dahil, dosyaları diskte durur), Aktar dosyaları, tarama kutusu, profil
-fotoğrafı. Metin kayıtları (not, harcama...) çok küçük olduğu için sayılmaz. Genel disk kotası (STORAGE_QUOTA_MB)
-her zaman ayrıca geçerlidir.
+fotoğrafı, davetiye kapak fotoğrafları. Metin kayıtları (not, harcama...) çok küçük olduğu için sayılmaz.
+Genel disk kotası (STORAGE_QUOTA_MB) her zaman ayrıca geçerlidir.
 Yeni kullanıcıların varsayılanı: DEFAULT_QUOTA_MB / DEFAULT_UPLOAD_MAX_MB (boşsa sınırsız).
 """
 import json
@@ -54,6 +54,8 @@ def usage(user_id):
         "scan": query_one("SELECT COALESCE(SUM(size), 0) AS s FROM scan_inbox WHERE user_id = ? AND expires_at > ?",
                           (user_id, now))["s"],
         "profile": query_one("SELECT COALESCE(SUM(length(photo)), 0) AS s FROM public_profiles WHERE user_id = ?",
+                             (user_id,))["s"],
+        "invites": query_one("SELECT COALESCE(SUM(length(photo)), 0) AS s FROM invites WHERE user_id = ?",
                              (user_id,))["s"],
     }
     parts["total"] = sum(parts.values())

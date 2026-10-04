@@ -182,6 +182,14 @@ def _sources(user_id):
          ("question", "description", "options"), lambda r: r["question"] + (" (kapandı)" if r["closed"] else ""),
          lambda r: " · ".join(x for x in (f"{r['votes']} oy", r["description"], r["options"]) if x),
          lambda r: url_for("polls.detail", poll_id=r["id"])),
+        ("Davetiye", "🎉",
+         "SELECT i.id, i.title, i.host, i.place, i.address, i.description, i.cover_emoji, i.starts_on, i.starts_at,"
+         " (SELECT COALESCE(SUM(r.count), 0) FROM invite_responses r WHERE r.invite_id = i.id AND r.status = 'yes')"
+         " AS coming FROM invites i WHERE i.user_id = ? ORDER BY i.starts_on DESC, i.id DESC LIMIT ?", (user_id,),
+         ("title", "host", "place", "address", "description"), lambda r: f"{r['cover_emoji']} {r['title']}",
+         lambda r: " · ".join(x for x in (f"{fmt_date(r['starts_on'], True)} {r['starts_at']}", r["place"],
+                                          f"{r['coming']} kişi geliyor") if x),
+         lambda r: url_for("invites.detail", invite_id=r["id"])),
     ]
 
 
