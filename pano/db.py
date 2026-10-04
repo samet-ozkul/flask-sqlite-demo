@@ -1070,6 +1070,80 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_tickets_user ON tickets(user_id, starts_on);
     """,
+    # 38: davetiye (/d/<kod>, girişsiz LCV). Tarih ve saatler yerel, saat dilimsiz. Kapak fotoğrafı veritabanında
+    #     (profil gibi; çöp kutusunda base64). FK'lar çöpten geri getirme sırasına uyar: davetiye -> davetliler ->
+    #     yanıtlar (guest_id) -> takvim etkinliği (event_id'de FK yok). rev: her yeni/değişen yanıtta artan sayaç
+    #     (toplu Telegram bildirimi notified_rev'den sonrakileri yazar)
+    """
+    CREATE TABLE invites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        code TEXT NOT NULL UNIQUE,                    -- karışmayan harflerden 7 karakter, küçük harf
+        title TEXT NOT NULL,
+        host TEXT NOT NULL DEFAULT '',                -- ev sahibi adı
+        starts_on TEXT NOT NULL,                      -- 'YYYY-MM-DD'
+        starts_at TEXT NOT NULL,                      -- 'HH:MM'
+        ends_at TEXT,                                 -- 'HH:MM'; başlangıçtan önceyse ertesi gün (NULL: 3 saat sayılır)
+        place TEXT NOT NULL DEFAULT '',
+        address TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        cover_emoji TEXT NOT NULL DEFAULT '🎉',
+        accent TEXT NOT NULL DEFAULT 'pink',          -- profile.ACCENTS anahtarı
+        photo BLOB,                                   -- kapak: en fazla 1200×630 JPEG, EXIF'siz
+        rsvp_deadline TEXT,                           -- 'YYYY-MM-DD' (o gün dahil); NULL = etkinlik başlayana kadar
+        allow_maybe INTEGER NOT NULL DEFAULT 1,
+        ask_count INTEGER NOT NULL DEFAULT 1,         -- "Geliyorum"da kişi sayısı sorulur
+        max_per_response INTEGER NOT NULL DEFAULT 6,
+        capacity INTEGER,                             -- toplam "geliyor" kişi sınırı (NULL = sınırsız)
+        question TEXT NOT NULL DEFAULT '',            -- isteğe bağlı özel soru
+        show_guests TEXT NOT NULL DEFAULT 'counts' CHECK (show_guests IN ('none', 'counts', 'names')),
+        invite_only INTEGER NOT NULL DEFAULT 0,       -- ortak link yanıt almaz, sadece kişiye özel linkler
+        closed INTEGER NOT NULL DEFAULT 0,            -- LCV elle kapatıldı
+        event_id INTEGER,                             -- takvimdeki özel etkinlik (FK yok: geri getirme sırası)
+        notify INTEGER NOT NULL DEFAULT 0,            -- yeni/değişen yanıtları Telegram'dan bildir (10 dakikada bir)
+        rev INTEGER NOT NULL DEFAULT 0,
+        notified_rev INTEGER NOT NULL DEFAULT 0,
+        notified_at TEXT,                             -- son toplu bildirim, yerel 'YYYY-MM-DD HH:MM:SS'
+        deadline_sent_for TEXT,                       -- LCV son tarihi özeti hangi son tarih için gönderildi
+        eve_sent_for TEXT,                            -- bir gün önceki akşam mesajı hangi etkinlik günü için gönderildi
+        views INTEGER NOT NULL DEFAULT 0,             -- sahibi ve link önizlemeleri sayılmaz
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_invites_user ON invites(user_id, starts_on);
+    CREATE INDEX idx_invites_date ON invites(starts_on);
+    CREATE TABLE invite_guests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invite_id INTEGER NOT NULL REFERENCES invites(id) ON DELETE CASCADE,
+        label TEXT NOT NULL,                          -- "Ahmet ve ailesi" (sahibine görünür; formda ad olarak gelir)
+        phone TEXT NOT NULL DEFAULT '',               -- WhatsApp davet mesajı için
+        token TEXT NOT NULL UNIQUE,                   -- /d/<kod>?k=<anahtar>; bu linkin yanıtı düzenlenebilir
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_invite_guests ON invite_guests(invite_id, id);
+    CREATE TABLE invite_responses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invite_id INTEGER NOT NULL REFERENCES invites(id) ON DELETE CASCADE,
+        guest_id INTEGER REFERENCES invite_guests(id) ON DELETE SET NULL,   -- kişiye özel linkle verildiyse
+        name TEXT NOT NULL,
+        name_key TEXT NOT NULL,                       -- fold(ad): aynı isimle ikinci yanıt engellenir
+        status TEXT NOT NULL CHECK (status IN ('yes', 'no', 'maybe')),
+        count INTEGER NOT NULL DEFAULT 0,             -- "geliyor" kişi sayısı (yanıtlayan dahil); diğerlerinde 0
+        note TEXT NOT NULL DEFAULT '',
+        answer TEXT NOT NULL DEFAULT '',              -- özel sorunun cevabı
+        edit_token_hash TEXT NOT NULL DEFAULT '',     -- düzenleme belirtecinin (çerez / kişisel link) SHA-256'sı
+        ip_hash TEXT NOT NULL DEFAULT '',             -- SECRET_KEY ile HMAC; IP düz saklanmaz
+        rev INTEGER NOT NULL DEFAULT 0,               -- son değişikliğin sayaç değeri
+        created_rev INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_invite_responses ON invite_responses(invite_id, id);
+    CREATE UNIQUE INDEX idx_invite_responses_name ON invite_responses(invite_id, name_key);
+    CREATE UNIQUE INDEX idx_invite_responses_guest ON invite_responses(guest_id) WHERE guest_id IS NOT NULL;
+    CREATE INDEX idx_invite_responses_token ON invite_responses(invite_id, edit_token_hash);
+    CREATE INDEX idx_invite_responses_ip ON invite_responses(invite_id, ip_hash, created_at);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

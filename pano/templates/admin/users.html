@@ -58,7 +58,8 @@
           <details>
             <summary class="muted small" style="cursor: pointer">💾 Alan ve dosya sınırı</summary>
             <p class="muted small" style="margin: 6px 0 0">Ekler {{ q.usage.attachments | size }} · çöp kutusu {{ q.usage.trash | size }} ·
-              Aktar {{ q.usage.transfer | size }} · tarama {{ q.usage.scan | size }} · profil {{ q.usage.profile | size }}</p>
+              Aktar {{ q.usage.transfer | size }} · tarama {{ q.usage.scan | size }} · profil {{ q.usage.profile | size }} ·
+              davetiye {{ q.usage.invites | size }}</p>
             <form method="post" action="{{ url_for('admin.set_limits', user_id=u.id) }}" class="q-form">
               {{ ui.csrf() }}
               <label>Depolama kotası (MB)<input type="number" name="quota_mb" min="0" max="{{ global_quota_mb }}"

@@ -198,7 +198,7 @@
       <span class="bar-value">%{{ storage.percent }}</span></div></div>
   {% endif %}
   <p class="muted small">Ekler {{ u.attachments | size }} · çöp kutusu {{ u.trash | size }} · Aktar {{ u.transfer | size }} ·
-    tarama kutusu {{ u.scan | size }} · profil fotoğrafı {{ u.profile | size }}</p>
+    tarama kutusu {{ u.scan | size }} · profil fotoğrafı {{ u.profile | size }} · davetiye kapakları {{ u.invites | size }}</p>
   <p class="muted small">{% if storage.upload_max_mb is none %}Dosya başına yönetici sınırı yok (modüllerin kendi sınırları geçerli).
     {% elif storage.upload_max_mb == 0 %}🚫 Hesabında dosya yükleme kapalı.
     {% else %}Tek dosya en fazla {{ storage.upload_max_mb }} MB olabilir.{% endif %}
