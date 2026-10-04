@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "installments/_parts.html" import style, purchase_fields with context %}
+{% block title %}Yeni alışveriş{% endblock %}
+{% block head %}{{ style() }}{% endblock %}
+{% block content %}
+{{ ui.page_header("💳 Yeni alışveriş", "Tek çekim ya da taksitli; hangi ekstreye ne kadar düşeceği aşağıda görünür.",
+                  back=url_for('installments.index')) }}
+
+<div class="card">
+  {% if cards %}
+    <form method="post" action="{{ url_for('installments.purchase_new') }}" data-plan-url="{{ url_for('installments.plan_preview') }}">
+      {{ ui.csrf() }}
+      {{ purchase_fields(p, cards, first_auto) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  {% else %}
+    {{ ui.empty("Önce bir kart ekle: ad, hesap kesim günü ve son ödeme günü yeter.", "💳") }}
+    <p class="center"><a class="btn primary" href="{{ url_for('installments.index') }}">＋ Kart ekle</a></p>
+  {% endif %}
+</div>
+<script src="{{ url_for('static', filename='installments.js') }}?v=1" defer></script>
+{% endblock %}

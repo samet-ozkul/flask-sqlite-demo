@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "installments/_parts.html" import style, state_badge with context %}
+{% block title %}{{ card.name }} · {{ st.label }}{% endblock %}
+{% block head %}{{ style() }}{% endblock %}
+{% block content %}
+{% set here = request.full_path.rstrip('?') %}
+{{ ui.page_header(color_icon(card.color) ~ " " ~ card.name ~ " · " ~ st.label ~ " ekstresi", None,
+                  back=url_for('installments.card_page', card_id=card.id)) }}
+
+<nav class="tabs" aria-label="Dönemler">
+  <a href="{{ url_for('installments.statement_page', card_id=card.id, period=prev) }}">← {{ period_label(prev, True) }}</a>
+  <a href="{{ url_for('installments.statement_page', card_id=card.id, period=st.period) }}" class="active">{{ period_label(st.period, True) }}</a>
+  <a href="{{ url_for('installments.statement_page', card_id=card.id, period=nxt) }}">{{ period_label(nxt, True) }} →</a>
+  {% if st.period != current %}<a href="{{ url_for('installments.statement_page', card_id=card.id, period=current) }}">Açık dönem</a>{% endif %}
+</nav>
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Ekstre tutarı</div>
+    <div class="value">{{ st.amount | money }}</div>
+    <div class="sub">{{ st.entries | length }} kalem</div>
+  </div>
+  <div class="stat">
+    <div class="label">Hesap kesim</div>
+    <div class="value" style="font-size: 1.1rem">{{ st.cut | date_tr(True) }}</div>
+    <div class="sub">{{ "Kesildi" if st.is_cut else "Kesim günü dahil o güne kadarki alışverişler eklenir" }}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Son ödeme</div>
+    <div class="value" style="font-size: 1.1rem">{{ st.due | date_tr(True) }}</div>
+    <div class="sub">{% if st.state in ('due', 'open', 'future') and st.amount %}{{ ui.due_badge(st.due, card.remind_days) }}{% else %}{{ state_badge(st.state) }}{% endif %}</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Taksitler</h2>
+  {% if st.entries %}
+    <div class="table-wrap">
+      <table class="ins-plan">
+        <thead><tr><th>Alışveriş</th><th>Taksit</th><th class="num">Tutar</th></tr></thead>
+        <tbody>
+          {% for p, e in st.entries %}
+            <tr>
+              <td><a href="{{ url_for('installments.purchase', purchase_id=p.id) }}">{{ p.title }}</a>
+                <small>{{ p.purchased_on | date_tr }}{% if p.merchant %} · {{ p.merchant }}{% endif %}</small></td>
+              <td>{{ entry_label(e, p.count) }}</td>
+              <td class="num">{{ e.amount | money }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr><td colspan="2">Toplam</td><td class="num">{{ st.amount | money }}</td></tr></tfoot>
+      </table>
+    </div>
+  {% else %}
+    {{ ui.empty("Bu ekstreye düşen taksit yok.", "📄") }}
+  {% endif %}
+</div>
+
+<div class="card">
+  {% if st.state == 'paid' %}
+    <h2>✅ Ödendi</h2>
+    <p>{{ st.row.paid_on | date_tr(True) }} günü <b>{{ st.row.paid_amount | money }}</b> ödendi.
+      {% if (st.row.paid_amount - st.amount) | abs >= 0.01 %}<span class="muted">Ekstre toplamı şu an {{ st.amount | money }}.</span>{% endif %}
+    </p>
+    {% set n = (st.row.expense_ids or "").split(",") | select | list | length %}
+    <form method="post" action="{{ url_for('installments.statement_unpay', card_id=card.id, period=st.period) }}" class="row-flex"
+          data-confirm="Ödeme geri alınsın mı?{{ ' Bu ödemeyle eklenen taksit harcamaları da silinir.' if n }}">
+      {{ ui.csrf() }}
+      <input type="hidden" name="next" value="{{ here }}">
+      <button class="btn sm">↩️ Ödemeyi geri al</button>
+      {% if n %}<span class="muted small">Bu ödemeyle Harcamalar'a işlenen {{ n }} taksit de silinir.</span>{% endif %}
+    </form>
+  {% elif st.state == 'assumed' %}
+    <h2>✅ Ödenmiş sayılır</h2>
+    <p class="muted" style="margin: 0">Bu ekstrenin son ödemesi kart panoya eklenmeden önceydi.</p>
+  {% elif st.amount %}
+    <h2>Ödendi olarak işaretle</h2>
+    <form method="post" action="{{ url_for('installments.statement_pay', card_id=card.id, period=st.period) }}" class="ins-pay">
+      {{ ui.csrf() }}
+      <input type="hidden" name="next" value="{{ here }}">
+      <div class="form-row">
+        {{ ui.field("Ödeme tarihi", "paid_on", today_str(), type="date", required=True, attrs='max="' ~ today_str() ~ '"') }}
+        {{ ui.money_field("Ödenen tutar (₺)", "paid_amount", st.amount) }}
+      </div>
+      {% if monthly %}<p class="muted small">“Her taksit, ödendiği ay” seçili {{ monthly }} alışverişin bu ekstredeki taksiti ödeme gününe Harcamalar'a işlenir.</p>{% endif %}
+      <button class="btn primary">✅ Ödendi</button>
+    </form>
+  {% else %}
+    <p class="muted" style="margin: 0">Ödenecek bir şey yok.</p>
+  {% endif %}
+</div>
+{% endblock %}

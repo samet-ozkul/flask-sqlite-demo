@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "installments/_parts.html" import style, purchase_fields, plan_table with context %}
+{% block title %}{{ p.title }}{% endblock %}
+{% block head %}{{ style() }}{% endblock %}
+{% block content %}
+{% call ui.page_header("💳 " ~ p.title, card.name ~ " · " ~ count_text(p.count) ~ " · " ~ (p.total | money),
+                       back=url_for('installments.index')) %}
+  {{ ui.delete_button(url_for('installments.purchase_delete', purchase_id=p.id), "Sil",
+                      "Alışveriş silinsin mi? Harcamalar'a işlenen kayıtlar kalır. Çöp kutusundan geri getirebilirsin.") }}
+{% endcall %}
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Kalan</div>
+    <div class="value">{{ pr.remaining | money }}</div>
+    <div class="sub">{% if pr.done %}✓ Bitti{% else %}{{ pr.paid }}/{{ p.count }} taksit ödendi{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="label">{{ "Tutar" if p.count == 1 else "Aylık taksit" }}</div>
+    <div class="value">{{ pr.plan[0].amount | money if pr.plan else "—" }}</div>
+    <div class="sub">{{ p.purchased_on | date_tr(True) }}{% if p.merchant %} · {{ p.merchant }}{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Sıradaki</div>
+    <div class="value" style="font-size: 1.1rem">{{ pr.next.period_label if pr.next else "—" }}</div>
+    <div class="sub">{% if pr.next %}son ödeme {{ pr.next.due | date_tr }}{% else %}Tüm taksitler ödendi{% endif %}</div>
+  </div>
+</div>
+
+<div class="card c-{{ card.color }}">
+  <h2>Taksit planı</h2>
+  {% if p.count > 1 %}
+    <div class="ins-progress" style="margin: 0 0 10px"><div class="meter"><span style="width: {{ pr.percent }}%"></span></div></div>
+  {% endif %}
+  {{ plan_table(pr.plan, card, p.total) }}
+  <p class="muted small">
+    {{ category_icon(p.category) }} {{ p.category }} · Harcamalar: {{ expense_modes[p.expense_mode] | lower }}
+    {% if expense %} · <a href="{{ url_for('expenses.edit', expense_id=expense.id) }}">💸 harcamalarda</a>{% endif %}
+  </p>
+  {% if p.note %}<p class="muted" style="white-space: pre-line">{{ p.note }}</p>{% endif %}
+</div>
+
+{% if p.closed_early_on %}
+  <div class="card">
+    <h2>🔒 Erken kapandı</h2>
+    <p>{{ p.closed_early_on | date_tr(True) }} günü kapatıldı; kalan taksitler tek seferde o günün ekstresine eklendi.</p>
+    <form method="post" action="{{ url_for('installments.purchase_reopen', purchase_id=p.id) }}" data-confirm="Erken kapama geri alınsın mı?">
+      {{ ui.csrf() }}
+      <button class="btn sm">↩️ Erken kapamayı geri al</button>
+    </form>
+  </div>
+{% elif p.count > 1 and not pr.done %}
+  <div class="card">
+    <details class="add">
+      <summary>🔒 Erken kapat</summary>
+      <form method="post" action="{{ url_for('installments.purchase_close', purchase_id=p.id) }}" class="ins-pay"
+            data-confirm="Kalan taksitler kapatma gününün ekstresine tek seferde eklensin mi?">
+        {{ ui.csrf() }}
+        <p class="muted small">Kalan taksitlerin hepsi kapatma gününün ekstresine (bugün kapatırsan {{ close_target }}) tek seferde eklenir.</p>
+        <div class="row-flex">
+          {{ ui.field("Kapatma tarihi", "closed_on", today_str(), type="date", required=True,
+                      attrs='min="' ~ p.purchased_on ~ '" max="' ~ today_str() ~ '"') }}
+          <button class="btn">Erken kapat</button>
+        </div>
+      </form>
+    </details>
+  </div>
+{% endif %}
+
+<div class="card">
+  <details class="add">
+    <summary>✏️ Düzenle</summary>
+    <form method="post" action="{{ url_for('installments.purchase', purchase_id=p.id) }}" data-plan-url="{{ url_for('installments.plan_preview') }}">
+      {{ ui.csrf() }}
+      {{ purchase_fields(p, cards, first_auto) }}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </details>
+</div>
+<script src="{{ url_for('static', filename='installments.js') }}?v=1" defer></script>
+{% endblock %}

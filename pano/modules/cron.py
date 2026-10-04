@@ -286,6 +286,21 @@ def todo_reminders(secret):
             except telegram.TelegramError as e:
                 result["errors"].append(f"ödünç {loan['id']}: {e}")
 
+    # Taksitler: kredi kartı ekstresinin son ödemesinden X gün önce ve son gün, ödenmediyse (varsayılan saatten sonra,
+    # her son ödeme tarihi için birer kez)
+    from . import installments
+    result["installments_sent"] = 0
+    if now.strftime("%H:%M") >= todo.DEFAULT_DUE_TIME:
+        for kind, st, chat_id in installments.pending(now):
+            url = url_for("installments.statement_page", card_id=st["card"]["id"], period=st["period"], _external=True)
+            try:
+                telegram.send_message(chat_id, installments.message(kind, st, now.date(), url, telegram.escape),
+                                      buttons=installments.buttons(st) if with_buttons else None)
+                installments.mark_sent(st, kind)
+                result["installments_sent"] += 1
+            except telegram.TelegramError as e:
+                result["errors"].append(f"taksit {st['card']['id']} {st['period']}: {e}")
+
     # Biletler: bir gün önce akşam kısa "yarın"; etkinlik günü (saatliyse 3-4 saat önce) özet ve bilet dosyaları
     from . import tickets
     result["tickets_sent"] = 0

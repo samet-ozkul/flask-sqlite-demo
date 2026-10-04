@@ -38,6 +38,12 @@ def _ticket_detail(r):
     return " · ".join(x for x in (when, r["venue"], r["booking_code"]) if x)
 
 
+def _purchase_detail(r):
+    from .modules.installments import count_text
+    return " · ".join(x for x in (r["card_name"], r["merchant"], count_text(r["count"]), fmt_money(r["total"]),
+                                  fmt_date(r["purchased_on"])) if x)
+
+
 def _loan_detail(r):
     from .modules.loans import held_text
     return held_text(r)
@@ -107,6 +113,11 @@ def _sources(user_id):
          ("name", "note"), lambda r: r["name"] + (" ✓" if r["paid"] else ""),
          lambda r: fmt_date(r["due_date"]) + (" · " + fmt_money(r["amount"]) if r["amount"] else ""),
          lambda r: url_for("bills.edit", bill_id=r["id"])),
+        ("Taksitler", "💳",
+         "SELECT p.*, c.name AS card_name FROM card_purchases p JOIN credit_cards c ON c.id = p.card_id"
+         " WHERE p.user_id = ? ORDER BY p.purchased_on DESC, p.id DESC LIMIT ?", (user_id,),
+         ("title", "merchant", "note"), lambda r: r["title"], _purchase_detail,
+         lambda r: url_for("installments.purchase", purchase_id=r["id"])),
         ("Abonelikler", "🔁", "SELECT * FROM subscriptions WHERE user_id = ? LIMIT ?", (user_id,),
          ("name", "category", "note"), lambda r: r["name"], lambda r: fmt_money(r["amount"], r["currency"]),
          lambda r: url_for("subscriptions.edit", sub_id=r["id"])),

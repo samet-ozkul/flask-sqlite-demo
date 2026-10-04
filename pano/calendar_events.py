@@ -1,8 +1,8 @@
 """Tüm tarihli kayıtlar tek listede: takvim sayfası ve telefon takvimi aboneliği (ICS) kullanır.
 
-Kaynaklar: faturalar, abonelik yenilemeleri, borç/alacak vadeleri, araç tarihleri, garanti bitişleri,
-randevular, yapılacaklar (açık), kanban kartları (bitti sütunu hariç), ev bakımı (sıradaki tarih), biletler,
-önemli günler, kişilerin doğum günleri, ödünçteki eşyaların beklenen dönüşü.
+Kaynaklar: faturalar, kredi kartı ekstrelerinin son ödeme günü, abonelik yenilemeleri, borç/alacak vadeleri, araç
+tarihleri, garanti bitişleri, randevular, yapılacaklar (açık), kanban kartları (bitti sütunu hariç), ev bakımı (sıradaki
+tarih), biletler, önemli günler, kişilerin doğum günleri, ödünçteki eşyaların beklenen dönüşü.
 Abonelik, önemli günler ve doğum günleri aralık içinde çoğaltılır.
 """
 from datetime import date, timedelta
@@ -37,6 +37,13 @@ def events_between(user_id, start, end, external=False):
     for r in query("SELECT * FROM bills WHERE user_id = ? AND due_date BETWEEN ? AND ?", (user_id, s, e)):
         add("bill", r["id"], r["due_date"], f"{r['name']} son gün", "🧾", "bills.edit",
             detail=fmt_money(r["amount"]) if r["amount"] else "", done=bool(r["paid"]), bill_id=r["id"])
+
+    # Taksitler: kredi kartı ekstrelerinin son ödeme günü (ödendiyse tamamlandı)
+    from .modules.installments import due_events
+    for st in due_events(user_id, start, end):
+        add("card-due", f"{st['card']['id']}-{st['period']}", st["due"], f"{st['card']['name']} ekstresi son ödeme", "💳",
+            "installments.statement_page", detail=f"{st['label']} · {fmt_money(st['amount'])}", done=st["paid"],
+            card_id=st["card"]["id"], period=st["period"])
 
     # Abonelikler: next_date'ten ileri ve geri döngüyle aralığa düşen yenilemeler
     for r in query("SELECT * FROM subscriptions WHERE user_id = ? AND active = 1", (user_id,)):
