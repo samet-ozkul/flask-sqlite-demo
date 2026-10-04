@@ -1070,7 +1070,7 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_tickets_user ON tickets(user_id, starts_on);
     """,
-    # 38: davetiye (/d/<kod>, girişsiz LCV). Tarih ve saatler yerel, saat dilimsiz. Kapak fotoğrafı veritabanında
+    # 37: davetiye (/d/<kod>, girişsiz LCV). Tarih ve saatler yerel, saat dilimsiz. Kapak fotoğrafı veritabanında
     #     (profil gibi; çöp kutusunda base64). FK'lar çöpten geri getirme sırasına uyar: davetiye -> davetliler ->
     #     yanıtlar (guest_id) -> takvim etkinliği (event_id'de FK yok). rev: her yeni/değişen yanıtta artan sayaç
     #     (toplu Telegram bildirimi notified_rev'den sonrakileri yazar)
