@@ -14,6 +14,7 @@ MODULES = [
     ("vault", "vault.index", "Şifreli Kasa", "🔐", "Listeler ve notlar"),
     ("expenses", "expenses.index", "Harcamalar", "💸", "Para"),
     ("bills", "bills.index", "Faturalar", "🧾", "Para"),
+    ("installments", "installments.index", "Taksitler", "💳", "Para"),
     ("subscriptions", "subscriptions.index", "Abonelikler", "🔁", "Para"),
     ("debts", "debts.index", "Borç / Alacak", "🤝", "Para"),
     ("rates", "rates.index", "Kurlar", "💱", "Para"),

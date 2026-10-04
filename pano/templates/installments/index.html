@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% from "installments/_parts.html" import style, card_fields, purchase_row, state_badge with context %}
+{% block title %}Taksitler{% endblock %}
+{% block head %}{{ style() }}{% endblock %}
+{% block content %}
+{% call ui.page_header("💳 Taksitler", summary or "Kredi kartı ekstre günleri ve taksitli alışverişler: hangi ay ne kadar ödenecek?") %}
+  {% if overview %}<a class="btn primary" href="{{ url_for('installments.purchase_new') }}">＋ Alışveriş</a>{% endif %}
+{% endcall %}
+
+{% if book.cards %}
+  <div class="stats">
+    <div class="stat">
+      <div class="label">Kalan borç</div>
+      <div class="value">{{ total_left | money }}</div>
+      <div class="sub">{{ ongoing | length }} devam eden alışveriş</div>
+    </div>
+    <div class="stat">
+      <div class="label">{{ chart[0].label }} ödenecek</div>
+      <div class="value">{{ chart[0].total | money }}</div>
+      <div class="sub">Son ödemesi bu ay olan ekstreler</div>
+    </div>
+    <div class="stat">
+      <div class="label">Geciken ekstre</div>
+      <div class="value {{ 'danger-text' if late_count }}">{{ late_count }}</div>
+      <div class="sub">{{ "Ödendi olarak işaretlenmemiş" if late_count else "Geciken yok" }}</div>
+    </div>
+  </div>
+{% endif %}
+
+{% if overview %}
+  <div class="cc-cards">
+    {% for o in overview %}
+      {% set c, st = o.card, o.next %}
+      <div class="card cc-card c-{{ c.color }}" id="kart-{{ c.id }}">
+        <div class="cc-head">
+          <a class="cc-name" href="{{ url_for('installments.card_page', card_id=c.id) }}">{{ c.name }}</a>
+          <span class="muted small">kesim ayın {{ c.statement_day }}. günü</span>
+        </div>
+        <div>
+          <div class="muted small">Sıradaki: {{ st.label }} ekstresi</div>
+          <div class="cc-amount">{{ st.amount | money }}</div>
+          <div class="cc-meta">
+            <span>Kesim {{ st.cut | date_tr }}</span>
+            <span>Son ödeme {{ st.due | date_tr(True) }}</span>
+            {% if st.state == 'due' %}{{ ui.due_badge(st.due, c.remind_days) }} <span>ödenmedi</span>{% else %}{{ state_badge(st.state) }}{% endif %}
+          </div>
+        </div>
+        {% for l in o.late %}
+          <div class="cc-late">⚠️ <a href="{{ url_for('installments.statement_page', card_id=c.id, period=l.period) }}">{{ l.label }} ekstresi</a>
+            ödenmedi: {{ l.amount | money }} (son ödeme {{ l.due | date_tr }})</div>
+        {% endfor %}
+        {% if o.percent is not none %}
+          <div>
+            <div class="cc-meta"><span>Limit doluluğu %{{ o.percent }}</span><span>{{ o.debt | money }} / {{ c.limit_amount | money }}</span></div>
+            <div class="meter {{ 'full' if o.percent >= 100 else ('warn' if o.percent >= 80 else '') }}" role="progressbar"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ [o.percent, 100] | min }}"><span style="width: {{ [o.percent, 100] | min }}%"></span></div>
+          </div>
+        {% elif o.debt %}
+          <div class="cc-meta"><span>Kalan borç {{ o.debt | money }}</span></div>
+        {% endif %}
+        <div class="cc-actions">
+          <a class="btn sm" href="{{ url_for('installments.statement_page', card_id=c.id, period=st.period) }}">📄 Ekstre</a>
+          <a class="btn sm" href="{{ url_for('installments.purchase_new', kart=c.id) }}">＋ Alışveriş</a>
+          <a class="btn sm" href="{{ url_for('installments.card_page', card_id=c.id) }}">Kart →</a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<div class="card">
+  <details class="add" {% if not book.cards %}open{% endif %}>
+    <summary>＋ Kart ekle</summary>
+    <form method="post" action="{{ url_for('installments.card_create') }}">
+      {{ ui.csrf() }}
+      {{ card_fields(card_form) }}
+      <button class="btn primary">Ekle</button>
+    </form>
+  </details>
+</div>
+
+{% if not book.cards %}
+  {{ ui.empty("Henüz kart yok. Önce kartını ekle: bir ad, hesap kesim günü ve son ödeme günü yeter. Sonra taksitli alışverişlerini gir; hangi ay ne kadar ödeyeceğini ve kalan borcunu görelim.", "💳") }}
+{% else %}
+  <div class="card">
+    <h2>📊 Önümüzdeki 12 ay taksit yükü</h2>
+    {% if chart_max %}
+      <div class="bars">
+        {% for m in chart %}
+          <div class="bar-row">
+            <span class="bar-label">{{ m.short }}</span>
+            <span class="bar-track ins-stack">
+              {% for c, v in m.parts %}<span class="seg c-{{ c.color }}" style="width: {{ (v * 100 / chart_max) | round(2) }}%" title="{{ c.name }}: {{ v | money }}"></span>{% endfor %}
+            </span>
+            <span class="bar-value">{{ m.total | money if m.total else "—" }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      {% if legend | length > 1 %}
+        <div class="ins-legend">{% for c in legend %}<span class="c-{{ c.color }}"><span class="cc-dot"></span>{{ c.name }}</span>{% endfor %}</div>
+      {% endif %}
+      <p class="muted small">Son ödeme gününün ayına göre; ödenmiş ekstreler sayılmaz.</p>
+    {% else %}
+      {{ ui.empty("Önümüzdeki 12 ayda ödenecek taksit yok.", "🎉") }}
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>🛍️ Devam eden alışverişler <span class="pill-count">{{ ongoing | length }}</span></h2>
+    {% if ongoing %}
+      <ul class="rows">
+        {% for p in ongoing %}{{ purchase_row(p, book.cards[p.card_id], progresses[p.id]) }}{% endfor %}
+      </ul>
+    {% elif overview %}
+      {{ ui.empty("Devam eden taksitli alışveriş yok. Kartla bir şey aldıysan “＋ Alışveriş” ile ekle.", "🛍️") }}
+    {% else %}
+      {{ ui.empty("Devam eden taksitli alışveriş yok.", "🛍️") }}
+    {% endif %}
+  </div>
+
+  {% if finished %}
+    <div class="card">
+      <details class="passive">
+        <summary>✅ Biten alışverişler <span class="pill-count">{{ finished | length }}</span></summary>
+        <ul class="rows">
+          {% for p in finished %}{{ purchase_row(p, book.cards[p.card_id], progresses[p.id]) }}{% endfor %}
+        </ul>
+      </details>
+    </div>
+  {% endif %}
+
+  {% if inactive %}
+    <div class="card">
+      <details class="passive">
+        <summary>⏸️ Kullanılmayan kartlar <span class="pill-count">{{ inactive | length }}</span></summary>
+        <ul class="rows">
+          {% for c in inactive %}
+            <li class="c-{{ c.color }}">
+              <span class="ico"><span class="cc-dot"></span></span>
+              <a class="grow" href="{{ url_for('installments.card_page', card_id=c.id) }}">
+                <div class="title">{{ c.name }}</div>
+                <div class="meta"><span>Hatırlatma gelmez</span></div>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </details>
+    </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

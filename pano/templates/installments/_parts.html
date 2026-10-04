@@ -1,0 +1,196 @@
+{% import "_macros.html" as ui %}
+
+{# Sayfa stili ve kart renkleri: açık temada koyu, koyu temada açık tonlar (kanban/_colors.html kalıbı) #}
+{% macro style() -%}
+<style>
+  :root {
+    --ic-blue: #2563eb; --ic-green: #16a34a; --ic-purple: #9333ea; --ic-orange: #ea580c;
+    --ic-red: #dc2626; --ic-yellow: #ca8a04; --ic-brown: #92400e; --ic-black: #374151;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ic-blue: #60a5fa; --ic-green: #4ade80; --ic-purple: #c084fc; --ic-orange: #fb923c;
+      --ic-red: #f87171; --ic-yellow: #facc15; --ic-brown: #d6a477; --ic-black: #cbd5e1;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ic-blue: #60a5fa; --ic-green: #4ade80; --ic-purple: #c084fc; --ic-orange: #fb923c;
+    --ic-red: #f87171; --ic-yellow: #facc15; --ic-brown: #d6a477; --ic-black: #cbd5e1;
+  }
+  .c-blue { --k: var(--ic-blue); } .c-green { --k: var(--ic-green); } .c-purple { --k: var(--ic-purple); }
+  .c-orange { --k: var(--ic-orange); } .c-red { --k: var(--ic-red); } .c-yellow { --k: var(--ic-yellow); }
+  .c-brown { --k: var(--ic-brown); } .c-black { --k: var(--ic-black); }
+  .cc-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--k, var(--primary));
+            flex-shrink: 0; vertical-align: baseline; }
+  .rows .ico .cc-dot { width: 14px; height: 14px; }
+  .cc-cards { display: grid; gap: 12px; grid-template-columns: 1fr; margin-bottom: 14px; }
+  @media (min-width: 640px) { .cc-cards { grid-template-columns: repeat(2, 1fr); } }
+  .cc-card { margin: 0; border-top: 4px solid var(--k, var(--primary)); display: flex; flex-direction: column; gap: 8px; }
+  .cc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .cc-name { font-weight: 600; font-size: 1.08rem; color: var(--text); overflow-wrap: anywhere; }
+  .cc-amount { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .cc-meta { font-size: .85rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: center; }
+  .cc-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+  .cc-late { font-size: .85rem; color: var(--danger); }
+  .ins-stack { display: flex; }
+  .ins-stack .seg { display: block; height: 100%; background: var(--k, var(--primary)); min-width: 2px; }
+  .ins-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .85rem; color: var(--muted); margin-top: 10px; }
+  .ins-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .ins-progress { margin-top: 6px; }
+  .ins-progress .meter { height: 8px; }
+  .ins-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; text-align: right; }
+  .ins-plan td, .ins-plan th { padding: 7px 4px; }
+  .ins-plan td small { display: block; color: var(--muted); font-size: .78rem; }
+  .ins-plan tfoot td { font-weight: 600; border-bottom: 0; }
+  .ins-plan .badge { white-space: nowrap; }
+  .ins-note { font-size: .82rem; color: var(--muted); margin: 0 0 12px; }
+  .ins-preview { margin: 4px 0 14px; }
+  .ins-preview:empty { display: none; }
+  details.passive > summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+  details.passive[open] > summary { margin-bottom: 6px; }
+  .ins-pay input[type=date] { width: auto; flex: 0 1 11em; min-width: 0; }
+  .ins-pay .field { margin: 0; }
+</style>
+{%- endmacro %}
+
+{# Durum rozeti: STATES[durum] = (metin, badge sınıfı) #}
+{% macro state_badge(state) -%}
+  {% set text, cls = states[state] %}<span class="badge {{ cls }}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro privacy() -%}
+  <p class="ins-note">🔒 Kart numarası, son 4 hane, CVV ya da son kullanma tarihi istenmez ve saklanmaz; kartı verdiğin adla tanırız.</p>
+{%- endmacro %}
+
+{# Kart ekleme / düzenleme alanları. c: credit_cards satırı ya da aynı anahtarlı sözlük #}
+{% macro card_fields(c) -%}
+  {{ privacy() }}
+  <div class="form-row three">
+    {{ ui.field("Kart adı", "name", c.name, required=True, placeholder="ör. Bonus, Maximum, Maaş kartı",
+                attrs='maxlength="40" autocomplete="off"') }}
+    <label class="field"><span>Renk</span>
+      <select name="color">
+        {% for key, (label, icon) in colors.items() %}
+          <option value="{{ key }}" {% if key == c.color %}selected{% endif %}>{{ icon }} {{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {{ ui.money_field("Limit (₺)", "limit_amount", c.limit_amount, placeholder="İsteğe bağlı") }}
+  </div>
+  <div class="form-row three">
+    {{ ui.field("Hesap kesim günü", "statement_day", c.statement_day, type="number", required=True,
+                attrs='min="1" max="31" inputmode="numeric"', hint="Ayda o gün yoksa ayın son günü") }}
+    {{ ui.field("Son ödeme: kesimden kaç gün sonra", "due_days", c.due_days, type="number", required=True,
+                attrs='min="1" max="' ~ max_due_days ~ '" inputmode="numeric"', hint="Çoğu kartta 10") }}
+    <label class="field"><span>Telegram hatırlatması</span>
+      <select name="remind_days">
+        {% for v, label in remind_options %}
+          <option value="{{ v }}" {% if v == c.remind_days %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <small class="muted">Ödenmemişse; ayrıca son ödeme günü</small>
+    </label>
+  </div>
+{%- endmacro %}
+
+{# Alışveriş alanları. p: card_purchases satırı ya da aynı anahtarlı sözlük. İlk ekstre installments.js ile
+   kendiliğinden dolar; JS yoksa boş bırakılırsa ya da önerilenle (first_auto) aynıysa sunucuda hesaplanır. #}
+{% macro purchase_fields(p, cards, first_auto) -%}
+  <div class="form-row three">
+    <label class="field"><span>Kart <b class="req">*</b></span>
+      <select name="card_id" required>
+        {% for c in cards %}
+          <option value="{{ c.id }}" {% if c.id == p.card_id %}selected{% endif %}>{{ color_icon(c.color) }} {{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {{ ui.field("Açıklama", "title", p.title, required=True, placeholder="ör. Buzdolabı", attrs='maxlength="100"') }}
+    {{ ui.field("Mağaza", "merchant", p.merchant, placeholder="ör. Teknosa", attrs='maxlength="100" list="ins-merchants" autocomplete="off"') }}
+  </div>
+  <datalist id="ins-merchants">{% for m in merchants %}<option value="{{ m }}">{% endfor %}</datalist>
+  <div class="form-row three">
+    {{ ui.money_field("Toplam tutar (₺)", "total", p.total, required=True) }}
+    <label class="field"><span>Taksit sayısı</span>
+      <select name="count">
+        {% for n in count_options %}
+          <option value="{{ n }}" {% if n == p.count %}selected{% endif %}>{{ count_text(n) }}</option>
+        {% endfor %}
+        <option value="0" {% if p.count not in count_options %}selected{% endif %}>Diğer…</option>
+      </select>
+    </label>
+    <div data-show-for="count=0">
+      {{ ui.field("Kaç taksit?", "count_other", p.count if p.count not in count_options else "", type="number",
+                  attrs='min="1" max="' ~ max_count ~ '" inputmode="numeric"', hint="1-" ~ max_count) }}
+    </div>
+  </div>
+  <div class="form-row three">
+    {{ ui.field("Alış tarihi", "purchased_on", p.purchased_on, type="date", required=True, attrs='max="' ~ today_str() ~ '"') }}
+    {{ ui.field("İlk taksitin düşeceği ekstre", "first_statement", p.first_statement, type="month",
+                placeholder="YYYY-AA", hint="Kesim günü dahil o ayın ekstresi; ertelemeli kampanyada değiştir") }}
+    <input type="hidden" name="first_auto" value="{{ first_auto }}">
+    <label class="field"><span>Kategori</span>
+      <select name="category">
+        {% for c in expense_categories %}
+          <option value="{{ c }}" {% if c == p.category %}selected{% endif %}>{{ category_icon(c) }} {{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <label class="field"><span>Harcamalar'a işleme</span>
+    <select name="expense_mode">
+      {% for k, label in expense_modes.items() %}
+        <option value="{{ k }}" {% if k == p.expense_mode %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <small class="muted">Tamamı: alış gününe toplam tutar · Her taksit: ekstre “Ödendi” denince o ayın taksiti, ödeme gününe</small>
+  </label>
+  {{ ui.textarea("Not", "note", p.note, rows=2, placeholder="ör. Kampanya: 3 ay ertelemeli, faizsiz") }}
+  <div id="plan-preview" class="ins-preview" aria-live="polite"></div>
+  <p class="ins-note">🔒 Kart bilgisi istenmez; alışveriş verdiğin kart adıyla tutulur.</p>
+{%- endmacro %}
+
+{# Taksit planı: taksit, ekstre (son ödeme), tutar, durum #}
+{% macro plan_table(plan, card, total=None) -%}
+  <div class="table-wrap">
+    <table class="ins-plan">
+      <thead><tr><th>Taksit</th><th>Ekstre</th><th class="num">Tutar</th><th>Durum</th></tr></thead>
+      <tbody>
+        {% for r in plan %}
+          <tr>
+            <td>{{ r.label }}</td>
+            <td><a href="{{ url_for('installments.statement_page', card_id=card.id, period=r.period) }}">{{ r.period_label }}</a>
+              <small>son ödeme {{ r.due | date_tr }}</small></td>
+            <td class="num">{{ r.amount | money }}</td>
+            <td>{{ state_badge(r.state) }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      {% if total is not none %}<tfoot><tr><td colspan="2">Toplam</td><td class="num">{{ total | money }}</td><td></td></tr></tfoot>{% endif %}
+    </table>
+  </div>
+{%- endmacro %}
+
+{# Alışveriş satırı: "Buzdolabı · 12 taksit · 5/12 ödendi · kalan 4.200 ₺" ve ilerleme çubuğu #}
+{% macro purchase_row(p, card, pr) -%}
+  <li class="c-{{ card.color }}">
+    <span class="ico"><span class="cc-dot"></span></span>
+    <a class="grow" href="{{ url_for('installments.purchase', purchase_id=p.id) }}">
+      <div class="title">{{ p.title }}</div>
+      <div class="meta">
+        <span>{{ card.name }}</span>
+        <span>{{ count_text(p.count) }}</span>
+        {% if p.count > 1 %}<span>{{ pr.paid }}/{{ p.count }} ödendi</span>{% endif %}
+        {% if pr.done %}<span>✓ bitti</span>{% else %}<span>kalan {{ pr.remaining | money }}</span>{% endif %}
+        {% if p.closed_early_on %}<span>🔒 erken kapandı</span>{% endif %}
+      </div>
+      {% if p.count > 1 %}
+        <div class="ins-progress"><div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="{{ p.count }}"
+             aria-valuenow="{{ pr.paid }}"><span style="width: {{ pr.percent }}%"></span></div></div>
+      {% endif %}
+    </a>
+    <div class="ins-side">
+      <span class="amount">{{ p.total | money }}</span>
+      {% if pr.next %}<span class="muted small">sıradaki {{ pr.next.period_label }}</span>{% endif %}
+    </div>
+  </li>
+{%- endmacro %}

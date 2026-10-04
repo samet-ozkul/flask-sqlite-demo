@@ -13,6 +13,7 @@ Mesajı gönderen, bu sohbete bağlı pano kullanıcısıdır.
   /hafta                     -> bu haftanın sayıları ve öncelikleri
   /kisalt url [kod]          -> kısa link (/k/kod)
   /odunc matkap Ahmet        -> ödünç (son kelime kişi); /odunc -> kimde ne var
+  /taksit                    -> önümüzdeki 3 ayın taksit yükü ve sıradaki kredi kartı ekstreleri
   link                      -> Sonra Bak'a kaydedilir
   fotoğraf / PDF             -> garantiye, nota ya da bilet cüzdanına eklenir (sorulur)
   konum                      -> park yeri ya da Harita'ya yer olarak kaydedilir (sorulur)
@@ -51,6 +52,7 @@ COMMANDS = [
     ("hafta", "Bu haftanın sayıları ve öncelikleri"),
     ("ara", "Her yerde ara: /ara matkap"),
     ("odunc", "Ödünç: /odunc matkap Ahmet · kimde ne var: /odunc"),
+    ("taksit", "Taksit yükü ve sıradaki kredi kartı ekstreleri"),
     ("sor","Verilerine soru sor: /sor bu ay ne kadar harcadım"),
     ("yardim", "Komutlar"),
 ]
@@ -78,6 +80,7 @@ HELP = """<b>Kişisel Pano komutları</b>
 🗓️ <code>/hafta</code> — bu haftanın sayıları ve öncelikleri (pazar değerlendirmesi panoda: Haftalık Değerlendirme)
 🔍 <code>/ara matkap</code> — notlar, envanter, garantiler... her yerde ara
 🔁 <code>/odunc matkap Ahmet</code> — Ahmet'e matkap verildi (son kelime kişi) · <code>/odunc</code> — kimde ne var
+💳 <code>/taksit</code> — önümüzdeki 3 ayın taksit yükü ve sıradaki kredi kartı ekstreleri
 🤖 <code>/sor bu ay markete ne kadar harcadım?</code> — verilerine soru sor (yapay zekâ açıksa)
 
 🔖 Link gönder → Sonra Bak'a kaydedilir
@@ -185,6 +188,7 @@ def handle_message(msg):
             "hafta": cmd_week,
             "ara": cmd_search,
             "odunc": cmd_loan,
+            "taksit": cmd_installments,
             "sor": cmd_ask,
         }.get(command, cmd_help)
         handler(user, chat_id, rest.strip())
@@ -204,7 +208,7 @@ def handle_callback(cq, chat_id, message_id):
     handlers = {"exu": cb_undo_expense, "li": cb_list_item, "lv": cb_list_view, "ph": cb_attachment, "tx": cb_text,
                 "rc": cb_receipt, "ai": cb_ai, "jm": cb_journal_mood, "ct": cb_contact, "ctz": cb_contact,
                 "tt": cb_timer, "loc": cb_location, "scn": cb_scan, "hm": cb_home, "wk": cb_weekly_score,
-                "bk": cb_booking, "ln": cb_loan, "tk": cb_ticket}
+                "bk": cb_booking, "ln": cb_loan, "tk": cb_ticket, "ins": cb_installment}
     if prefix not in handlers:
         return False
     user = user_for_chat(chat_id)
@@ -487,6 +491,45 @@ def cb_loan(user, chat_id, message_id, callback_id, data):
     url = link("loans.edit", loan_id=loan["id"])
     try:
         telegram.edit_message(chat_id, message_id, f'{text}\n<a href="{esc(url)}">Ödünç →</a>')
+    except telegram.TelegramError:
+        pass
+
+
+# ---------- Taksitler ----------
+def cmd_installments(user, chat_id, rest):
+    """'/taksit': önümüzdeki 3 ayın taksit yükü ve sıradaki ekstreler."""
+    from .modules import installments as ins
+    telegram.send_message(chat_id, ins.bot_message(
+        user["id"], today(), link("installments.index"),
+        lambda card_id, period: link("installments.statement_page", card_id=card_id, period=period), esc))
+
+
+def cb_installment(user, chat_id, message_id, callback_id, data):
+    """Ekstre hatırlatması: ins:pay:<kart>:<YYYY-MM> -> ekstre bugün, toplam tutarla ödendi (sadece kartın sahibi)."""
+    from .modules import installments as ins
+    _prefix, action, raw_id, period = (data.split(":") + ["", "", ""])[:4]
+    card = query_one("SELECT * FROM credit_cards WHERE id = ? AND user_id = ?",
+                     (int(raw_id) if raw_id.isdigit() and len(raw_id) < 15 else 0, user["id"]))
+    if card is None or action != "pay" or not ins.parse_period(period):
+        telegram.answer_callback(callback_id, "Ekstre bulunamadı, kart silinmiş olabilir.")
+        return
+    st = ins.statement(ins.load(user["id"]), card, period)
+    url = link("installments.statement_page", card_id=card["id"], period=period)
+    if st["paid"]:  # çift dokunuş ya da panoda zaten işaretlenmiş
+        telegram.answer_callback(callback_id, "Bu ekstre zaten ödenmiş.")
+        paid = st["row"]["paid_on"] if st["row"] and st["row"]["paid_on"] else None
+        text = (f"✅ <b>{esc(card['name'])}</b> · {st['label']} ekstresi"
+                + (f" {fmt_date(paid, True)} günü ödendi." if paid else " ödenmiş sayılıyor.")
+                + f'\n<a href="{esc(url)}">Ekstre →</a>')
+    elif not st["amount"]:
+        telegram.answer_callback(callback_id, "Bu ekstrede taksit yok.")
+        return
+    else:
+        added = ins.pay(st, today_str())
+        telegram.answer_callback(callback_id, "✅ Ödendi")
+        text = ins.paid_message(st, added, url, esc)
+    try:
+        telegram.edit_message(chat_id, message_id, text)
     except telegram.TelegramError:
         pass
 

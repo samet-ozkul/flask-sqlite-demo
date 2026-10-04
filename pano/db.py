@@ -1070,6 +1070,56 @@ MIGRATIONS = [
     );
     CREATE INDEX idx_tickets_user ON tickets(user_id, starts_on);
     """,
+    # 37: taksitler — kredi kartları (sadece kullanıcının verdiği ad; kart numarası, son 4 hane, CVV, son kullanma
+    #     tarihi saklanmaz), taksitli alışverişler ve ekstre kayıtları. Taksitler satır satır tutulmaz, alışverişten
+    #     hesaplanır. expense_id / expense_ids için FK yok (home_task_logs.expense_id gibi: çöpten geri getirme bozulmasın)
+    """
+    CREATE TABLE credit_cards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,                        -- "Bonus", "Maaş kartı"
+        color TEXT NOT NULL DEFAULT '',            -- hazır renk anahtarı (installments.COLORS)
+        statement_day INTEGER NOT NULL CHECK (statement_day BETWEEN 1 AND 31),  -- hesap kesim günü
+        due_days INTEGER NOT NULL DEFAULT 10,      -- son ödeme, kesimden kaç gün sonra
+        limit_amount REAL,                         -- isteğe bağlı (doluluk oranı için)
+        remind_days INTEGER NOT NULL DEFAULT 3,    -- son ödemeden kaç gün önce Telegram (0 = sadece son gün)
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_credit_cards_user ON credit_cards(user_id, active);
+    CREATE TABLE card_purchases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        card_id INTEGER NOT NULL REFERENCES credit_cards(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        merchant TEXT NOT NULL DEFAULT '',
+        category TEXT NOT NULL DEFAULT 'Diğer',    -- Harcamalar kategorisi
+        purchased_on TEXT NOT NULL,                -- 'YYYY-MM-DD'
+        total REAL NOT NULL,
+        count INTEGER NOT NULL DEFAULT 1 CHECK (count BETWEEN 1 AND 36),  -- 1 = tek çekim
+        first_statement TEXT NOT NULL,             -- 'YYYY-MM', ilk taksitin düştüğü ekstre
+        expense_mode TEXT NOT NULL DEFAULT 'full' CHECK (expense_mode IN ('full', 'monthly', 'none')),
+        expense_id INTEGER,                        -- 'full': alış günü eklenen harcama
+        note TEXT NOT NULL DEFAULT '',
+        closed_early_on TEXT,                      -- erken kapama günü: kalan taksitler o günün ekstresinde
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX idx_card_purchases_user ON card_purchases(user_id, card_id);
+    CREATE INDEX idx_card_purchases_card ON card_purchases(card_id);
+    CREATE TABLE card_statements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        card_id INTEGER NOT NULL REFERENCES credit_cards(id) ON DELETE CASCADE,
+        period TEXT NOT NULL,                      -- 'YYYY-MM', kesim ayı
+        paid_on TEXT,                              -- NULL = ödenmedi
+        paid_amount REAL,
+        expense_ids TEXT NOT NULL DEFAULT '',      -- ödenince Harcamalar'a eklenen taksitler ('monthly'; geri alınca silinir)
+        reminded_for TEXT,                         -- son Telegram hatırlatması 'tür:son ödeme' (ör. 'pre:2026-10-15')
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (card_id, period)
+    );
+    CREATE INDEX idx_card_statements_user ON card_statements(user_id);
+    """,
 ]
 
 SCHEMA_VERSION = len(MIGRATIONS)

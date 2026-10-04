@@ -50,6 +50,12 @@ def upcoming(user_id, days=7, long_days=30):
     for r in query("SELECT * FROM bills WHERE user_id = ? AND paid = 0 AND due_date <= ?", (user_id, soon)):
         add("🧾", r["name"], r["due_date"], "bills.index", detail=_money(r["amount"], "TRY"))
 
+    # Taksitler: ödenmemiş kredi kartı ekstrelerinin son ödeme günü (gecikenler 30 gün görünür)
+    from .modules.installments import upcoming_statements
+    for st in upcoming_statements(user_id, t, t + timedelta(days=days)):
+        add("💳", f"{st['card']['name']} ekstresi son ödeme", st["due"].isoformat(), "installments.statement_page",
+            detail=f"{st['label']} · {fmt_money(st['amount'])}", card_id=st["card"]["id"], period=st["period"])
+
     for r in query("SELECT * FROM subscriptions WHERE user_id = ? AND active = 1 AND next_date <= ?",
                    (user_id, soon)):
         add("🔁", f"{r['name']} yenileniyor", r["next_date"], "subscriptions.index",
